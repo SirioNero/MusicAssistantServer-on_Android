@@ -23,6 +23,7 @@ import androidx.core.content.ContextCompat
 import androidx.media3.common.C
 import androidx.media3.common.HeartRating
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.common.Rating
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.DefaultMediaNotificationProvider
@@ -141,6 +142,9 @@ class PlaybackService : MediaLibraryService() {
             }
         }
         scope.launch { engine.outputting.collect(::onOutputting) }
+        player.addListener(object : Player.Listener {
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) = updateLocks()
+        })
         connectivity.registerDefaultNetworkCallback(networkCallback)
         getSystemService(AudioManager::class.java).registerAudioDeviceCallback(outputs, main)
     }
@@ -222,17 +226,34 @@ class PlaybackService : MediaLibraryService() {
         }
     }
 
+    /** L'audio esce adesso dal telefono. */
+    private var outputting = false
+
+    /**
+     * Sveglio (processore e Wi-Fi) mentre esce l'audio, e per al massimo [PREPARE_LOCK_MS] (solo il processore) anche
+     * quando Music Assistant sta per suonare ma l'audio non esce ancora: col server sul telefono, in auto a schermo
+     * spento, la preparazione del brano (Soloist: circa 7 s) o la riconnessione dopo un calo di rete si fermerebbero.
+     */
+    private fun updateLocks() {
+        when {
+            outputting -> acquireLocks()
+            player.playWhenReady -> acquireCpu(PREPARE_LOCK_MS)
+            else -> releaseLocks()
+        }
+    }
+
     private fun onOutputting(on: Boolean) {
+        outputting = on
         if (on) {
             main.removeCallbacks(abandonFocus)
-            acquireLocks()
+            updateLocks()
             setNoisyReceiver(true)
             if (!focus.request()) {
                 Log.i(TAG, "Un'altra app ha l'audio (telefonata?): metto in pausa")
                 player.pauseFromSystem()
             }
         } else {
-            releaseLocks()
+            updateLocks()
             setNoisyReceiver(false)
             // Ferma per un po': si lascia l'audio alle altre app, ma non durante una telefonata.
             if (!resumeAfterInterruption) main.postDelayed(abandonFocus, FOCUS_GRACE_MS)
@@ -295,12 +316,16 @@ class PlaybackService : MediaLibraryService() {
 
     /** A schermo spento il telefono non deve addormentarsi né spegnere il Wi-Fi mentre suona. */
     @Suppress("DEPRECATION")
-    private fun acquireLocks() {
+    private fun acquireCpu(timeoutMs: Long) {
         val wake = wakeLock ?: getSystemService(PowerManager::class.java)
             .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Xonos:audio")
             .apply { setReferenceCounted(false) }
             .also { wakeLock = it }
-        wake.acquire(LOCK_TIMEOUT_MS)
+        wake.acquire(timeoutMs)
+    }
+
+    private fun acquireLocks() {
+        acquireCpu(LOCK_TIMEOUT_MS)
         val wifi = wifiLock ?: applicationContext.getSystemService(WifiManager::class.java)
             ?.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "Xonos:audio")
             ?.apply { setReferenceCounted(false) }
@@ -480,6 +505,7 @@ class PlaybackService : MediaLibraryService() {
         const val RATE = 48_000
         const val FOCUS_GRACE_MS = 30_000L
         const val LOCK_TIMEOUT_MS = 6 * 60 * 60 * 1000L
+        const val PREPARE_LOCK_MS = 2 * 60 * 1000L
         const val QUEUE_WAIT_MS = 10_000L
         const val QUEUE_POLL_MS = 200L
 

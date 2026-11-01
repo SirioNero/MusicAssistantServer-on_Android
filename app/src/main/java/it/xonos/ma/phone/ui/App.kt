@@ -96,6 +96,8 @@ fun XonosScreen(model: PhoneModel, player: PlayerLink, host: Host) {
         LaunchedEffect(phonePlaying) { model.phonePlaying(phonePlaying) }
         // Finché non c'è un indirizzo e il token, si comincia dalle impostazioni.
         var configured by remember { mutableStateOf(model.configured) }
+        // Configurato senza passare da "Vai alla tua musica" (il telefono ha ruotato a metà): il benvenuto è finito.
+        LaunchedEffect(configured) { if (configured) model.welcomeDone() }
         // Anche il lettore e il benvenuto, che stanno fuori dallo Scaffold, scrivono con i colori del tema.
         Surface(Modifier.fillMaxSize().automationIds(), color = MaterialTheme.colorScheme.background, contentColor = MaterialTheme.colorScheme.onBackground) {
             if (!configured) {

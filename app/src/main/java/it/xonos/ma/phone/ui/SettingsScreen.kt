@@ -69,8 +69,13 @@ import kotlinx.coroutines.delay
 /** Il primo avvio: le impostazioni da sole, finché Xonos non sa a quale Music Assistant collegarsi. */
 @Composable
 internal fun Onboarding(model: PhoneModel, host: Host, onDone: () -> Unit) {
-    val page = remember { model.settingsPage() }
-    SettingsScreen(page, model, host, onboarding = true, onDone)
+    // La pagina sta nel modello: se il telefono ruota o cambia lingua l'Activity si ricrea, e una pagina ricordata
+    // solo qui ripartirebbe vuota mentre il download del server e l'accesso continuano su quella di prima.
+    val page = model.welcomePage()
+    SettingsScreen(page, model, host, onboarding = true) {
+        model.welcomeDone()
+        onDone()
+    }
 }
 
 /**

@@ -170,6 +170,19 @@ class PhoneModel(
         }
     }
 
+    private var welcome: SettingsPage? = null
+
+    /**
+     * La pagina del benvenuto. Vive qui, come il resto del modello: download del server, accesso e prova della
+     * connessione restano sullo schermo anche se il telefono ruota o cambia lingua.
+     */
+    fun welcomePage(): SettingsPage = welcome ?: settingsPage().also { welcome = it }
+
+    /** Finito il benvenuto: se un giorno ricompare (tolto il server, per esempio) riparte da capo. */
+    fun welcomeDone() {
+        welcome = null
+    }
+
     /** Un server trovato nella rete: i suoi indirizzi vanno nel modulo. */
     fun choose(page: SettingsPage, server: FoundServer) {
         page.home = server.url
@@ -1175,8 +1188,11 @@ class PhoneModel(
      */
     fun removePhoneServer(page: SettingsPage) {
         val server = phoneServer ?: return
-        if (usesPhoneServer(page)) {
-            leavePhoneServer(page)
+        if (usesPhoneServer(page)) leavePhoneServer(page)
+        // Anche se il modulo mostra già un altro Music Assistant ("Usa un altro Music Assistant" senza salvare):
+        // finché le impostazioni salvate sono quelle del server sul telefono, Xonos e myCar restano lì, e Xonos lo
+        // farebbe ripartire mentre lo si cancella.
+        if (onPhoneServer) {
             settings.save(Settings.Config("", "", ""))
             repo.reconnect()
         }

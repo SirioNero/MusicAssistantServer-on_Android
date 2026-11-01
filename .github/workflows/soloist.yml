@@ -1,0 +1,74 @@
+name: Soloist
+
+# La prova della "strada B": Soloist, il motore ufficiale di Spotify (un programma per Linux), dentro Xonos con
+# proot. Sul runner scarica Soloist da Spotify solo per la prova (non si pubblica né si conserva) e prepara il
+# piccolo sistema Linux con glibc e PulseAudio; la build di prova ha proot compilato dal sorgente come la
+# release (app/native/proot.sh). Sull'emulatore Android (API 34) avvia tutto da dentro Xonos (tools/soloist).
+# Parte a mano, o quando cambiano questi file su un ramo claude/**. Il riassunto va nella pagina del workflow.
+on:
+  workflow_dispatch:
+  push:
+    branches: ["claude/**"]
+    paths: [".github/workflows/soloist.yml", "tools/soloist/**", "app/src/debug/**", "app/native/**"]
+
+jobs:
+  prova:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      OUT: ${{ github.workspace }}/soloist-out
+      WORK: /tmp/soloist
+    steps:
+      - name: Scarica il repository
+        uses: actions/checkout@v5
+
+      - name: Prepara Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Prepara Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.14.3"
+
+      - name: Soloist e il sistema Linux di prova
+        run: |
+          sudo apt-get install -y -q busybox-static > /dev/null
+          bash tools/soloist/prepare.sh
+
+      - name: Compila la build di prova (con proot dal sorgente)
+        run: |
+          set -o pipefail
+          gradle :app:assembleDebug --no-daemon --stacktrace 2>&1 | tail -n 60
+          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -E 'lib/.*proot'
+
+      - name: KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Prova sull'emulatore
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          cores: 4
+          ram-size: 4096M
+          disk-size: 8G
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-boot-anim -camera-back none -camera-front none
+          script: bash tools/soloist/emulator.sh
+
+      - name: Riassunto
+        if: always()
+        run: |
+          for f in "$OUT"/runner.txt "$OUT"/emulator.txt; do
+            [ -f "$f" ] || continue
+            { echo "### $(basename "$f")"; echo '```'; cat "$f"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            # Anche nel log del passo: si legge con le API, il riassunto della pagina no.
+            echo "===== $(basename "$f")"; cat "$f"
+          done

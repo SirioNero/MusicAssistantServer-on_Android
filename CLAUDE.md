@@ -10,6 +10,8 @@ prima di cominciare: le cose scritte qui sono già state verificate, non vanno r
 
 ## Regole
 
+- Il repository si chiama `SirioNero/MusicAssistantServer-on_Android` dal 1° novembre 2026 (prima
+  `Music-Assistant-on-Gearslip`: GitHub rimanda, anche git, le API e i download delle release, ma i link si scrivono col nome nuovo).
 - Codice, commenti, commit e log in italiano, con frasi semplici come nel resto del codice. README in
   inglese, poi spagnolo, francese, tedesco, italiano e portoghese: stesse sezioni, con i nomi dei menu e
   dei tasti presi dalle stringhe dell'app in quella lingua; come si compila e la mappa del codice solo in
@@ -19,7 +21,7 @@ prima di cominciare: le cose scritte qui sono già state verificate, non vanno r
   "fai un aggiornamento"): ogni push in `main` che cambia l'app crea una release.
 - All'utente si danno **sempre i link per rilasciare**, appena una versione è pronta e senza aspettare
   che li chieda: quello per unire il ramo in `main`
-  (`https://github.com/SirioNero/Music-Assistant-on-Gearslip/compare/main...<ramo>`, poi Create pull
+  (`https://github.com/SirioNero/MusicAssistantServer-on_Android/compare/main...<ramo>`, poi Create pull
   request e Merge: la release parte da sola), e dopo il link della release.
 - Niente pull request se non richiesta.
 - Niente copie offline o permanenti dei brani di Spotify, Tidal, YouTube Music e degli altri servizi
@@ -34,7 +36,7 @@ prima di cominciare: le cose scritte qui sono già state verificate, non vanno r
 - In questa sandbox non c'è l'SDK Android (dl.google.com, cioè il Maven di Google, è bloccato): l'app
   si compila solo su GitHub Actions, workflow "Compila Xonos" (`.github/workflows/build.yml`), a ogni push.
 - Lo stato dei workflow: gli strumenti GitHub (`actions_list`, `get_job_logs` a job finito) o
-  `curl https://api.github.com/repos/SirioNero/Music-Assistant-on-Gearslip/actions/runs?branch=...`
+  `curl https://api.github.com/repos/SirioNero/MusicAssistantServer-on_Android/actions/runs?branch=...`
   (senza token: `gh` qui non è autenticato). Gli errori di compilazione finiscono anche in
   un'annotazione del check run. Non si può leggere l'elenco dei secret.
 - Release: solo da `main`, solo se l'app è cambiata, solo con la chiave. File `Xonos.apk` e il pacchetto di
@@ -77,6 +79,12 @@ prima di cominciare: le cose scritte qui sono già state verificate, non vanno r
 - Strumenti: AGP 8.11.1, Kotlin 2.2.0, Gradle 8.14.3, compileSdk 36, targetSdk 34, minSdk 26,
   Media3 1.11.1, OkHttp 4.12.0, coroutines 1.10.2, Compose 1.9.4, Material 3 1.4.0, activity-compose
   1.10.1, Coil 3.3.0 (con coil-svg per le icone dei servizi), profileinstaller 1.4.1. Pacchetto `it.xonos.ma`.
+- NDK fissato (`ndkVersion` 27.3.13750724, cioè r27d) dalla 0.1.49: compila proot (`app/native/proot.sh`, task
+  `buildProot`) per arm64-v8a e x86_64, dentro l'APK come `libproot.so` e `libproot-loader.so`; le librerie si
+  estraggono all'installazione (`useLegacyPackaging`). Sorgenti scaricati da versioni fissate con lo SHA-256 (quelli
+  di Termux): termux/proot 5.1.107.101 e talloc 2.5.0 di Samba, compilato da solo con `talloc-replace.h` al posto
+  di waf; percorsi tolti, niente build-id, pagine da 16 KB. Nella ricetta di F-Droid le build nuove vogliono
+  `ndk: r27d`; "Riproducibile" installa quell'NDK. In locale (sandbox) non si compila né si esegue: solo in CI.
 - R8 è acceso nella release (`isMinifyEnabled` e `isShrinkResources`, regole in `app/proguard-rules.pro`,
   `-dontobfuscate` così gli errori restano leggibili). L'APK ridotto si prova sull'emulatore con le misure
   (sotto): parte, si collega, suona Opus, nessun arresto.
@@ -333,7 +341,9 @@ di Xonos suona dal server sul telefono; la release ridotta con R8, da capo come 
   in pochi minuti e resta in cache finché lo script non cambia.
 - `music_assistant` è in `extractPackages` di Chaquopy: MA cerca `setup_flow.py` sul disco per sapere quali
   servizi hanno una procedura (nel pacchetto tutto è comunque estratto).
-- Pesa 68,5 MB lo zip per arm64 (165 MB estratto), 72 MB per x86_64 (179 MB); Xonos chiede libero 4 volte lo zip,
+- Pesa 68,5 MB lo zip per arm64 (165 MB estratto), 72 MB per x86_64 (179 MB), fino al 2.10.8-3; dal 2.10.8-4 c'è anche
+  `rootfs.tar` (+6,4 MB nello zip, 16,7 MB il tar e altrettanto estratto: circa 75 MB e 200 MB in tutto, stima da
+  verificare sulla release; Soloist, scaricato da MA quando serve, altri 34 MB). Xonos chiede libero 4 volte lo zip,
   per zip ed estratto insieme. Solo 64 bit: Python 3.13 per Android non c'è
   per armeabi-v7a; su un telefono a 32 bit la scheda non c'è (`PhoneServer.create` dà null).
 - **Servizi** (`PROVIDERS` in `prepare.py`): 59, cioè tutti quelli le cui librerie esistono per Android, che
@@ -390,9 +400,13 @@ di Xonos suona dal server sul telefono; la release ridotta con R8, da capo come 
   spiegato passa com'è. Con un'app personale (Development Mode) Spotify dà i brani (`playlists/{id}/items`) solo
   delle playlist della persona (o collaborative): per le altre (seguite, di Spotify come Daily Mix) Music
   Assistant passa alla sua chiave, che qui non c'è; ora `xonos_playlist_not_yours` (owner `provider.spotify`) dice di
-  copiare i brani in una propria playlist. Nelle Impostazioni "Condividi il registro di Music Assistant"
-  (`PhoneServer.log`: le ultime 96 KB di `musicassistant.log`, versioni in testa, condivisione di Android come
-  testo). Verificato: col server sul computer il motivo nel messaggio (`check.py`, anche in CI), con la rete finta
+  copiare i brani in una propria playlist. Nella scheda del server sul telefono "Condividi il registro del
+  server sul telefono" (`PhoneServer.log`: le ultime 96 KB di `musicassistant.log`, versioni in testa,
+  condivisione di Android come testo). Prima diceva solo "del registro di Music Assistant" e l'utente, collegato a
+  umbrel, mandava quello del telefono: dalla 0.1.48 per qualsiasi altro Music Assistant c'è nelle Impostazioni
+  "Registro di Music Assistant" (sotto i servizi, solo admin), che lo prende dal server collegato con
+  `logging/get` (scope `SYSTEM_MANAGE`; risponde con tutto il file, `Library.serverLog` tiene le ultime 96 KB da
+  una riga intera; `LogCheckKt`) e dice di quale server è (il nome, o l'indirizzo se si chiama solo "Music Assistant"). Verificato: col server sul computer il motivo nel messaggio (`check.py`, anche in CI), con la rete finta
   il messaggio solo per le playlist non proprie (non per le proprie né per i brani piaciuti); il banco JVM compila.
   Poi l'utente: "qualsiasi brano non funziona". Un brano della libreria al play non passa da Spotify
   (`get_library_item_by_prov_id`, poi `[track]`): se non suona è la sua mappatura `available` falsa, cioè
@@ -413,27 +427,60 @@ di Xonos suona dal server sul telefono; la release ridotta con R8, da capo come 
 - **Spotify**: il fork di librespot di Music Assistant (`music-assistant/librespot`, ramo `mass`, 0.8.0)
   compilato per Android in `server/librespot/build.sh` (Rust con cargo-ndk, rustls al posto di OpenSSL, senza
   uscite audio), nel pacchetto `bin/librespot`; `prepare.py` fa cercare a MA `librespot` nel PATH. Va solo con
-  gli account Premium creati prima di dicembre 2024. Soloist, il motore ufficiale, è un programma per Linux
-  (glibc, PipeWire/PulseAudio): non si può ridistribuire, va scaricato da Spotify sul telefono con il consenso
-  della persona e una sua chiave dell'API; da provare (attività in sospeso). Come lo usa Music Assistant (ramo
-  `dev`, ottobre 2026, `providers/spotify/backends/soloist.py` e `providers/spotify_connect/soloist/`): scarica,
-  solo col consenso, `https://soloist-builds.spotifycdn.com/soloist_release_{arm64|x86_64}.tar.gz`, controlla
-  l'ELF e lo aggiorna quando la build scade; la chiave personale va sulla riga di comando di `soloist`; l'audio
-  passa da un demone `pulseaudio` vero, privato di MA (`helpers/pulse_capture.py`: `module-pipe-sink` su un
-  FIFO, `pactl`, libpulse con ctypes), a 44,1 kHz s32le. Sul telefono servirebbero quindi: PulseAudio per
-  Android (si compila con l'NDK, come fa Termux), un ambiente glibc per `soloist` (ld.so e le librerie che
-  vuole, compresa libpulse) avviato senza `execve` (da Android 10 i file scaricati non si eseguono: un piccolo
-  caricatore che mappa ld.so e il programma e ci salta dentro), e le chiamate di sistema di glibc dentro il
-  filtro seccomp delle app Android (una vietata non dà ENOSYS ma SIGSYS: per esempio `clone3`). Prima prova
-  possibile senza la chiave: `soloist --version` sull'emulatore x86_64.
+  gli account Premium creati prima di dicembre 2024. Per gli altri c'è Soloist (sotto).
+- **Soloist sul telefono** (Xonos 0.1.49, pacchetto 2.10.8-4; "strada B", voluta dall'utente: "deve funzionare per
+  tutti"). Soloist è il motore ufficiale di Spotify (tutti gli account Premium; 1.3.10.31 a ottobre 2026), un
+  programma per Linux con glibc che dà l'audio a PulseAudio (apre da sé `libpulse.so.0`, PipeWire se c'è) e fa da
+  solo l'annuncio mDNS per l'abbinamento (niente Avahi). Non si ridistribuisce: lo scarica Music Assistant da
+  Spotify (`soloist-builds.spotifycdn.com/soloist_release_{arm64|x86_64}.tar.gz`) dopo il consenso della persona,
+  che mette anche una sua chiave API di Soloist; le build scadono dopo 90 giorni e MA le rinnova. Come gira:
+  - **proot** (nell'APK, vedi sopra) fa da chroot con ptrace e gestisce il SIGSYS del seccomp di Android; il suo
+    caricatore va avviato con execve, quindi deve stare tra le librerie dell'app (i file scaricati non si avviano).
+    Su GrapheneOS il ptrace delle app installate è permesso di serie, salvo l'opzione che blocca il "native code
+    debugging" per le app nuove: allora va permesso a Xonos.
+  - **Il sistema Linux**: `server/package/rootfs.py` prende glibc 2.39, PulseAudio 16.1 (demone, pactl, pacat, moduli
+    `native-protocol-unix` e `pipe-sink`) e libpulse dai pacchetti di Ubuntu 24.04 (firme controllate da apt) e
+    tiene solo i file chiesti (NEEDED, come le cerca il caricatore): 38 pacchetti, 16,6 MB per arm64, 6,4 MB
+    compressi. `make_payload.py` lo mette nel pacchetto come `rootfs.tar` (sempre uguale), con i pacchetti nel
+    NOTICE e i loro `copyright` dentro. Ci sono `client.conf` e `daemon.conf` senza shm (Android non ha /dev/shm) e
+    senza rtkit/D-Bus.
+  - **xonos_server.py** (`_linux_programs`): estrae `rootfs.tar` la prima volta (tutto o niente, tarfile con
+    `filter="data"`); i programmi `pulseaudio`, `pactl`, `pacat`, `parec` e quelli dentro la cartella dei dati
+    (Soloist sta in `<dati>/soloist/soloist`) passano da `proot --kill-on-exit -r <rootfs> -b /dev -b /proc -b /sys
+    -b <dati> -b <cache>` più `/etc/resolv.conf` (il file del DNS che Xonos aggiorna) e `/etc/machine-id`
+    (`<dati>/machine-id`). Dati e cache allo stesso percorso, sia `/data/user/0/...` (come li usa MA) sia
+    `/data/data/...` (il percorso vero: `/data/user/0` è un collegamento; con uno solo PulseAudio non trovava la sua
+    configurazione): socket di PulseAudio, tubo del pipe sink, porta della WebSocket di Soloist restano gli stessi. Toglie dall'ambiente LD_LIBRARY_PATH, PYTHONHOME/PATH e
+    SSL_CERT_FILE (i certificati del pacchetto non si vedono dentro). Se XONOS_PROOT o il sistema Linux mancano,
+    toglie XONOS_PROOT e Spotify resta con librespot. Durante `soloist --pair` stampa `XONOS_MULTICAST on/off`.
+  - **prepare.py** (`_soloist`): `_resolve_architecture` accetta Android quando c'è XONOS_PROOT; il flusso di Spotify
+    mostra la scelta del motore solo allora (sennò librespot); `PAVolumeController` comanda PulseAudio con `pactl`
+    (stessa interfaccia: load/unload-module, set-sink-volume) perché la libpulse del sistema Linux è di glibc e il
+    Python del pacchetto no.
+  - **PhoneServer**: XONOS_PROOT e XONOS_PROOT_LOADER dalla cartella delle librerie, XONOS_DNS_FILE
+    (`<dati>/resolv.conf`: i DNS della rete in uso più 1.1.1.1 e 8.8.8.8, riscritto con un NetworkCallback), il
+    MulticastLock del Wi-Fi solo tra `XONOS_MULTICAST on` e `off` (permesso CHANGE_WIFI_MULTICAST_STATE).
+  - **Verificato in CI** (emulatore Android 14 x86_64): workflow "Soloist" (`tools/soloist`, ExecCheckActivity della
+    build di prova: comandi dentro il processo di Xonos) con proot dal sorgente: glibc, `soloist --version`, PulseAudio
+    in 0,1 s, pipe sink, audio nel tubo, Soloist acceso con una chiave finta fino a "waiting for login — connect to
+    … from your Spotify app", nessun SIGSYS; la rete da dentro proot (DNS, http verso Spotify). "Server MA" con
+    `xonos_selftest.py` (parte se c'è `<dati>/xonos-selftest`, aspetta `xonos-selftest-go`; 7 prove, tutte
+    passate): Music Assistant scarica Soloist e lo prova, PulseAudio e pipe sink col suo codice, audio nel tubo,
+    Soloist acceso, e lo si cerca come l'app Spotify: risponde all'mDNS (`_spotify-connect._tcp.local`: PTR, SRV con
+    la porta, TXT `CPath=/zc`, A con gli indirizzi del telefono, in multicast al gruppo, non con risposte dirette) e
+    la sua pagina getInfo risponde su 127.0.0.1 e sull'indirizzo di rete. `tools/soloist/ifaddrs-test.c`: dentro
+    proot, dall'app, glibc vede le interfacce (getifaddrs, netlink anche con bind e RTM_GETLINK, SIOCGIFCONF) su
+    Android 14. **Non provato**: l'abbinamento vero dall'app Spotify, la riproduzione con un account e una chiave
+    veri, arm64 su un telefono vero (Android 17, GrapheneOS: limiti di rete e ptrace forse diversi), la batteria.
 - **Gli account recenti** (registro dell'utente, 29 ottobre 2026, pacchetto 2.10.8-3): accesso a Spotify riuscito,
   poi al primo brano librespot `Unable to load audio item: ... FaultyRequest(INVALID_CREDENTIALS)` e Music
   Assistant scarica il servizio ("Spotify is not loaded" ai play dopo). Music Assistant scrive che librespot non va
   con gli account creati da dicembre 2024; Spotify un giorno preciso non l'ha mai dato (un altro progetto parla
   di "account degli ultimi due anni" da dicembre 2025, non confermato). Per questo, col server sul telefono, il
   flusso di Spotify mostra in cima l'avviso `spotify_old_accounts` (`PhoneModel.onPhoneServer`: l'indirizzo
-  salvato è quello del server; con un altro Music Assistant no, lì si può scegliere Soloist), e il README lo
-  dice in ogni lingua. Scena `spotify-phone` in `tools/screens`.
+  salvato è quello del server; con un altro Music Assistant no), e il README lo dice in ogni lingua. Dalla 0.1.49
+  l'avviso spiega i due motori e cosa serve a Soloist (chiave API, "Music Assistant Pairing" dall'app Spotify, Wi-Fi).
+  Scena `spotify-phone` in `tools/screens`.
 - I task Gradle di ffmpeg e librespot **non dichiarano uscite**: alla prima esecuzione Gradle svuota le
   cartelle di uscita dei task, e con la cache di GitHub lo script trovava il suo segno (fuori dalla cartella)
   e non ricompilava, così ffmpeg mancava. Gli script controllano anche che i programmi ci siano.
@@ -573,7 +620,9 @@ sincronizzati sul telefono, fluidità (R8, Baseline Profile, elenchi fuori dal t
 ricomposizioni, schermate salvate), server trovati in rete e accesso con nome utente e password,
 gestione dei servizi di MA per gli admin, donazioni in bitcoin, "Suona su" con passaggio della coda, playlist
 modificabili (aggiungi, togli, nuova, elimina) e coda modificabile (suona dopo, togli), Music Assistant sul
-telefono stesso scaricato su richiesta ("Fai diventare Xonos il tuo server Music Assistant", da provare sul telefono).
+telefono stesso scaricato su richiesta ("Fai diventare Xonos il tuo server Music Assistant", da provare sul telefono),
+Spotify per tutti gli account Premium su quel server: Soloist dentro proot (0.1.49, provato sull'emulatore; da provare
+sul telefono con una chiave API e un account veri).
 Proposto, non fatto: cercare dal telefono con mDNS/SSDP le casse che MA non vede e suggerire il
 servizio da aggiungere. Ancora da fare:
 

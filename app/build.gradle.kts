@@ -1,4 +1,6 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.gradle.process.ExecOperations
+import javax.inject.Inject
 
 plugins {
     id("com.android.application")
@@ -23,6 +25,8 @@ val serverPackage: String = providers.gradleProperty("xonosServerPackage").get()
 android {
     namespace = "it.xonos.ma"
     compileSdk = 36
+    // L'NDK che compila proot (native/proot.sh): fissato, perché l'APK di F-Droid deve venire identico al nostro.
+    ndkVersion = "27.3.13750724"
 
     defaultConfig {
         applicationId = "it.xonos.ma"
@@ -30,13 +34,13 @@ android {
         targetSdk = 34
         // Si alzano entrambi a ogni pubblicazione in main: la release prende il tag v<versionName>, che
         // Obtainium confronta con l'app installata, e F-Droid compila da quel tag.
-        versionCode = 47
-        versionName = "0.1.47"
+        versionCode = 49
+        versionName = "0.1.49"
         buildConfigField("String", "SERVER_PACKAGE", "\"$serverPackage\"")
         buildConfigField(
             "String",
             "SERVER_PACKAGE_URL",
-            "\"https://github.com/SirioNero/Music-Assistant-on-Gearslip/releases/download/v$versionName/\"",
+            "\"https://github.com/SirioNero/MusicAssistantServer-on_Android/releases/download/v$versionName/\"",
         )
     }
 
@@ -101,6 +105,52 @@ kotlin {
 // Il profilo generato (vedi baselineprofile/) sta in src/main/generated/baselineProfiles.
 baselineProfile {
     mergeIntoMain = true
+}
+
+// proot, compilato dal sorgente (native/proot.sh), fa girare i programmi per Linux del server sul telefono
+// (Soloist di Spotify e PulseAudio). Solo per i telefoni a 64 bit, come il server.
+abstract class BuildProot : DefaultTask() {
+    @get:InputFiles
+    abstract val scripts: ConfigurableFileCollection
+
+    @get:Input
+    abstract val ndk: Property<String>
+
+    @get:Input
+    abstract val abis: ListProperty<String>
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @get:Inject
+    abstract val execOperations: ExecOperations
+
+    @TaskAction
+    fun build() {
+        val out = outputDir.get().asFile
+        out.deleteRecursively()
+        val script = scripts.files.first { it.name == "proot.sh" }
+        execOperations.exec {
+            commandLine(listOf("bash", script.path, ndk.get(), out.path) + abis.get())
+        }
+    }
+}
+
+val buildProot = tasks.register<BuildProot>("buildProot") {
+    description = "Compila proot per Android dal sorgente (native/proot.sh)."
+    scripts.from("native/proot.sh", "native/talloc-replace.h")
+    ndk.set(androidComponents.sdkComponents.ndkDirectory.map { it.asFile.path })
+    abis.set(listOf("arm64-v8a", "x86_64"))
+    outputDir.set(layout.buildDirectory.dir("proot"))
+}
+
+// Le librerie si estraggono su disco all'installazione: da Android 10 un'app può avviare un programma solo dalla
+// cartella delle sue librerie, e proot è un programma.
+androidComponents {
+    onVariants { variant ->
+        variant.sources.jniLibs?.addGeneratedSourceDirectory(buildProot, BuildProot::outputDir)
+        variant.packaging.jniLibs.useLegacyPackaging.set(true)
+    }
 }
 
 dependencies {

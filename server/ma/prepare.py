@@ -385,6 +385,7 @@ def _patch(root: Path) -> None:
     _replace(root / "constants.py", '    ("lastfm_recommendations", False),\n', "")
     _reasons(root)
     _spotify(root)
+    _soloist(root)
     _texts(root)
 
 
@@ -492,8 +493,14 @@ def _spotify(root: Path) -> None:
     _replace(
         flow,
         "        selected = await _choose_playback_backend(session, preselect, errors)\n",
-        "        selected = BACKEND_LIBRESPOT  # Xonos: Soloist è un programma per Linux\n",
+        "        # Xonos: Soloist è un programma per Linux, gira dentro proot (vedi xonos_server): si può scegliere\n"
+        "        # solo se l'app ha proot e il pacchetto il sistema Linux\n"
+        "        if os.environ.get(\"XONOS_PROOT\"):\n"
+        "            selected = await _choose_playback_backend(session, preselect, errors)\n"
+        "        else:\n"
+        "            selected = BACKEND_LIBRESPOT\n",
     )
+    _replace(flow, "import asyncio\nimport logging\n", "import asyncio\nimport logging\nimport os\n")
     _replace(
         flow,
         "        method_values = await session.form(\n"
@@ -651,6 +658,133 @@ def _spotify(root: Path) -> None:
         "            # Xonos: con la chiave della persona, i limiti di una chiave propria\n"
         "            self.throttler.set_rate_limit(rate_limit=30, period=30)\n",
     )
+
+
+def _soloist(root: Path) -> None:
+    """
+    Soloist, il motore ufficiale di Spotify (tutti gli account Premium, anche quelli nuovi), sul telefono.
+
+    È un programma per Linux con glibc, come PulseAudio a cui dà l'audio: girano dentro proot, nel piccolo sistema
+    Linux del pacchetto (xonos_server.py li fa passare da lì). Music Assistant li comanda come su Linux; cambiano
+    due cose: Soloist si accetta su Android quando c'è proot, e PulseAudio si comanda con pactl invece che con
+    libpulse dentro Python (la libpulse del sistema Linux è di glibc, il Python del pacchetto no).
+    """
+    runtime = root / "providers" / "spotify_connect" / "soloist" / "runtime.py"
+    _replace(runtime, "import logging\nimport platform\n", "import logging\nimport os\nimport platform\n")
+    _replace(
+        runtime,
+        "    system = platform.system()\n    if system != \"Linux\":\n",
+        "    system = platform.system()\n"
+        "    # Xonos: su Android Soloist gira dentro proot, nel sistema Linux del pacchetto\n"
+        "    if os.environ.get(\"XONOS_PROOT\"):\n"
+        "        system = \"Linux\"\n"
+        "    if system != \"Linux\":\n",
+    )
+    capture = root / "helpers" / "pulse_capture.py"
+    text = capture.read_text()
+    start = "class PAVolumeController:\n"
+    end = "# One shared server per MusicAssistant instance; weak keys so a discarded mass\n"
+    if text.count(start) != 1 or text.count(end) != 1:
+        sys.exit(f"{capture}: non trovo la classe PAVolumeController da cambiare")
+    head, rest = text.split(start)
+    _, tail = rest.split(end)
+    capture.write_text(head + PACTL_CONTROLLER + "\n\n" + end + tail)
+
+
+# Xonos: al posto della classe di Music Assistant, che usa libpulse con ctypes.
+PACTL_CONTROLLER = '''class PAVolumeController:
+    """
+    Xonos: PulseAudio comandato con pactl invece che con libpulse.
+
+    Sul telefono PulseAudio e libpulse sono programmi glibc dentro proot: il Python di Music Assistant (bionic) non
+    può caricare libpulse con ctypes. pactl fa le stesse cose da fuori e xonos_server lo fa passare da proot come
+    PulseAudio. Stessa interfaccia di prima: chiamate bloccanti, da un thread.
+    """
+
+    def __init__(self, server: str | None = None) -> None:
+        """
+        Check that the daemon answers.
+
+        :param server: PA server address to connect to (e.g. "unix:<socket>").
+        """
+        self._server = server or get_default_pulse_server()
+        self._closed = False
+        if self._pactl("info") is None:
+            raise OSError("Timed out connecting to PulseAudio for volume control")
+
+    def set_sink_volume(self, sink_name: str, volume_pct: int, channels: int = 2) -> bool:
+        """
+        Set hardware volume on a named PA sink.
+
+        :param sink_name: PA sink name.
+        :param volume_pct: Volume level 0-100, mapped through an exponential audio taper curve.
+        :param channels: Unused: pactl sets every channel.
+        """
+        amplitude = volume_pct_to_amplitude(volume_pct)
+        pa_vol = round(PA_VOLUME_NORM * amplitude ** (1.0 / 3.0))
+        return self._pactl("set-sink-volume", sink_name, str(pa_vol)) is not None
+
+    def set_sink_volume_raw(self, sink_name: str, volume_pct: float, channels: int = 2) -> bool:
+        """
+        Set raw (linear) volume on a named PA sink, without the audio taper.
+
+        :param sink_name: PA sink name.
+        :param volume_pct: Linear percentage where 100 maps exactly onto PA_VOLUME_NORM (0 dB).
+        :param channels: Unused: pactl sets every channel.
+        """
+        volume_pct = min(max(volume_pct, 0.0), MAX_RAW_VOLUME_PCT)
+        pa_vol = round(PA_VOLUME_NORM * volume_pct / 100.0)
+        return self._pactl("set-sink-volume", sink_name, str(pa_vol)) is not None
+
+    def load_module(self, module_name: str, argument: str) -> int | None:
+        """
+        Load a PulseAudio module.
+
+        :param module_name: PA module name, e.g. "module-pipe-sink".
+        :param argument: Module argument string (no spaces inside values).
+        :returns: The loaded module's index, or None on failure/timeout.
+        """
+        output = self._pactl("load-module", module_name, *argument.split())
+        try:
+            return int(output.strip()) if output is not None else None
+        except ValueError:
+            return None
+
+    def unload_module(self, module_index: int) -> bool:
+        """
+        Unload a previously-loaded PulseAudio module by index.
+
+        :returns: True if PA reported success.
+        """
+        return self._pactl("unload-module", str(module_index)) is not None
+
+    def close(self) -> None:
+        """Nothing to tear down: every call is its own pactl."""
+        self._closed = True
+
+    def _pactl(self, *args: str, timeout: float = 10.0) -> str | None:
+        """pactl on the private daemon: its output, or None when it failed."""
+        if self._closed:
+            return None
+        import subprocess  # noqa: PLC0415
+
+        env = {**os.environ, "PULSE_SERVER": self._server}
+        try:
+            result = subprocess.run(
+                ["pactl", "--server", self._server, *args],
+                capture_output=True,
+                env=env,
+                timeout=timeout,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as err:
+            LOGGER.debug("pactl %s: %s", args[0], err)
+            return None
+        if result.returncode != 0:
+            LOGGER.debug("pactl %s: %s", args[0], result.stderr.decode(errors="replace").strip())
+            return None
+        return result.stdout.decode(errors="replace")
+'''
 
 
 def _texts(root: Path) -> None:

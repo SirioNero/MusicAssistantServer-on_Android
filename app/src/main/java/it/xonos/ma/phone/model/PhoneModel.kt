@@ -1010,6 +1010,32 @@ class PhoneModel(
         scope.launch { share(runCatching { server.log() }.getOrElse { "Xonos: ${it.message ?: it}" }) }
     }
 
+    /** Si sta prendendo il registro del Music Assistant collegato (può volerci qualche secondo). */
+    var fetchingServerLog by mutableStateOf(false)
+        private set
+
+    /**
+     * Passa a [share] le ultime righe del registro del Music Assistant a cui Xonos è collegato (umbrel,
+     * un computer, il telefono), con versione e indirizzo in testa. Solo per gli amministratori.
+     */
+    fun shareServerLog(share: (String) -> Unit) {
+        val connected = connection.value as? Connection.Connected ?: return
+        if (fetchingServerLog) return
+        fetchingServerLog = true
+        scope.launch {
+            try {
+                val log = library.serverLog()
+                share("Music Assistant ${connected.server.version} (${connected.server.name}) ${connected.url}\n\n$log")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                notice = Notice.Failed(e)
+            } finally {
+                fetchingServerLog = false
+            }
+        }
+    }
+
     /**
      * Avvia Music Assistant sul telefono e ci collega Xonos. La prima volta crea l'account (è
      * l'amministratore, così si possono aggiungere i servizi): nome e password li sceglie Xonos e la

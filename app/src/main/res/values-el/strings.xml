@@ -48,7 +48,7 @@
     <string name="phone_server_remove">Αφαίρεση από αυτό το τηλέφωνο</string>
     <string name="phone_server_remove_title">Αφαίρεση του Music Assistant από αυτό το τηλέφωνο;</string>
     <string name="phone_server_remove_text">Διαγράφονται επίσης οι υπηρεσίες και η βιβλιοθήκη του σε αυτό το τηλέφωνο. Μπορείτε να το κατεβάσετε ξανά όποτε θέλετε.</string>
-    <string name="phone_server_share_log">Κοινοποίηση του αρχείου καταγραφής του Music Assistant</string>
+    <string name="phone_server_share_log">Κοινοποίηση του αρχείου καταγραφής του διακομιστή σε αυτό το τηλέφωνο</string>
     <string name="phone_server_log_subject">Αρχείο καταγραφής του Music Assistant από το Xonos</string>
     <string name="show_password">Εμφάνιση κωδικού</string>
     <string name="hide_password">Απόκρυψη κωδικού</string>
@@ -212,6 +212,9 @@
     <string name="volume">Ένταση</string>
     <string name="services_title">Υπηρεσίες του Music Assistant</string>
     <string name="services_help">Προσθέστε ή ρυθμίστε από πού έρχεται η μουσική: Spotify, Tidal, Jellyfin, podcast, ραδιόφωνο…</string>
+    <string name="server_log_title">Αρχείο καταγραφής του Music Assistant</string>
+    <string name="server_log_help">Μοιραστείτε τις τελευταίες γραμμές του αρχείου καταγραφής του %1$s με όποιον σας βοηθά.</string>
+    <string name="server_log_subject">Αρχείο καταγραφής Music Assistant (%1$s) από το Xonos</string>
     <string name="services_add">Προσθήκη υπηρεσίας</string>
     <string name="services_none">Δεν υπάρχουν ακόμη υπηρεσίες</string>
     <string name="services_old_server">Για να προσθέσετε και να ρυθμίσετε υπηρεσίες από εδώ χρειάζεται το Music Assistant 2.10 ή νεότερο. Μπορείτε πάντως να τις δείτε και να τις αφαιρέσετε.</string>
@@ -243,7 +246,7 @@
     <string name="flow_next">Επόμενο</string>
     <string name="flow_open_browser">Άνοιγμα στο πρόγραμμα περιήγησης</string>
     <string name="flow_external_wait">Ολοκληρώστε στο πρόγραμμα περιήγησης και επιστρέψτε εδώ: το Xonos συνεχίζει μόνο του.</string>
-    <string name="spotify_old_accounts">Σε αυτό το τηλέφωνο το Spotify παίζει μόνο με λογαριασμούς Premium που δημιουργήθηκαν πριν από τον Δεκέμβριο του 2024 (το Spotify δεν έδωσε ποτέ ακριβή ημερομηνία). Με νεότερο λογαριασμό η μουσική σας εμφανίζεται αλλά δεν παίζει: τότε χρησιμοποιήστε το Music Assistant σε υπολογιστή ή οικιακό διακομιστή, όπου μπορείτε να επιλέξετε το Soloist.</string>
+    <string name="spotify_old_accounts">Το Spotify έχει δύο μηχανές αναπαραγωγής. Το librespot λειτουργεί μόνο με λογαριασμούς Premium που δημιουργήθηκαν πριν από τον Δεκέμβριο του 2024 (το Spotify δεν έδωσε ποτέ ακριβή ημερομηνία). Το Soloist, η επίσημη μηχανή του Spotify, λειτουργεί με όλους τους λογαριασμούς Premium: χρειάζεται το δικό σας κλειδί API του Soloist (από το developer.spotify.com) και, μία φορά, να επιλέξετε «Music Assistant Pairing» στις συσκευές της εφαρμογής Spotify, με το τηλέφωνο σε Wi-Fi.</string>
     <string name="flow_working">Μια στιγμή…</string>
     <string name="flow_finished">Έτοιμο: η υπηρεσία είναι έτοιμη. Η μουσική της μπορεί να χρειαστεί λίγα λεπτά για να εμφανιστεί στη βιβλιοθήκη.</string>
     <string name="flow_done">Τέλος</string>

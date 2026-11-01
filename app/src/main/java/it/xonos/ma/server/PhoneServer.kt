@@ -1,6 +1,10 @@
 package it.xonos.ma.server
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.LinkProperties
+import android.net.Network
+import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.SystemClock
 import android.util.Log
@@ -22,11 +26,24 @@ import kotlin.concurrent.thread
  * programmi che ha scaricato: li fa partire il linker di sistema (`/system/bin/linker64 <programma>`), anche
  * ffmpeg, ffprobe e librespot quando li chiama Music Assistant. Il processo vive quanto Xonos; i dati di
  * Music Assistant (account, servizi, libreria) restano nella cartella dell'app anche quando il pacchetto cambia.
+ *
+ * Soloist (il motore ufficiale di Spotify) e PulseAudio sono programmi per Linux: girano dentro proot, che sta tra
+ * le librerie dell'app (app/native/proot.sh). Xonos dice dov'è (XONOS_PROOT) e tiene aggiornato il file del DNS
+ * che quei programmi usano (Android non ha resolv.conf). Mentre Soloist si fa trovare dall'app Spotify per
+ * l'abbinamento, il server lo dice (XONOS_MULTICAST on/off) e Xonos lascia passare il multicast del Wi-Fi.
  */
 class PhoneServer private constructor(context: Context, private val pkg: ServerPackage) : PhoneServerControl {
 
+    private val app = context.applicationContext
     private val data = File(context.filesDir, "music-assistant")
     private val cache = File(context.cacheDir, "music-assistant")
+    private val dnsFile = File(data, "resolv.conf")
+    private var dnsWatch: ConnectivityManager.NetworkCallback? = null
+    private val multicastLock: WifiManager.MulticastLock? by lazy {
+        app.getSystemService(WifiManager::class.java)?.createMulticastLock("xonos-soloist")?.apply {
+            setReferenceCounted(false)
+        }
+    }
     private val lock = Any()
     private var process: Process? = null
     private var stopping = false
@@ -126,7 +143,16 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
             addAll(listOf("-m", "xonos_server", "--data", data.path, "--cache", cache.path))
         }
         val builder = ProcessBuilder(command).redirectErrorStream(true).directory(data)
+        val libs = File(app.applicationInfo.nativeLibraryDir)
+        val proot = File(libs, "libproot.so")
+        val prootLoader = File(libs, "libproot-loader.so")
+        watchDns()
         builder.environment().apply {
+            if (proot.isFile && prootLoader.isFile) {
+                put("XONOS_PROOT", proot.path)
+                put("XONOS_PROOT_LOADER", prootLoader.path)
+            }
+            put("XONOS_DNS_FILE", dnsFile.path)
             put("PYTHONHOME", dir.path)
             put("PYTHONPATH", "$dir/app:$dir/site-packages")
             put("LD_LIBRARY_PATH", "$dir/lib:$dir/site-packages/chaquopy/lib")
@@ -159,7 +185,9 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
         val last = ArrayDeque<String>()
         runCatching {
             running.inputStream.bufferedReader().forEachLine { line ->
-                if (line.startsWith(STATE_PREFIX)) {
+                if (line.startsWith(MULTICAST_PREFIX)) {
+                    multicast(line.removePrefix(MULTICAST_PREFIX).trim() == "on")
+                } else if (line.startsWith(STATE_PREFIX)) {
                     val said = line.removePrefix(STATE_PREFIX).trim()
                     when {
                         said == "running" -> state = State.RUNNING
@@ -178,8 +206,10 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
             }
         }
         val code = running.waitFor()
+        multicast(false)
         synchronized(lock) {
             if (process === running) process = null
+            unwatchDns()
             if (stopping) {
                 state = State.STOPPED
             } else if (state != State.FAILED) {
@@ -190,6 +220,47 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
         Log.i(TAG, "Music Assistant sul telefono si è fermato ($code)")
     }
 
+    /** Il multicast del Wi-Fi mentre Soloist si fa trovare dall'app Spotify (mDNS); spento il resto del tempo. */
+    private fun multicast(on: Boolean) {
+        val lock = multicastLock ?: return
+        runCatching { if (on) lock.acquire() else if (lock.isHeld) lock.release() }
+            .onFailure { Log.w(TAG, "Multicast del Wi-Fi", it) }
+    }
+
+    /**
+     * Il file del DNS per i programmi Linux dentro proot (il loro /etc/resolv.conf): i server DNS della rete in uso,
+     * più due pubblici di riserva, riscritto quando la rete cambia finché il server gira.
+     */
+    private fun watchDns() {
+        val connectivity = app.getSystemService(ConnectivityManager::class.java) ?: return
+        writeDns(connectivity.getLinkProperties(connectivity.activeNetwork))
+        if (dnsWatch != null) return
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onLinkPropertiesChanged(network: Network, properties: LinkProperties) = writeDns(properties)
+        }
+        runCatching { connectivity.registerDefaultNetworkCallback(callback) }
+            .onSuccess { dnsWatch = callback }
+            .onFailure { Log.w(TAG, "DNS per i programmi Linux", it) }
+    }
+
+    private fun unwatchDns() {
+        val callback = dnsWatch ?: return
+        dnsWatch = null
+        runCatching { app.getSystemService(ConnectivityManager::class.java)?.unregisterNetworkCallback(callback) }
+    }
+
+    private fun writeDns(properties: LinkProperties?) {
+        val servers = properties?.dnsServers.orEmpty().mapNotNull { it.hostAddress } + FALLBACK_DNS
+        // glibc ne legge al massimo tre.
+        val text = servers.distinct().take(3).joinToString("") { "nameserver $it\n" }
+        runCatching {
+            data.mkdirs()
+            val next = File(data, "resolv.conf.new")
+            next.writeText(text)
+            next.renameTo(dnsFile)
+        }.onFailure { Log.w(TAG, "DNS per i programmi Linux", it) }
+    }
+
     companion object {
         const val URL = "http://127.0.0.1:8095"
         private const val TAG = "XonosServer"
@@ -197,6 +268,9 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
         /** Android 10: da qui le app non avviano più i programmi che scaricano (W^X). */
         private const val W_X_SDK = 29
         private const val STATE_PREFIX = "XONOS_STATE"
+        private const val MULTICAST_PREFIX = "XONOS_MULTICAST"
+        /** Se la rete non dice i suoi server DNS (o non bastano). */
+        private val FALLBACK_DNS = listOf("1.1.1.1", "8.8.8.8")
         /** Il primo avvio dopo il download prepara il database: su un telefono lento ci vuole un po'. */
         private const val START_TIMEOUT_MS = 180_000L
         private const val POLL_MS = 250L

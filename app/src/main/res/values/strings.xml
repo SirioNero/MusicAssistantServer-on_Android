@@ -51,7 +51,7 @@
     <string name="phone_server_remove">Remove from this phone</string>
     <string name="phone_server_remove_title">Remove Music Assistant from this phone?</string>
     <string name="phone_server_remove_text">Its services and library on this phone are deleted too. You can download it again whenever you like.</string>
-    <string name="phone_server_share_log">Share the Music Assistant log</string>
+    <string name="phone_server_share_log">Share the log of the server on this phone</string>
     <string name="phone_server_log_subject">Music Assistant log from Xonos</string>
     <string name="show_password">Show the password</string>
     <string name="hide_password">Hide the password</string>
@@ -215,6 +215,9 @@
     <string name="volume">Volume</string>
     <string name="services_title">Music Assistant services</string>
     <string name="services_help">Add or set up where the music comes from: Spotify, Tidal, Jellyfin, podcasts, radio…</string>
+    <string name="server_log_title">Music Assistant log</string>
+    <string name="server_log_help">Share the latest lines of the log of %1$s with whoever is helping you.</string>
+    <string name="server_log_subject">Music Assistant log (%1$s) from Xonos</string>
     <string name="services_add">Add a service</string>
     <string name="services_none">No services yet</string>
     <string name="services_old_server">To add and set up services from here you need Music Assistant 2.10 or later. You can still see and remove them.</string>
@@ -246,7 +249,7 @@
     <string name="flow_next">Next</string>
     <string name="flow_open_browser">Open in the browser</string>
     <string name="flow_external_wait">Finish in the browser, then come back here: Xonos moves on by itself.</string>
-    <string name="spotify_old_accounts">On this phone, Spotify only plays with Premium accounts created before December 2024 (Spotify never gave the exact day). With a newer account your music shows up but won’t play: then use Music Assistant on a computer or home server, where you can choose Soloist.</string>
+    <string name="spotify_old_accounts">Spotify has two engines. librespot only works with Premium accounts created before December 2024 (Spotify never gave the exact day). Soloist, Spotify’s official engine, works with every Premium account: it needs your own Soloist API key (from developer.spotify.com) and, once, choosing “Music Assistant Pairing” among the devices in the Spotify app, with the phone on Wi-Fi.</string>
     <string name="flow_working">Working…</string>
     <string name="flow_finished">All set: the service is ready. Its music may take a few minutes to show up in the library.</string>
     <string name="flow_done">Done</string>

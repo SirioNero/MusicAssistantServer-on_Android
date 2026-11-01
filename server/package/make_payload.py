@@ -12,6 +12,8 @@ Dentro lo zip:
                i suoi moduli nativi (python3.13/lib-dynload), i certificati (cacert.pem)
     app/       Music Assistant preparato da ma/prepare.py e xonos_server.py
     site-packages/  i pacchetti di requirements.txt, installati per Android da Chaquopy
+    rootfs.tar il piccolo sistema Linux (glibc, PulseAudio) dove gira Soloist dentro proot (rootfs.py): Xonos
+               lo estrae la prima volta che serve (xonos_server.py), con i suoi collegamenti
     licenses/  i testi delle licenze (da licenses/ qui accanto, più quella di Xonos)
     NOTICE.txt di chi è ogni parte, con quale licenza e dove sta il sorgente
     payload.json    versione, ABI e Python
@@ -29,6 +31,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 import zipfile
 from email.parser import HeaderParser
@@ -36,7 +39,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 SERVER = HERE.parent
-REPO_URL = "https://github.com/SirioNero/Music-Assistant-on-Gearslip"
+REPO_URL = "https://github.com/SirioNero/MusicAssistantServer-on_Android"
 PYTHON = "3.13"
 FIXED_TIME = (1980, 1, 1, 0, 0, 0)
 # I programmi che Android installa dall'APK come librerie (lib<nome>.so): qui tornano programmi.
@@ -44,6 +47,8 @@ PROGRAMS = {"libffmpeg.so": "ffmpeg", "libffprobe.so": "ffprobe", "liblibrespot.
 # Il ponte Java di Chaquopy: fuori dall'app non serve.
 SKIP_LIBS = {"libchaquopy_java.so"}
 TRIPLES = {"arm64-v8a": "aarch64-linux-android", "x86_64": "x86_64-linux-android"}
+# L'architettura dei pacchetti di Ubuntu per il sistema Linux di Soloist.
+UBUNTU_ARCH = {"arm64-v8a": "arm64", "x86_64": "amd64"}
 MIN_SDK = 26
 PAGE_16K = 16384
 # Le librerie di lib/ e a quale parte di NOTICE.txt appartengono (per inizio del nome).
@@ -70,6 +75,7 @@ def main() -> None:
     parser.add_argument("--out", required=True, help="Lo zip da scrivere")
     parser.add_argument("--ndk", help="L'NDK, per compilare python3")
     parser.add_argument("--launcher", help="Un python3 già compilato, invece di compilarlo")
+    parser.add_argument("--rootfs-cache", help="Dove tenere i pacchetti di Ubuntu scaricati (fra un'ABI e l'altra)")
     args = parser.parse_args()
     if not args.ndk and not args.launcher:
         sys.exit("Serve --ndk (per compilare python3) o --launcher")
@@ -81,7 +87,9 @@ def main() -> None:
             shutil.copyfile(args.launcher, python3)
         else:
             compile_launcher(Path(args.ndk), args.abi, root, python3)
-        write_notice(root, args.version, args.abi)
+        cache = Path(args.rootfs_cache) if args.rootfs_cache else Path(tmp) / "rootfs-cache"
+        ubuntu = add_rootfs(root, args.abi, cache)
+        write_notice(root, args.version, args.abi, ubuntu)
         report_alignment(root)
         write_zip(root, Path(args.out))
         # Quanto occupa sul telefono, una volta estratto (Xonos chiede 4 volte lo zip libero, zip compreso).
@@ -133,7 +141,44 @@ def build(aar: Path, abi: str, version: str, root: Path) -> None:
     (root / "payload.json").write_text(json.dumps(info, indent=2) + "\n")
 
 
-def write_notice(root: Path, version: str, abi: str) -> None:
+def add_rootfs(root: Path, abi: str, cache: Path) -> list[tuple[str, str]]:
+    """rootfs.tar con il sistema Linux di Soloist (rootfs.py); i pacchetti di Ubuntu usati, con la versione."""
+    with tempfile.TemporaryDirectory() as tmp:
+        tree = Path(tmp) / "rootfs"
+        result = subprocess.run(
+            [sys.executable, str(HERE / "rootfs.py"), "--arch", UBUNTU_ARCH[abi], "--out", str(tree), "--cache", str(cache)],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        print(result.stdout.strip().splitlines()[-1] if result.stdout.strip() else "rootfs.py: niente da dire")
+        used = next((line for line in result.stdout.splitlines() if line.startswith("usati: ")), "")
+        packages = [tuple(item.split("=", 1)) for item in used.removeprefix("usati: ").split()]
+        write_tar(tree, root / "rootfs.tar")
+    return [(name, version.replace("%3a", ":")) for name, version in packages]
+
+
+def write_tar(tree: Path, out: Path) -> None:
+    """Un tar sempre uguale a parità di contenuto: voci in ordine, date e proprietari fissi, collegamenti com'erano."""
+    entries = []
+    for folder, dirs, files in os.walk(tree):
+        for name in dirs + files:
+            entries.append(Path(folder) / name)
+    entries.sort(key=lambda path: path.relative_to(tree).as_posix())
+    with tarfile.open(out, "w", format=tarfile.GNU_FORMAT) as archive:
+        for path in entries:
+            info = archive.gettarinfo(str(path), arcname=path.relative_to(tree).as_posix())
+            info.uid = info.gid = 0
+            info.uname = info.gname = ""
+            info.mtime = 315532800  # 1980-01-01, come le voci dello zip
+            if info.isreg():
+                with path.open("rb") as file:
+                    archive.addfile(info, file)
+            else:
+                archive.addfile(info)
+
+
+def write_notice(root: Path, version: str, abi: str, ubuntu: list[tuple[str, str]]) -> None:
     """NOTICE.txt e licenses/: di chi è ogni parte del pacchetto, con quale licenza e dove sta il sorgente."""
     gradle = (SERVER / "build.gradle.kts").read_text()
     ffmpeg_script = (SERVER / "ffmpeg" / "build.sh").read_text()
@@ -201,6 +246,14 @@ def write_notice(root: Path, version: str, abi: str) -> None:
             "LLVM libc++ from the Android NDK (lib/libc++_shared.so), if present",
             "Apache-2.0 WITH LLVM-exception (licenses/Apache-2.0.txt)",
             "https://github.com/llvm/llvm-project",
+        ),
+        (
+            "A small Ubuntu 24.04 system (rootfs.tar) where Spotify's Soloist runs inside proot: glibc, PulseAudio\n"
+            "and the libraries they need, unchanged from these Ubuntu packages: "
+            + ", ".join(f"{name} {package_version}" for name, package_version in ubuntu),
+            "each package's own (GPL, LGPL, MIT, BSD and others): its copyright file is inside the archive, in\n"
+            "usr/share/doc/<package>/copyright",
+            "https://launchpad.net/ubuntu/+source/<package> (the source packages of Ubuntu 24.04 'noble')",
         ),
     ]
     lines = [

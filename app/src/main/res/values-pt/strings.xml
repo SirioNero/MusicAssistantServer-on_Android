@@ -48,7 +48,7 @@
     <string name="phone_server_remove">Remover deste telefone</string>
     <string name="phone_server_remove_title">Remover o Music Assistant deste telefone?</string>
     <string name="phone_server_remove_text">Os serviços e a biblioteca dele neste telefone também são apagados. Você pode baixá-lo de novo quando quiser.</string>
-    <string name="phone_server_share_log">Compartilhar o registro do Music Assistant</string>
+    <string name="phone_server_share_log">Compartilhar o registro do servidor deste telefone</string>
     <string name="phone_server_log_subject">Registro do Music Assistant no Xonos</string>
     <string name="show_password">Mostrar a senha</string>
     <string name="hide_password">Ocultar a senha</string>
@@ -212,6 +212,9 @@
     <string name="volume">Volume</string>
     <string name="services_title">Serviços do Music Assistant</string>
     <string name="services_help">Adicione ou configure de onde vem a música: Spotify, Tidal, Jellyfin, podcasts, rádio…</string>
+    <string name="server_log_title">Registro do Music Assistant</string>
+    <string name="server_log_help">Compartilhe as últimas linhas do registro de %1$s com quem está ajudando você.</string>
+    <string name="server_log_subject">Registro do Music Assistant (%1$s) do Xonos</string>
     <string name="services_add">Adicionar um serviço</string>
     <string name="services_none">Ainda não há serviços</string>
     <string name="services_old_server">Para adicionar e configurar serviços daqui é preciso o Music Assistant 2.10 ou mais recente. Mesmo assim você pode vê-los e removê-los.</string>
@@ -243,7 +246,7 @@
     <string name="flow_next">Avançar</string>
     <string name="flow_open_browser">Abrir no navegador</string>
     <string name="flow_external_wait">Termine no navegador e volte aqui: o Xonos continua sozinho.</string>
-    <string name="spotify_old_accounts">Neste telefone, o Spotify só toca com contas Premium criadas antes de dezembro de 2024 (o Spotify nunca informou o dia exato). Com uma conta mais nova, sua música aparece mas não toca: nesse caso, use o Music Assistant em um computador ou servidor em casa, onde você pode escolher o Soloist.</string>
+    <string name="spotify_old_accounts">O Spotify tem dois motores. O librespot só funciona com contas Premium criadas antes de dezembro de 2024 (o Spotify nunca informou o dia exato). O Soloist, o motor oficial do Spotify, funciona com todas as contas Premium: precisa da sua própria chave de API do Soloist (em developer.spotify.com) e, uma única vez, escolher “Music Assistant Pairing” entre os dispositivos do app Spotify, com o telefone no Wi-Fi.</string>
     <string name="flow_working">Um momento…</string>
     <string name="flow_finished">Pronto: o serviço está configurado. As músicas podem levar alguns minutos para aparecer na biblioteca.</string>
     <string name="flow_done">Concluído</string>

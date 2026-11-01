@@ -279,6 +279,18 @@ class Library(private val repo: MaRepository) {
         }
     }
 
+    /**
+     * Le ultime righe del registro di Music Assistant (`logging/get`, solo per gli amministratori): il
+     * registro intero può essere di qualche MB, a chi aiuta servono le ultime [chars] lettere, da una riga intera.
+     */
+    suspend fun serverLog(chars: Int = LOG_CHARS): String {
+        val log = repo.command("logging/get", 60_000) as? String ?: return ""
+        if (log.length <= chars) return log
+        val start = log.length - chars
+        val line = log.indexOf('\n', start)
+        return log.substring(if (line >= 0) line + 1 else start)
+    }
+
     /** Riprende la coda da dove si era fermata (play su una coda ferma la fa ripartire). */
     suspend fun resume(queueId: String) {
         unlock.retrying(queueId) { repo.command("player_queues/play") { put("queue_id", queueId) } }
@@ -366,6 +378,9 @@ class Library(private val repo: MaRepository) {
 
         /** Risultati per tipo: il valore predefinito di Music Assistant. */
         const val SEARCH_LIMIT = 25
+
+        /** Quanto registro di Music Assistant si condivide: come per il server sul telefono, circa 96 KB. */
+        const val LOG_CHARS = 96 * 1024
 
         val SEARCH_TYPES = listOf("artists", "tracks", "albums", "playlists", "podcasts", "audiobooks", "radio", "genres")
     }

@@ -3,16 +3,16 @@ Categories:
   - Online Media Player
 License: AGPL-3.0-or-later
 AuthorName: SirioNero
-SourceCode: https://github.com/SirioNero/Music-Assistant-on-Gearslip
-IssueTracker: https://github.com/SirioNero/Music-Assistant-on-Gearslip/issues
-Changelog: https://github.com/SirioNero/Music-Assistant-on-Gearslip/releases
+SourceCode: https://github.com/SirioNero/MusicAssistantServer-on_Android
+IssueTracker: https://github.com/SirioNero/MusicAssistantServer-on_Android/issues
+Changelog: https://github.com/SirioNero/MusicAssistantServer-on_Android/releases
 Bitcoin: bc1qu8q2sc5kuccjj3zpzzfpj85xn7szp73nae9xlx
 
 AutoName: Xonos
 
 RepoType: git
-Repo: https://github.com/SirioNero/Music-Assistant-on-Gearslip.git
-Binaries: https://github.com/SirioNero/Music-Assistant-on-Gearslip/releases/download/v%v/Xonos.apk
+Repo: https://github.com/SirioNero/MusicAssistantServer-on_Android.git
+Binaries: https://github.com/SirioNero/MusicAssistantServer-on_Android/releases/download/v%v/Xonos.apk
 
 Builds:
   - versionName: 0.1.38

@@ -96,8 +96,13 @@ prima di cominciare: le cose scritte qui sono già state verificate, non vanno r
   "Riproducibile" fa le stesse due cose. Il GNUmakefile di proot chiama `readelf` del sistema (non quello dell'NDK)
   per l'offset di `pokedata_workaround` (solo arm64, usato se PTRACE_POKEDATA non va): senza readelf non dà errore,
   l'offset diventa 0, `libproot.so` arm64 è sbagliato e l'APK non è identico (Riproducibile, 1° novembre 2026).
-  Nella 0.1.49 della release è giusto (1016, controllato dal caricatore). In locale (sandbox) non si compila né si
-  esegue: solo in CI.
+  Nella 0.1.49 della release è giusto (1016, controllato dal caricatore), e con binutils Riproducibile la dà
+  identica. Dopo la 0.1.49 (ramo `claude/proot-readelf`, da unire solo con un aumento di versione) `proot.sh` mette
+  nel GNUmakefile il `llvm-readelf` dell'NDK e al posto dello script di proot `app/native/loader-info.awk` (stesso
+  file generato, con ogni awk; si ferma se mancano i simboli), controlla l'offset e scrive le impronte SHA-256 delle
+  quattro librerie nel log: in CI uguali a quelle della 0.1.49. gawk e binutils allora non dovrebbero più servire
+  (da provare con Riproducibile prima di toglierli dalla ricetta). In locale (sandbox) non si compila né si esegue:
+  solo in CI.
 - R8 è acceso nella release (`isMinifyEnabled` e `isShrinkResources`, regole in `app/proguard-rules.pro`,
   `-dontobfuscate` così gli errori restano leggibili). L'APK ridotto si prova sull'emulatore con le misure
   (sotto): parte, si collega, suona Opus, nessun arresto.

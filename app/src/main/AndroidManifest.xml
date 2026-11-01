@@ -15,6 +15,9 @@
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
+    <!-- Soloist (Spotify) sul telefono: per l'abbinamento si fa trovare dall'app Spotify con mDNS, che arriva
+         in multicast; Xonos lo lascia passare solo in quei minuti. -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
 
     <application
         android:name=".XonosApp"

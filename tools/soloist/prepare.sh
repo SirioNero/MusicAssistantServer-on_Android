@@ -27,7 +27,7 @@ readelf -d "$BIN" | grep NEEDED | sed -E 's/.*\[(.*)\]/\1/' | tr '\n' ' ' | tee 
 # 2. Il sistema Linux di prova: glibc e PulseAudio di Ubuntu 24.04 (rootfs.py, come sul telefono), Soloist in
 # /opt/soloist, busybox (statico) per lo script che gira dentro (inside.sh). Il DNS è quello dell'emulatore.
 ROOT="$WORK/root"
-python3 tools/soloist/rootfs.py --arch amd64 --out "$ROOT" --cache "$WORK/rootfs-cache" 2>&1 | tee -a "$REPORT"
+python3 server/package/rootfs.py --arch amd64 --out "$ROOT" --cache "$WORK/rootfs-cache" 2>&1 | tee -a "$REPORT"
 mkdir -p "$ROOT/opt/soloist"
 cp -a "$WORK/x86_64/." "$ROOT/opt/soloist/"
 cp -L "$(command -v busybox)" "$ROOT/usr/bin/busybox"

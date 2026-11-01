@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Il piccolo sistema Linux (glibc) in cui gira Soloist dentro Xonos.
+Il piccolo sistema Linux (glibc) in cui gira Soloist dentro Xonos, per il pacchetto del server sul telefono
+(make_payload.py lo mette in rootfs.tar) e per la prova di tools/soloist.
 
 Dentro: glibc, PulseAudio (il demone, pactl, pacat e i due moduli che usa Music Assistant: il socket e il
 "pipe sink" che scrive l'audio in un tubo) e libpulse, che Soloist apre da sé per suonare. I pacchetti sono
@@ -265,13 +266,16 @@ def closure(start: set[str], files: dict[str, Path], triplet: str) -> tuple[set[
 
 
 def copy(rel: str, source: Path, out: Path) -> None:
-    """Un file del pacchetto al suo posto, collegamenti compresi."""
+    """Un file del pacchetto al suo posto, collegamenti compresi (relativi: si estraggono anche altrove)."""
     target = out / rel
     if target.exists() or target.is_symlink():
         return
     target.parent.mkdir(parents=True, exist_ok=True)
     if source.is_symlink():
-        target.symlink_to(os.readlink(source))
+        link = os.readlink(source)
+        if link.startswith("/"):
+            link = os.path.relpath(link.lstrip("/"), os.path.dirname(rel) or ".")
+        target.symlink_to(link)
     else:
         shutil.copy2(source, target)
 

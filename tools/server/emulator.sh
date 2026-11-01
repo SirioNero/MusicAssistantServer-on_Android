@@ -116,6 +116,8 @@ tap() {
 # 1. Il server da solo.
 copy_music || { echo "La musica di prova non è arrivata intera"; exit 1; }
 package_url
+# La prova di Soloist e PulseAudio dentro Xonos (xonos_selftest.py) parte col server e aspetta il via.
+adb shell run-as "$PACKAGE" sh -c "'mkdir -p files/music-assistant && touch files/music-assistant/xonos-selftest'"
 adb logcat -c
 adb logcat -v time > "$OUT/logcat.txt" 2>&1 &
 LOGCAT=$!
@@ -129,6 +131,26 @@ if [ "$state" = "Server: RUNNING" ]; then
     python3 tools/server/check.py --url http://127.0.0.1:8095 --music "$MUSIC" --seconds 12 --spotify 2>&1 | tee "$OUT/check.txt"
     status=${PIPESTATUS[0]}
     adb forward --remove tcp:8095
+fi
+# Soloist (scaricato da Spotify come fa Music Assistant), PulseAudio e il tubo dell'audio, dentro proot, col
+# codice vero di Music Assistant: dopo check.py, per non pesare sulle sue prove.
+if [ "$state" = "Server: RUNNING" ]; then
+    adb shell run-as "$PACKAGE" touch files/music-assistant/xonos-selftest-go
+    selftest=""
+    for _ in $(seq 1 60); do
+        selftest=$(adb exec-out run-as "$PACKAGE" cat files/music-assistant/musicassistant.log 2>/dev/null \
+            | grep -o "XONOS_SELFTEST fine [0-9]*/[0-9]*" | tail -n 1)
+        [ -n "$selftest" ] && break
+        sleep 5
+    done
+    adb exec-out run-as "$PACKAGE" cat files/music-assistant/musicassistant.log 2>/dev/null \
+        | grep "XONOS_SELFTEST" | sed 's/^.*XONOS_SELFTEST/XONOS_SELFTEST/' | tee "$OUT/selftest.txt"
+    echo "== Soloist e PulseAudio dentro Xonos: ${selftest:-nessun risultato dopo 5 minuti}"
+    read -r passed total <<< "$(echo "$selftest" | sed -n 's/.* \([0-9]*\)\/\([0-9]*\)$/\1 \2/p')"
+    if [ -z "$selftest" ] || [ "${passed:-0}" != "${total:-x}" ]; then
+        echo "::error title=Soloist sul telefono::La prova di Soloist e PulseAudio dentro Xonos non è passata ($selftest)"
+        status=1
+    fi
 fi
 adb exec-out run-as "$PACKAGE" cat files/music-assistant/musicassistant.log > "$OUT/musicassistant.log" 2>/dev/null
 # FFmpeg del telefono con https (mbedTLS), come per radio e podcast: un file di Music Assistant su GitHub.

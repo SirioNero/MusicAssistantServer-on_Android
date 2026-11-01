@@ -25,6 +25,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -91,13 +92,19 @@ internal fun HomeScreen(page: HomePage, model: PhoneModel, host: Host) {
     }
 }
 
-/** Una riga sotto il titolo quando Music Assistant non risponde: il motivo, o che ci si sta collegando. */
+/**
+ * Una riga sotto il titolo quando Music Assistant non risponde: il motivo, o che ci si sta collegando. Se è quello
+ * sul telefono e Xonos è stato aggiornato senza il suo pacchetto nuovo, lo dice, con il tasto per aggiornarlo.
+ */
 @Composable
 internal fun ConnectionBanner(model: PhoneModel, host: Host) {
     val connection by model.connection.collectAsState()
-    val text = when (connection) {
-        is Connection.Connected -> return
-        is Connection.Connecting -> stringResource(R.string.connecting)
+    // Il server sul telefono parte solo con il pacchetto della versione di Xonos: finché non lo si scarica, niente.
+    val serverOld = connection !is Connection.Connected && model.onPhoneServer && model.phoneServerOutdated
+    val text = when {
+        serverOld -> stringResource(R.string.phone_server_outdated)
+        connection is Connection.Connected -> return
+        connection is Connection.Connecting -> stringResource(R.string.connecting)
         else -> host.describe(connection) ?: return
     }
     Surface(
@@ -105,13 +112,20 @@ internal fun ConnectionBanner(model: PhoneModel, host: Host) {
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (connection is Connection.Connecting) {
-                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-            } else {
-                Icon(XIcons.Offline, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.error)
+        Column(Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (connection is Connection.Connecting && !serverOld) {
+                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(XIcons.Offline, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.error)
+                }
+                Text(text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
             }
-            Text(text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            if (serverOld) {
+                TextButton(onClick = { model.openSettings() }, modifier = Modifier.align(Alignment.End).testTag("update_phone_server")) {
+                    Text(stringResource(R.string.phone_server_update))
+                }
+            }
         }
     }
 }

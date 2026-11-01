@@ -1,0 +1,1 @@
+After an update of Xonos, Music Assistant on this phone needs its new version too. Now "Update Music Assistant on this phone" shows up in its card even while Xonos is using it, and the Home says so, with a button to Settings. Before, you first had to tap "Use another Music Assistant". Your account, services and library stay.

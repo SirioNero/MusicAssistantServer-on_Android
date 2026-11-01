@@ -66,8 +66,8 @@ prima di cominciare: le cose scritte qui sono già state verificate, non vanno r
   senza chiave e passa ricetta e APK a `fdroid lint` e `fdroid scanner`. `dependenciesInfo` è spento
   (F-Droid rifiuta quel blocco). Build riproducibili: il workflow "Riproducibile" compila la release
   come F-Droid (la loro immagine `fdroidserver:buildserver-trixie`, OpenJDK 21, Gradle del wrapper,
-  senza `tools/`) e la confronta byte per byte con l'APK della release tolta la firma: per la 0.1.38 e la
-  0.1.42 identici. Così la ricetta ha `Binaries` e `AllowedAPKSigningKeys` (SHA-256 del certificato
+  senza `tools/`) e la confronta byte per byte con l'APK della release tolta la firma: per la 0.1.38, la
+  0.1.42, la 0.1.49 e la 0.1.50 identici. Così la ricetta ha `Binaries` e `AllowedAPKSigningKeys` (SHA-256 del certificato
   `18ef3fc3…2c836`): F-Droid pubblica l'APK con la nostra firma e si passa da GitHub/Obtainium a F-Droid
   senza disinstallare. Dopo ogni release va lanciato a mano "Riproducibile": una versione non identica
   F-Droid non la pubblica. Il modello delle richieste di fdroiddata vuole in `commit` l'hash completo e
@@ -100,7 +100,7 @@ prima di cominciare: le cose scritte qui sono già state verificate, non vanno r
   identica. Dalla 0.1.50 `proot.sh` mette
   nel GNUmakefile il `llvm-readelf` dell'NDK e al posto dello script di proot `app/native/loader-info.awk` (stesso
   file generato, con ogni awk; si ferma se mancano i simboli), controlla l'offset e scrive le impronte SHA-256 delle
-  quattro librerie nel log: in CI uguali a quelle della 0.1.49. gawk e binutils allora non dovrebbero più servire
+  quattro librerie nel log: in CI uguali a quelle della 0.1.49, e Riproducibile dà la 0.1.50 identica. gawk e binutils allora non dovrebbero più servire
   (da provare con Riproducibile prima di toglierli dalla ricetta). In locale (sandbox) non si compila né si esegue:
   solo in CI.
 - R8 è acceso nella release (`isMinifyEnabled` e `isShrinkResources`, regole in `app/proguard-rules.pro`,
@@ -534,7 +534,10 @@ di Xonos suona dal server sul telefono; la release ridotta con R8, da capo come 
   (`usePhoneServer`): avvia il server, la prima volta crea l'account `xonos` (amministratore) con una password
   che Xonos tiene in `Settings` (per rientrare se perde il token), poi token e prova della connessione come
   per ogni Music Assistant. Scaricato: "Usa Music Assistant su questo telefono" e "Togli dal telefono" (con
-  conferma); in uso: "Usa un altro Music Assistant". `XonosApp` riavvia il server all'avvio e quando la
+  conferma); in uso: "Usa un altro Music Assistant". In uso ma senza il pacchetto di questa versione (Xonos
+  aggiornato, il server non parte) dalla 0.1.51 la scheda dice di aggiornarlo e ha "Aggiorna Music Assistant su
+  questo telefono" (fino alla 0.1.50 il tasto compariva solo dopo "Usa un altro Music Assistant", e l'utente non lo
+  trovava), e la Home lo dice nel `ConnectionBanner`, con un tasto per le Impostazioni. I dati restano. `XonosApp` riavvia il server all'avvio e quando la
   connessione cade, se l'indirizzo salvato è il suo e il pacchetto c'è. `PhoneServerControl` è l'interfaccia
   senza Android: `PhoneServerCheckKt` (banco JVM) la prova con un download finto contro il server avviato sul
   computer.

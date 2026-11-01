@@ -91,7 +91,8 @@ prima di cominciare: le cose scritte qui sono già state verificate, non vanno r
   estraggono all'installazione (`useLegacyPackaging`). Sorgenti scaricati da versioni fissate con lo SHA-256 (quelli
   di Termux): termux/proot 5.1.107.101 e talloc 2.5.0 di Samba, compilato da solo con `talloc-replace.h` al posto
   di waf; percorsi tolti, niente build-id, pagine da 16 KB. Nella ricetta di F-Droid le build nuove vogliono
-  `ndk: r27d`; "Riproducibile" installa quell'NDK. In locale (sandbox) non si compila né si esegue: solo in CI.
+  `ndk: r27d` e `sudo: [apt-get update, apt-get install -y make]` (l'immagine `buildserver-trixie` non ha make);
+  "Riproducibile" fa le stesse due cose. In locale (sandbox) non si compila né si esegue: solo in CI.
 - R8 è acceso nella release (`isMinifyEnabled` e `isShrinkResources`, regole in `app/proguard-rules.pro`,
   `-dontobfuscate` così gli errori restano leggibili). L'APK ridotto si prova sull'emulatore con le misure
   (sotto): parte, si collega, suona Opus, nessun arresto.

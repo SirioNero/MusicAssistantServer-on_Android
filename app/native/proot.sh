@@ -51,6 +51,7 @@ for ABI in "$@"; do
     cp "$BUILD/talloc-$TALLOC_VERSION/talloc.c" "$BUILD/talloc-$TALLOC_VERSION/talloc.h" "$BUILD/talloc/"
     cp "$HERE/talloc-replace.h" "$BUILD/talloc/replace.h"
     CC="$TOOLCHAIN/bin/$TRIPLE$API-clang"
+    SRC="$BUILD/proot-$PROOT_VERSION/src"
     # I percorsi della macchina che compila non restano nei programmi (assert, __FILE__).
     MAP="-ffile-prefix-map=$BUILD=."
     echo "talloc $TALLOC_VERSION per $ABI"
@@ -58,20 +59,33 @@ for ABI in "$@"; do
     "$TOOLCHAIN/bin/llvm-ar" rcsD "$BUILD/talloc/libtalloc.a" "$BUILD/talloc/talloc.o"
     echo "proot $PROOT_VERSION per $ABI"
     # ashmem_memfd.c usa strcmp e memset senza includere string.h: il clang dell'NDK 27 lo tratta come un errore.
-    sed -i '1i #include <string.h>' "$BUILD/proot-$PROOT_VERSION/src/extension/ashmem_memfd/ashmem_memfd.c"
+    sed -i '1i #include <string.h>' "$SRC/extension/ashmem_memfd/ashmem_memfd.c"
+    # Per arm64 il GNUmakefile scrive loader/loader-info.c con "readelf -s loader | awk -f loader-info.awk": il
+    # readelf del sistema (binutils) e uno script per gawk. Senza readelf non si ferma, e proot esce sbagliato
+    # (l'offset di pokedata_workaround diventa 0). Qui il readelf dell'NDK e loader-info.awk di Xonos, che va con
+    # ogni awk e si ferma se mancano i simboli: stesso file, stesso proot.
+    sed -i 's/^\treadelf -s \$</\t$(READELF) -s $</' "$SRC/GNUmakefile"
+    grep -q '^	$(READELF) -s ' "$SRC/GNUmakefile" || { echo "GNUmakefile di proot diverso: readelf non trovato"; exit 1; }
+    cp "$HERE/loader-info.awk" "$SRC/loader/loader-info.awk"
     # Le opzioni passano dall'ambiente: il GNUmakefile di proot ci aggiunge le sue (-ltalloc...). Il caricatore
     # resta un file a sé (PROOT_UNBUNDLE_LOADER; Xonos lo indica con PROOT_LOADER); niente caricatore a 32 bit,
     # perché i programmi da avviare sono a 64; GIT=false: la versione è quella scritta qui, non quella del
     # repository che compila.
-    env CC="$CC" LD="$CC" \
+    env CC="$CC" LD="$CC" READELF="$TOOLCHAIN/bin/llvm-readelf" \
         STRIP="$TOOLCHAIN/bin/llvm-strip" OBJCOPY="$TOOLCHAIN/bin/llvm-objcopy" OBJDUMP="$TOOLCHAIN/bin/llvm-objdump" \
         CPPFLAGS="-DARG_MAX=131072 -DVERSION=\\\"$PROOT_VERSION\\\" -I$BUILD/talloc" \
         CFLAGS="-g0 $MAP" \
         LDFLAGS="-L$BUILD/talloc -Wl,--build-id=none -Wl,-z,max-page-size=16384" \
         PROOT_UNBUNDLE_LOADER=/xonos \
-        make -s -C "$BUILD/proot-$PROOT_VERSION/src" -j"$(nproc)" HAS_LOADER_32BIT= GIT=false proot loader/loader
+        make -s -C "$SRC" -j"$(nproc)" HAS_LOADER_32BIT= GIT=false proot loader/loader
+    if [ "$ABI" = arm64-v8a ]; then
+        grep -Eq '^const ssize_t offset_to_pokedata_workaround=-?[1-9][0-9]*;$' "$SRC/loader/loader-info.c" \
+            || { echo "loader-info.c senza l'offset di pokedata_workaround:"; cat "$SRC/loader/loader-info.c"; exit 1; }
+        sed -n 's/^const ssize_t //p' "$SRC/loader/loader-info.c"
+    fi
     mkdir -p "$OUT/$ABI"
-    "$TOOLCHAIN/bin/llvm-strip" --strip-all -o "$OUT/$ABI/libproot.so" "$BUILD/proot-$PROOT_VERSION/src/proot"
-    "$TOOLCHAIN/bin/llvm-strip" --strip-all -o "$OUT/$ABI/libproot-loader.so" "$BUILD/proot-$PROOT_VERSION/src/loader/loader"
-    ls -l "$OUT/$ABI"
+    "$TOOLCHAIN/bin/llvm-strip" --strip-all -o "$OUT/$ABI/libproot.so" "$SRC/proot"
+    "$TOOLCHAIN/bin/llvm-strip" --strip-all -o "$OUT/$ABI/libproot-loader.so" "$SRC/loader/loader"
+    # Le impronte, da confrontare con le librerie di una release (lib/<abi>/ nell'APK).
+    (cd "$OUT" && sha256sum "$ABI"/*)
 done

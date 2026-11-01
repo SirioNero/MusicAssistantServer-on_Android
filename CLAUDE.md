@@ -96,8 +96,13 @@ prima di cominciare: le cose scritte qui sono già state verificate, non vanno r
   "Riproducibile" fa le stesse due cose. Il GNUmakefile di proot chiama `readelf` del sistema (non quello dell'NDK)
   per l'offset di `pokedata_workaround` (solo arm64, usato se PTRACE_POKEDATA non va): senza readelf non dà errore,
   l'offset diventa 0, `libproot.so` arm64 è sbagliato e l'APK non è identico (Riproducibile, 1° novembre 2026).
-  Nella 0.1.49 della release è giusto (1016, controllato dal caricatore). In locale (sandbox) non si compila né si
-  esegue: solo in CI.
+  Nella 0.1.49 della release è giusto (1016, controllato dal caricatore), e con binutils Riproducibile la dà
+  identica. Dalla 0.1.50 `proot.sh` mette
+  nel GNUmakefile il `llvm-readelf` dell'NDK e al posto dello script di proot `app/native/loader-info.awk` (stesso
+  file generato, con ogni awk; si ferma se mancano i simboli), controlla l'offset e scrive le impronte SHA-256 delle
+  quattro librerie nel log: in CI uguali a quelle della 0.1.49. gawk e binutils allora non dovrebbero più servire
+  (da provare con Riproducibile prima di toglierli dalla ricetta). In locale (sandbox) non si compila né si esegue:
+  solo in CI.
 - R8 è acceso nella release (`isMinifyEnabled` e `isShrinkResources`, regole in `app/proguard-rules.pro`,
   `-dontobfuscate` così gli errori restano leggibili). L'APK ridotto si prova sull'emulatore con le misure
   (sotto): parte, si collega, suona Opus, nessun arresto.
@@ -466,6 +471,31 @@ di Xonos suona dal server sul telefono; la release ridotta con R8, da capo come 
     configurazione): socket di PulseAudio, tubo del pipe sink, porta della WebSocket di Soloist restano gli stessi. Toglie dall'ambiente LD_LIBRARY_PATH, PYTHONHOME/PATH e
     SSL_CERT_FILE (i certificati del pacchetto non si vedono dentro). Se XONOS_PROOT o il sistema Linux mancano,
     toglie XONOS_PROOT e Spotify resta con librespot. Durante `soloist --pair` stampa `XONOS_MULTICAST on/off`.
+  - **Fermarli** (pacchetto 2.10.8-5, Xonos 0.1.50): proot ignora SIGINT, SIGTERM e SIGHUP (`event_loop` in
+    `tracee/event.c`: aspetta il ^C di un terminale, che va a tutto il gruppo di processi) e non usa
+    PTRACE_O_EXITKILL: se muore, il programma che seguiva resta acceso, staccato. Music Assistant ferma Soloist e
+    PulseAudio con `AsyncProcess.close()`: SIGINT al processo che ha avviato (proot), poi fino a cinque SIGKILL con
+    `os.kill(pid, 9)`. Con la 0.1.49 sul telefono dell'utente (1° novembre 2026, Pixel 10 Pro, GrapheneOS, Android
+    17): abbinamento riuscito e la musica partita (Soloist, PulseAudio e pipe sink vanno anche su arm64 vero), poi al
+    secondo play "The Spotify Soloist daemon could not be stopped", la musica ferma e il telefono lentissimo (il
+    lettore di `iter_stdout` tiene la sua serratura finché Soloist non esce: dopo 5 s close() rinuncia). Ora ogni
+    proot parte in un gruppo suo (`start_new_session`, il numero del gruppo è quello di proot, in `_guest_groups`) e
+    `os.kill` per un proot va a tutto il gruppo (`os.killpg`; l'os.kill vero resta in `os.kill.__wrapped__`): ci
+    passano anche `send_signal`, `terminate` e `kill` di Popen e di asyncio. All'avvio `_end_leftovers` toglie proot
+    e programmi Linux di un server di prima (riconosciuti dall'argv[0]: il percorso di proot, `/usr/bin/<programma>`,
+    la cartella dei dati), alla fine `_end_guests` dà SIGKILL ai gruppi rimasti; tutti e due lo scrivono nel
+    registro. Provato in locale con un finto proot in C che ignora gli stessi segnali: com'era SIGINT al solo proot
+    lascia acceso il programma; con la correzione SIGINT, terminate e SIGKILL fermano tutto il gruppo, la pulizia
+    toglie i rimasti. In CI (Server MA, emulatore x86_64, proot e Soloist veri): `proot-ignora-sigint` (SIGINT al
+    solo proot, Soloist resta acceso: il guasto del telefono), `soloist-ferma` (AsyncProcess.close() con il lettore
+    di iter_stdout, come in un brano: fermo in 0,0 s, codice 0, nessun processo rimasto), `pulseaudio-ferma`
+    (nessuno rimasto dopo release()); `cpu-audio`, 10 s di rumore con pacat letti dal tubo a 1,1 volte il tempo
+    reale: PulseAudio 1%, proot 1%, pacat 0% (3,87 MB letti su 3,53 MB del tempo reale).
+  - **Il processore nel registro**: ogni minuto (`CPU_EVERY_S`), finché gira un programma Linux, una riga
+    "Processore dei programmi Linux negli ultimi 60 s: soloist N%, proot N%, pulseaudio N%" (100% = un core, i nomi
+    dall'argv[0] di /proc; gli zombie non contano), così dal registro di una persona si vede quanto pesa proot.
+    In CI la riga non compare (le prove con i programmi Linux durano 21 s, prima del primo minuto): provata in
+    locale; `_processes` e `SC_CLK_TCK` sull'emulatore li usa anche `cpu-audio`.
   - **prepare.py** (`_soloist`): `_resolve_architecture` accetta Android quando c'è XONOS_PROOT; il flusso di Spotify
     mostra la scelta del motore solo allora (sennò librespot); `PAVolumeController` comanda PulseAudio con `pactl`
     (stessa interfaccia: load/unload-module, set-sink-volume) perché la libpulse del sistema Linux è di glibc e il
@@ -477,8 +507,9 @@ di Xonos suona dal server sul telefono; la release ridotta con R8, da capo come 
     build di prova: comandi dentro il processo di Xonos) con proot dal sorgente: glibc, `soloist --version`, PulseAudio
     in 0,1 s, pipe sink, audio nel tubo, Soloist acceso con una chiave finta fino a "waiting for login — connect to
     … from your Spotify app", nessun SIGSYS; la rete da dentro proot (DNS, http verso Spotify). "Server MA" con
-    `xonos_selftest.py` (parte se c'è `<dati>/xonos-selftest`, aspetta `xonos-selftest-go`; 7 prove, tutte
-    passate): Music Assistant scarica Soloist e lo prova, PulseAudio e pipe sink col suo codice, audio nel tubo,
+    `xonos_selftest.py` (parte se c'è `<dati>/xonos-selftest`, aspetta `xonos-selftest-go`; dal 2.10.8-5 11 prove,
+    tutte passate: anche `proot-ignora-sigint`, `soloist-ferma` con AsyncProcess come in un brano, `cpu-audio` con
+    10 s di audio a tempo reale e `pulseaudio-ferma`): Music Assistant scarica Soloist e lo prova, PulseAudio e pipe sink col suo codice, audio nel tubo,
     Soloist acceso, e lo si cerca come l'app Spotify: risponde all'mDNS (`_spotify-connect._tcp.local`: PTR, SRV con
     la porta, TXT `CPath=/zc`, A con gli indirizzi del telefono, in multicast al gruppo, non con risposte dirette) e
     la sua pagina getInfo risponde su 127.0.0.1 e sull'indirizzo di rete. `tools/soloist/ifaddrs-test.c`: dentro
@@ -634,8 +665,8 @@ ricomposizioni, schermate salvate), server trovati in rete e accesso con nome ut
 gestione dei servizi di MA per gli admin, donazioni in bitcoin, "Suona su" con passaggio della coda, playlist
 modificabili (aggiungi, togli, nuova, elimina) e coda modificabile (suona dopo, togli), Music Assistant sul
 telefono stesso scaricato su richiesta ("Fai diventare Xonos il tuo server Music Assistant", da provare sul telefono),
-Spotify per tutti gli account Premium su quel server: Soloist dentro proot (0.1.49, provato sull'emulatore; da provare
-sul telefono con una chiave API e un account veri).
+Spotify per tutti gli account Premium su quel server: Soloist dentro proot (0.1.49; sul telefono dell'utente
+l'abbinamento riesce e la musica parte, ma Soloist non si fermava: corretto nella 0.1.50, da riprovare sul telefono).
 Proposto, non fatto: cercare dal telefono con mDNS/SSDP le casse che MA non vede e suggerire il
 servizio da aggiungere. Ancora da fare:
 

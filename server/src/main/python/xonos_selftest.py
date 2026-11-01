@@ -5,6 +5,8 @@ xonos_server lo avvia dopo la partenza del server quando nella cartella dei dati
 (lo mette tools/server/emulator.sh; sul telefono di una persona non c'è). Senza account Spotify si arriva fin dove
 si può: Music Assistant scarica Soloist (col consenso) e lo prova, avvia PulseAudio come per un brano, crea il
 "pipe sink" e ci passa un suono, poi accende Soloist con una chiave finta finché aspetta l'abbinamento.
+Poi lo ferma come lo ferma Music Assistant (AsyncProcess.close), guarda quanto processore usano proot e PulseAudio
+con dieci secondi di audio a tempo reale, e che PulseAudio si fermi quando non serve più.
 Nel registro di Music Assistant: righe "XONOS_SELFTEST <prova> ok|fail <dettagli>" e alla fine
 "XONOS_SELFTEST fine <riuscite>/<prove>".
 """
@@ -14,6 +16,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import signal
+import sys
 from contextlib import suppress
 from pathlib import Path
 from typing import Any
@@ -22,6 +26,9 @@ LOGGER = logging.getLogger("xonos.selftest")
 SOLOIST_WAIT_S = 30
 GO_WAIT_S = 900
 FIFO_READ_S = 4
+CPU_AUDIO_S = 10
+# Il tubo del pipe sink di Music Assistant: s32le, 44,1 kHz, stereo.
+FIFO_BYTES_PER_S = 44100 * 8
 
 
 async def run(mass: Any) -> None:
@@ -79,6 +86,22 @@ async def run(mass: Any) -> None:
             say("soloist-getinfo", bool(found.get("getinfo")), str(found.get("getinfo"))[:300])
         except Exception as err:  # noqa: BLE001
             say("soloist-acceso", False, repr(err))
+        try:
+            ignored, stopped, detail = await _soloist_stop(binary, server, sink, Path(mass.cache_path))
+            # Fino al pacchetto 2.10.8-4 i segnali di Music Assistant andavano al solo proot: rifatto qui, Soloist
+            # deve restare acceso (proot li ignora). È il perché di "The Spotify Soloist daemon could not be stopped".
+            what = "resta acceso" if ignored else "si ferma"
+            say("proot-ignora-sigint", ignored, f"SIGINT al solo proot: Soloist {what}")
+            say("soloist-ferma", stopped, detail)
+        except Exception as err:  # noqa: BLE001
+            say("soloist-ferma", False, repr(err))
+
+    if server is not None and sink is not None:
+        try:
+            flowing, detail = await _cpu_with_audio(server, sink)
+            say("cpu-audio", flowing, detail)
+        except Exception as err:  # noqa: BLE001
+            say("cpu-audio", False, repr(err))
 
     if sink is not None:
         with suppress(Exception):
@@ -86,7 +109,157 @@ async def run(mass: Any) -> None:
     if server is not None:
         with suppress(Exception):
             await server.release()
+        # Music Assistant ferma PulseAudio (SIGINT) quando nessuno lo usa più: non deve restare acceso.
+        left = await _still_running("pulseaudio")
+        say("pulseaudio-ferma", not left, f"processi rimasti: {len(left)}")
     LOGGER.info("XONOS_SELFTEST fine %d/%d", sum(results), len(results))
+
+
+def _server_module() -> Any:
+    """Il modulo xonos_server già caricato (avviato con "python -m" si chiama __main__)."""
+    for name in ("xonos_server", "__main__"):
+        module = sys.modules.get(name)
+        if module is not None and hasattr(module, "_guest_groups"):
+            return module
+    raise RuntimeError("xonos_server non è caricato")
+
+
+async def _still_running(name: str, wait_s: float = 5) -> list[int]:
+    """I processi Linux che si chiamano [name] ancora accesi dopo al massimo [wait_s] secondi."""
+    server = _server_module()
+    left: list[int] = []
+    for _ in range(int(wait_s * 2) + 1):
+        left = [pid for pid, (argv, _, _) in server._processes().items() if os.path.basename(argv[0]) == name]
+        if not left:
+            break
+        await asyncio.sleep(0.5)
+    return left
+
+
+def _group_ticks(server: Any) -> dict[int, tuple[str, int]]:
+    """I processi dei gruppi di proot: pid -> (nome, tick di processore)."""
+    groups = set(server._guest_groups)
+    found: dict[int, tuple[str, int]] = {}
+    for pid, (argv, group, ticks) in server._processes().items():
+        if group in groups:
+            name = os.path.basename(argv[0])
+            found[pid] = ("proot" if name.startswith("libproot") else name, ticks)
+    return found
+
+
+async def _soloist_stop(binary: Path, server: Any, sink: Any, cache: Path) -> tuple[bool, bool, str]:
+    """
+    Soloist con la chiave finta, avviato e fermato come in un brano di Music Assistant: AsyncProcess, un lettore che
+    legge la sua uscita intanto, poi close(). Prima però SIGINT al solo proot, come fino al pacchetto 2.10.8-4.
+    Dice se con quello Soloist è rimasto acceso, se close() l'ha fermato del tutto, e i dettagli.
+    """
+    from music_assistant.helpers.process import AsyncProcess  # noqa: PLC0415
+
+    module = _server_module()
+    loop = asyncio.get_running_loop()
+    folder = cache / "selftest-soloist-ferma"
+    folder.mkdir(parents=True, exist_ok=True)
+    proc = AsyncProcess(
+        [str(binary), "--device-name", "Xonos prova", "--api-key", "prova",
+         "--data-dir", str(folder / "data"), "--cache-dir", str(folder / "cache")],
+        stdout=True,
+        stderr=asyncio.subprocess.STDOUT,
+        name="soloist[prova]",
+        env=server.child_env(sink.sink_name),
+    )
+    await proc.start()
+    assert proc.proc is not None
+    pid = proc.proc.pid
+    waiting = asyncio.Event()
+
+    async def read() -> None:
+        async for line in proc.iter_stdout():
+            if "waiting for login" in line:
+                waiting.set()
+
+    reader = asyncio.create_task(read())
+    try:
+        await asyncio.wait_for(waiting.wait(), SOLOIST_WAIT_S)
+        real_kill = getattr(os.kill, "__wrapped__", os.kill)
+        real_kill(pid, signal.SIGINT)
+        await asyncio.sleep(3)
+        ignored = proc.returncode is None
+        started = loop.time()
+        await proc.close()
+        took = loop.time() - started
+        await asyncio.sleep(0.5)
+        left = [other for other, (_, group, _) in module._processes().items() if group == pid]
+        stopped = proc.returncode is not None and not left
+        return ignored, stopped, f"close() in {took:.1f} s, codice {proc.returncode}, rimasti {len(left)}"
+    finally:
+        reader.cancel()
+        with suppress(BaseException):
+            await reader
+        if proc.returncode is None:
+            with suppress(Exception):
+                await proc.kill()
+
+
+async def _cpu_with_audio(server: Any, sink: Any) -> tuple[bool, str]:
+    """
+    CPU_AUDIO_S secondi di rumore nel pipe sink con pacat (dentro proot), letti dal tubo come li legge Music
+    Assistant per Soloist (poco sopra il tempo reale): quanto processore usano proot, PulseAudio e pacat intanto
+    (100% = un core intero). Va bene se l'audio scorre; i numeri sono per capire quanto pesa proot.
+    """
+    module = _server_module()
+    loop = asyncio.get_running_loop()
+    ticks_per_s = os.sysconf("SC_CLK_TCK") or 100
+    fd = os.open(sink.fifo_path, os.O_RDONLY | os.O_NONBLOCK)
+    received = 0
+    proc = None
+    feeder = None
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "pacat", "--raw", "--format=s16le", "--rate=44100", "--channels=2",
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+            env=server.child_env(sink.sink_name),
+        )
+
+        async def feed() -> None:
+            assert proc is not None and proc.stdin is not None
+            for _ in range((CPU_AUDIO_S + 5) * 10):
+                proc.stdin.write(os.urandom(44100 * 4 // 10))
+                await proc.stdin.drain()
+
+        feeder = asyncio.create_task(feed())
+        await asyncio.sleep(1)
+        before = _group_ticks(module)
+        started = loop.time()
+        while (elapsed := loop.time() - started) < CPU_AUDIO_S:
+            allowed = int(elapsed * FIFO_BYTES_PER_S * 1.1) - received
+            if allowed > 0:
+                try:
+                    received += len(os.read(fd, min(allowed, 65536)))
+                except BlockingIOError:
+                    pass
+            await asyncio.sleep(0.02)
+        seconds = loop.time() - started
+        after = _group_ticks(module)
+    finally:
+        if feeder is not None:
+            feeder.cancel()
+            with suppress(BaseException):
+                await feeder
+        if proc is not None and proc.returncode is None:
+            proc.kill()
+            with suppress(Exception):
+                await asyncio.wait_for(proc.wait(), 5)
+        os.close(fd)
+    used: dict[str, float] = {}
+    for pid, (name, ticks) in after.items():
+        old = before.get(pid)
+        used[name] = used.get(name, 0.0) + (ticks - (old[1] if old else 0)) / ticks_per_s
+    expected = int(seconds * FIFO_BYTES_PER_S)
+    ranked = sorted(used.items(), key=lambda item: -item[1])
+    parts = ", ".join(f"{name} {100 * value / seconds:.0f}%" for name, value in ranked)
+    return received >= expected // 2, f"{parts}; letti {received} byte su {expected} in {seconds:.0f} s"
 
 
 async def _pulseaudio_alone(cache: Path) -> str:

@@ -138,7 +138,7 @@ abstract class BuildProot : DefaultTask() {
 
 val buildProot = tasks.register<BuildProot>("buildProot") {
     description = "Compila proot per Android dal sorgente (native/proot.sh)."
-    scripts.from("native/proot.sh", "native/talloc-replace.h")
+    scripts.from("native/proot.sh", "native/talloc-replace.h", "native/loader-info.awk")
     ndk.set(androidComponents.sdkComponents.ndkDirectory.map { it.asFile.path })
     abis.set(listOf("arm64-v8a", "x86_64"))
     outputDir.set(layout.buildDirectory.dir("proot"))

@@ -448,8 +448,9 @@ di Xonos suona dal server sul telefono; la release ridotta con R8, da capo come 
     `filter="data"`); i programmi `pulseaudio`, `pactl`, `pacat`, `parec` e quelli dentro la cartella dei dati
     (Soloist sta in `<dati>/soloist/soloist`) passano da `proot --kill-on-exit -r <rootfs> -b /dev -b /proc -b /sys
     -b <dati> -b <cache>` più `/etc/resolv.conf` (il file del DNS che Xonos aggiorna) e `/etc/machine-id`
-    (`<dati>/machine-id`). Dati e cache allo stesso percorso: socket di PulseAudio, tubo del pipe sink, porta della
-    WebSocket di Soloist restano gli stessi per MA. Toglie dall'ambiente LD_LIBRARY_PATH, PYTHONHOME/PATH e
+    (`<dati>/machine-id`). Dati e cache allo stesso percorso, sia `/data/user/0/...` (come li usa MA) sia
+    `/data/data/...` (il percorso vero: `/data/user/0` è un collegamento; con uno solo PulseAudio non trovava la sua
+    configurazione): socket di PulseAudio, tubo del pipe sink, porta della WebSocket di Soloist restano gli stessi. Toglie dall'ambiente LD_LIBRARY_PATH, PYTHONHOME/PATH e
     SSL_CERT_FILE (i certificati del pacchetto non si vedono dentro). Se XONOS_PROOT o il sistema Linux mancano,
     toglie XONOS_PROOT e Spotify resta con librespot. Durante `soloist --pair` stampa `XONOS_MULTICAST on/off`.
   - **prepare.py** (`_soloist`): `_resolve_architecture` accetta Android quando c'è XONOS_PROOT; il flusso di Spotify
@@ -463,10 +464,14 @@ di Xonos suona dal server sul telefono; la release ridotta con R8, da capo come 
     build di prova: comandi dentro il processo di Xonos) con proot dal sorgente: glibc, `soloist --version`, PulseAudio
     in 0,1 s, pipe sink, audio nel tubo, Soloist acceso con una chiave finta fino a "waiting for login — connect to
     … from your Spotify app", nessun SIGSYS; la rete da dentro proot (DNS, http verso Spotify). "Server MA" con
-    `xonos_selftest.py` (parte se c'è `<dati>/xonos-selftest`, aspetta `xonos-selftest-go`): Music Assistant scarica
-    Soloist e lo prova, PulseAudio e pipe sink col suo codice, Soloist acceso. **Non provato**: l'abbinamento vero
-    con l'app Spotify (mDNS sul telefono, anche dalla stessa app sullo stesso telefono), la riproduzione con un
-    account e una chiave veri, arm64 su un telefono vero, GrapheneOS, la batteria.
+    `xonos_selftest.py` (parte se c'è `<dati>/xonos-selftest`, aspetta `xonos-selftest-go`; 7 prove, tutte
+    passate): Music Assistant scarica Soloist e lo prova, PulseAudio e pipe sink col suo codice, audio nel tubo,
+    Soloist acceso, e lo si cerca come l'app Spotify: risponde all'mDNS (`_spotify-connect._tcp.local`: PTR, SRV con
+    la porta, TXT `CPath=/zc`, A con gli indirizzi del telefono, in multicast al gruppo, non con risposte dirette) e
+    la sua pagina getInfo risponde su 127.0.0.1 e sull'indirizzo di rete. `tools/soloist/ifaddrs-test.c`: dentro
+    proot, dall'app, glibc vede le interfacce (getifaddrs, netlink anche con bind e RTM_GETLINK, SIOCGIFCONF) su
+    Android 14. **Non provato**: l'abbinamento vero dall'app Spotify, la riproduzione con un account e una chiave
+    veri, arm64 su un telefono vero (Android 17, GrapheneOS: limiti di rete e ptrace forse diversi), la batteria.
 - **Gli account recenti** (registro dell'utente, 29 ottobre 2026, pacchetto 2.10.8-3): accesso a Spotify riuscito,
   poi al primo brano librespot `Unable to load audio item: ... FaultyRequest(INVALID_CREDENTIALS)` e Music
   Assistant scarica il servizio ("Spotify is not loaded" ai play dopo). Music Assistant scrive che librespot non va

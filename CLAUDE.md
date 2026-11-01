@@ -91,8 +91,13 @@ prima di cominciare: le cose scritte qui sono già state verificate, non vanno r
   estraggono all'installazione (`useLegacyPackaging`). Sorgenti scaricati da versioni fissate con lo SHA-256 (quelli
   di Termux): termux/proot 5.1.107.101 e talloc 2.5.0 di Samba, compilato da solo con `talloc-replace.h` al posto
   di waf; percorsi tolti, niente build-id, pagine da 16 KB. Nella ricetta di F-Droid le build nuove vogliono
-  `ndk: r27d` e `sudo: [apt-get update, apt-get install -y make]` (l'immagine `buildserver-trixie` non ha make);
-  "Riproducibile" fa le stesse due cose. In locale (sandbox) non si compila né si esegue: solo in CI.
+  `ndk: r27d` e `sudo: [apt-get update, apt-get install -y make gawk binutils]` (l'immagine `buildserver-trixie` non
+  ha make né binutils, e il suo awk è mawk, senza lo `strtonum` che usa `loader/loader-info.awk` di proot);
+  "Riproducibile" fa le stesse due cose. Il GNUmakefile di proot chiama `readelf` del sistema (non quello dell'NDK)
+  per l'offset di `pokedata_workaround` (solo arm64, usato se PTRACE_POKEDATA non va): senza readelf non dà errore,
+  l'offset diventa 0, `libproot.so` arm64 è sbagliato e l'APK non è identico (Riproducibile, 1° novembre 2026).
+  Nella 0.1.49 della release è giusto (1016, controllato dal caricatore). In locale (sandbox) non si compila né si
+  esegue: solo in CI.
 - R8 è acceso nella release (`isMinifyEnabled` e `isShrinkResources`, regole in `app/proguard-rules.pro`,
   `-dontobfuscate` così gli errori restano leggibili). L'APK ridotto si prova sull'emulatore con le misure
   (sotto): parte, si collega, suona Opus, nessun arresto.

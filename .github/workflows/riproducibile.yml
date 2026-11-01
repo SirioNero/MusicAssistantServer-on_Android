@@ -26,8 +26,11 @@ jobs:
       - name: Prepara come il buildserver di F-Droid
         run: |
           apt-get update -q
-          # make per proot (app/native/proot.sh): nella ricetta va nel campo sudo (apt-get install -y make).
-          apt-get install -qy --no-install-recommends openjdk-21-jdk-headless git curl unzip python3 make
+          # make, gawk e binutils per proot (app/native/proot.sh). Il suo GNUmakefile scrive loader/loader-info.c
+          # con "readelf -s loader | awk -f loader-info.awk": lo script usa strtonum, che mawk di Debian non ha, e
+          # readelf è quello di binutils. Senza readelf non si ferma: per arm64 l'offset di pokedata_workaround
+          # diventa 0 (libproot.so diverso e sbagliato). Nella ricetta vanno nel campo sudo.
+          apt-get install -qy --no-install-recommends openjdk-21-jdk-headless git curl unzip python3 make gawk binutils
           update-alternatives --set java /usr/lib/jvm/java-21-openjdk-amd64/bin/java
           java -version
 

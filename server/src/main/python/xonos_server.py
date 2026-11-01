@@ -170,6 +170,13 @@ LINUX_PROGRAMS = {"pulseaudio", "pactl", "pacat", "parec"}
 GUEST_ENV_DROP = {"LD_LIBRARY_PATH", "LD_PRELOAD", "PYTHONHOME", "PYTHONPATH", "SSL_CERT_FILE", "SSL_CERT_DIR"}
 FALLBACK_DNS = "nameserver 1.1.1.1\nnameserver 8.8.8.8\n"
 MULTICAST_PREFIX = "XONOS_MULTICAST"
+# Ogni quanto il registro dice quanto processore usano proot e i programmi Linux, mentre girano.
+CPU_EVERY_S = 60
+
+# I gruppi di processi dei programmi Linux: uno per ogni proot avviato, con il numero di proot (vedi _linux_programs).
+_guest_groups: set[int] = set()
+# Quanti processi Linux di un server di prima erano rimasti accesi (tolti all'avvio, detto nel registro).
+_leftovers = 0
 
 
 def _linux_programs(data_dir: str, cache_dir: str) -> None:
@@ -180,6 +187,11 @@ def _linux_programs(data_dir: str, cache_dir: str) -> None:
     Xonos dice dove (XONOS_PROOT e XONOS_PROOT_LOADER). Ogni processo che Music Assistant avvia con pulseaudio,
     pactl o un programma della sua cartella dei dati (Soloist, che scarica lui) passa da proot. Le cartelle dei
     dati e della cache si vedono dentro allo stesso percorso: socket, tubi e file restano gli stessi.
+
+    proot ignora SIGINT e SIGTERM (aspetta il ^C di un terminale, che arriva a tutto il gruppo di processi) e, se
+    muore, il programma che seguiva resta acceso. Music Assistant invece ferma Soloist e PulseAudio con SIGINT, poi
+    SIGKILL, al solo processo che ha avviato, cioè a proot: Soloist non si fermava mai ("could not be stopped").
+    Per questo ogni proot parte in un gruppo suo e i segnali per lui vanno a tutto il gruppo (_group_kill).
     """
     proot = os.environ.get("XONOS_PROOT", "")
     loader = os.environ.get("XONOS_PROOT_LOADER", "")
@@ -228,11 +240,15 @@ def _linux_programs(data_dir: str, cache_dir: str) -> None:
             return path
         return None
 
+    # Un server fermato con SIGKILL lascia accesi i suoi programmi Linux (in un gruppo loro): via prima di partire.
+    _end_leftovers(proot, tuple(dict.fromkeys([os.path.abspath(data_dir) + os.sep, data + os.sep])))
+
     previous = subprocess.Popen
 
     class Popen(previous):  # type: ignore[misc, valid-type]
         def __init__(self, args, *rest, **kwargs):  # type: ignore[no-untyped-def]
             pairing = False
+            program = None
             if not kwargs.get("shell") and not isinstance(args, (str, bytes, os.PathLike)):
                 args = list(args)
                 program = guest(args) if args else None
@@ -244,15 +260,162 @@ def _linux_programs(data_dir: str, cache_dir: str) -> None:
                     env["PROOT_LOADER"] = loader
                     env["PROOT_TMP_DIR"] = str(tmp)
                     kwargs["env"] = env
+                    # Un gruppo di processi suo, con il numero di proot: i segnali vanno a tutto il gruppo.
+                    if "process_group" not in kwargs:
+                        kwargs["start_new_session"] = True
                     pairing = "--pair" in args
                     args = [*base, "-w", inside, program, *map(os.fsdecode, args[1:])]
             super().__init__(args, *rest, **kwargs)
+            if program is not None and kwargs.get("start_new_session"):
+                _guest_groups.add(self.pid)
             if pairing:
                 # Mentre Soloist si fa trovare dall'app Spotify (mDNS), il telefono deve ricevere il multicast.
                 _say_multicast(True)
                 threading.Thread(target=_multicast_off_at_exit, args=(self.pid,), daemon=True).start()
 
     subprocess.Popen = Popen  # type: ignore[misc]
+    # Popen.send_signal, terminate e kill (anche quelli di asyncio) passano da os.kill, come lo SIGKILL diretto
+    # di Music Assistant (AsyncProcess.close): per un proot il segnale va a tutto il suo gruppo.
+    real_kill = os.kill
+
+    def kill(pid: int, sig: int) -> None:
+        if pid in _guest_groups:
+            # Solo se pid è ancora il proot che guida il gruppo (un numero si può riusare); se proot non c'è più il
+            # segnale va a chi resta del suo gruppo.
+            try:
+                leader = os.getpgid(pid) == pid
+            except ProcessLookupError:
+                leader = True
+            except OSError:
+                leader = False
+            if leader and _group_kill(pid, sig):
+                return
+        real_kill(pid, sig)
+
+    kill.__wrapped__ = real_kill  # type: ignore[attr-defined]
+    os.kill = kill
+    threading.Thread(target=_watch_cpu, name="xonos-cpu", daemon=True).start()
+
+
+def _group_kill(group: int, sig: int) -> bool:
+    """Manda [sig] a tutto il gruppo di un proot; False se il gruppo non c'è più (allora lo si dimentica)."""
+    try:
+        os.killpg(group, sig)
+    except ProcessLookupError:
+        _guest_groups.discard(group)
+        return False
+    except OSError:
+        return False
+    return True
+
+
+def _end_guests() -> int:
+    """Alla fine del server: SIGKILL ai programmi Linux ancora accesi. Dice quanti gruppi erano rimasti."""
+    alive = {group for _, group, _ in _processes().values()}
+    ended = 0
+    for group in list(_guest_groups):
+        if group in alive and _group_kill(group, signal.SIGKILL):
+            ended += 1
+        _guest_groups.discard(group)
+    return ended
+
+
+def _processes() -> dict[int, tuple[list[str], int, int]]:
+    """I processi che si vedono (su Android solo quelli dell'app): pid -> (argomenti, gruppo, tick di processore)."""
+    found: dict[int, tuple[list[str], int, int]] = {}
+    for entry in os.scandir("/proc"):
+        if not entry.name.isdigit():
+            continue
+        try:
+            with open(f"/proc/{entry.name}/stat", "rb") as file:
+                stat = file.read().decode(errors="replace")
+            with open(f"/proc/{entry.name}/cmdline", "rb") as file:
+                argv = [os.fsdecode(part) for part in file.read().split(b"\0") if part]
+        except OSError:
+            continue
+        # Dopo "pid (nome) ": stato, genitore, gruppo, ... utime e stime sono il 12° e il 13° campo.
+        fields = stat[stat.rfind(")") + 2 :].split()
+        # Uno zombie (Z, X) è già morto: aspetta solo chi lo raccolga, non usa processore e non si ferma.
+        if len(fields) < 13 or fields[0] in ("Z", "X", "x"):
+            continue
+        if not argv:
+            argv = [stat[stat.find("(") + 1 : stat.rfind(")")]]
+        found[int(entry.name)] = (argv, int(fields[2]), int(fields[11]) + int(fields[12]))
+    return found
+
+
+def _end_leftovers(proot: str, data: tuple[str, ...]) -> None:
+    """
+    SIGKILL ai proot e ai programmi Linux di un server di prima ancora accesi (mai a questo processo): proot, i
+    programmi del sistema Linux e quelli della cartella dei dati [data] (i suoi due percorsi, con "/" in fondo).
+    """
+    global _leftovers
+    guests = {f"/usr/bin/{name}" for name in LINUX_PROGRAMS}
+    for pid, (argv, _, _) in _processes().items():
+        program = argv[0]
+        if pid != os.getpid() and (program == proot or program in guests or program.startswith(data)):
+            try:
+                os.kill(pid, signal.SIGKILL)
+                _leftovers += 1
+            except OSError:
+                pass
+
+
+def _watch_cpu() -> None:
+    """
+    Ogni CPU_EVERY_S secondi, se girano programmi Linux, scrive nel registro quanto processore hanno usato nel
+    frattempo (100% = un core intero), per nome: proot, soloist, pulseaudio... Serve a capire, dal registro di una
+    persona, se proot pesa troppo sul telefono.
+    """
+    import time  # noqa: PLC0415
+
+    try:
+        ticks = os.sysconf("SC_CLK_TCK") or 100
+    except (ValueError, OSError):
+        ticks = 100
+    logger = logging.getLogger("xonos")
+    before: dict[int, int] = {}
+    started = time.monotonic()
+    while True:
+        time.sleep(CPU_EVERY_S)
+        try:
+            before, started = _cpu_round(logger, ticks, before, started)
+        except Exception:  # noqa: BLE001 - solo un aiuto per capire: non deve mai fermarsi
+            logger.debug("Conto del processore non riuscito", exc_info=True)
+
+
+def _cpu_round(
+    logger: logging.Logger, ticks: int, before: dict[int, int], started: float
+) -> tuple[dict[int, int], float]:
+    """Un giro di _watch_cpu: scrive la riga se girano programmi Linux; dà i tick visti e il momento del giro."""
+    import time  # noqa: PLC0415
+
+    now = time.monotonic()
+    seconds = max(now - started, 1.0)
+    groups = set(_guest_groups)
+    used: dict[str, float] = {}
+    counted: dict[str, int] = {}
+    current: dict[int, int] = {}
+    alive: set[int] = set()
+    for pid, (argv, group, total) in _processes().items():
+        if group not in groups:
+            continue
+        alive.add(group)
+        current[pid] = total
+        name = os.path.basename(argv[0])
+        name = "proot" if name.startswith("libproot") else name
+        # Un processo nato nel frattempo conta tutto il suo tempo.
+        used[name] = used.get(name, 0.0) + (total - before.get(pid, 0)) / ticks
+        counted[name] = counted.get(name, 0) + 1
+    for group in groups - alive:
+        _guest_groups.discard(group)
+    if used:
+        parts = [
+            f"{name} {100 * value / seconds:.0f}%" + (f" ({counted[name]} processi)" if counted[name] > 1 else "")
+            for name, value in sorted(used.items(), key=lambda item: -item[1])
+        ]
+        logger.info("Processore dei programmi Linux negli ultimi %.0f s: %s", seconds, ", ".join(parts))
+    return current, now
 
 
 def _rootfs(package: Path) -> Path | None:
@@ -311,6 +474,10 @@ def _run(data_dir: str, cache_dir: str, log_level: str) -> None:
                 await mass.start()
                 _state = "running"
                 logging.getLogger("xonos").info("Music Assistant pronto sul telefono")
+                if _leftovers:
+                    logging.getLogger("xonos").warning(
+                        "Tolti %d processi Linux rimasti accesi da prima (proot, Soloist, PulseAudio)", _leftovers
+                    )
                 selftest = None
                 if (Path(data_dir) / SELFTEST_FILE).is_file():
                     # Solo per le prove in CI (il file lo mette il workflow): Soloist e PulseAudio col codice vero.
@@ -322,6 +489,8 @@ def _run(data_dir: str, cache_dir: str, log_level: str) -> None:
                     selftest.cancel()
             finally:
                 await mass.stop()
+                if ended := _end_guests():
+                    logging.getLogger("xonos").warning("Fermati %d programmi Linux ancora accesi alla fine", ended)
 
         asyncio.run(run_mass())
         _state = "stopped"

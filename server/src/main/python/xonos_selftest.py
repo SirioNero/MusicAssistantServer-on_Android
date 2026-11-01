@@ -333,13 +333,21 @@ def _dns_records(data: bytes) -> list[tuple[str, str, Any]]:
 
 
 async def _http_get(host: str, port: int, path: str) -> str:
-    """Un GET HTTP/1.0 semplice: il corpo della risposta (al massimo 4 KB), o l'errore."""
+    """Un GET HTTP/1.0 semplice: il corpo della risposta (al massimo 4 KB, anche se arriva a pezzi), o l'errore."""
     try:
         reader, writer = await asyncio.wait_for(asyncio.open_connection(host, port), 5)
         writer.write(f"GET {path} HTTP/1.0\r\nHost: {host}:{port}\r\n\r\n".encode())
         await writer.drain()
-        response = await asyncio.wait_for(reader.read(4096), 5)
+        head = (await asyncio.wait_for(reader.readuntil(b"\r\n\r\n"), 5)).decode(errors="replace")
+        length = next(
+            (int(line.split(":", 1)[1]) for line in head.split("\r\n") if line.lower().startswith("content-length:")),
+            None,
+        )
+        if length is not None:
+            body = await asyncio.wait_for(reader.readexactly(min(length, 4096)), 5)
+        else:
+            body = await asyncio.wait_for(reader.read(4096), 5)
         writer.close()
     except Exception as err:  # noqa: BLE001
         return f"errore: {err!r}"
-    return response.decode(errors="replace").split("\r\n\r\n", 1)[-1]
+    return body.decode(errors="replace")

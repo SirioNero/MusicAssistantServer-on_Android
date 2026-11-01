@@ -58,17 +58,9 @@ GUEST=(--kill-on-exit -r @FILES@/root -b /dev -b /proc -b /sys -w /)
 SOLOIST=$(cat "$WORK/soloist-path")
 
 run "proot da solo" $P --version
-if grep -q 'CANNOT LINK' "$LAST"; then
-  say "(con il RUNPATH \$ORIGIN non trova le sue librerie: riprovo con LD_LIBRARY_PATH)"
-  ENV_LINES+=("LD_LIBRARY_PATH=@LIB@")
-  run "proot da solo, con LD_LIBRARY_PATH" $P --version
-fi
-run "busybox dentro proot" $P "${GUEST[@]}" /bin/busybox sh -c 'uname -a; id; grep -E "^(Seccomp|NoNewPrivs)" /proc/self/status; ls /; cat /etc/resolv.conf'
-run "il caricatore di glibc dentro proot" $P "${GUEST[@]}" /lib64/ld-linux-x86-64.so.2 --version
+run "il caricatore di glibc (Ubuntu 24.04) dentro proot" $P "${GUEST[@]}" /lib64/ld-linux-x86-64.so.2 --version
 run "le librerie di Soloist dentro proot" $P "${GUEST[@]}" /lib64/ld-linux-x86-64.so.2 --list "$SOLOIST"
 run "Soloist --version dentro proot" $P "${GUEST[@]}" "$SOLOIST" --version
-run "Soloist --help dentro proot" $P "${GUEST[@]}" "$SOLOIST" --help
-run "la rete dentro proot" $P "${GUEST[@]}" /bin/busybox sh -c 'nslookup apresolve.spotify.com; wget -q -T 10 -O - http://apresolve.spotify.com/?type=accesspoint | head -c 300; echo'
-# Acceso per 25 s con una chiave finta: dice cosa prova a fare (rete, mDNS, audio) e dove si ferma.
-run "Soloist acceso 25 s (chiave finta)" /system/bin/timeout 25 $P -0 "${GUEST[@]}" "$SOLOIST" -n "Xonos prova" -k prova -D /tmp/soloist-data -C /tmp/soloist-cache
+# PulseAudio come lo avvia Music Assistant, un suono nel tubo, poi Soloist con PulseAudio (inside.sh).
+run "PulseAudio e Soloist dentro proot" $P "${GUEST[@]}" /bin/busybox sh /opt/xonos-test.sh
 exit 0

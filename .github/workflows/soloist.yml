@@ -1,15 +1,15 @@
 name: Soloist
 
 # La prova della "strada B": Soloist, il motore ufficiale di Spotify (un programma per Linux), dentro Xonos con
-# proot. Sul runner scarica Soloist da Spotify solo per la prova (non si pubblica né si conserva), prepara un
-# piccolo sistema Linux con le librerie che vuole e mette proot di Termux nella build di prova; sull'emulatore
-# Android (API 34, come i telefoni veri) lo avvia da dentro Xonos (tools/soloist). Parte a mano, o quando
-# cambiano questi file su un ramo claude/**. Il riassunto va nella pagina del workflow.
+# proot. Sul runner scarica Soloist da Spotify solo per la prova (non si pubblica né si conserva) e prepara il
+# piccolo sistema Linux con glibc e PulseAudio; la build di prova ha proot compilato dal sorgente come la
+# release (app/native/proot.sh). Sull'emulatore Android (API 34) avvia tutto da dentro Xonos (tools/soloist).
+# Parte a mano, o quando cambiano questi file su un ramo claude/**. Il riassunto va nella pagina del workflow.
 on:
   workflow_dispatch:
   push:
     branches: ["claude/**"]
-    paths: [".github/workflows/soloist.yml", "tools/soloist/**", "app/src/debug/**"]
+    paths: [".github/workflows/soloist.yml", "tools/soloist/**", "app/src/debug/**", "app/native/**"]
 
 jobs:
   prova:
@@ -33,15 +33,16 @@ jobs:
         with:
           gradle-version: "8.14.3"
 
-      - name: Soloist, il sistema Linux di prova e proot
+      - name: Soloist e il sistema Linux di prova
         run: |
-          sudo apt-get install -y -q patchelf busybox-static > /dev/null
+          sudo apt-get install -y -q busybox-static > /dev/null
           bash tools/soloist/prepare.sh
 
-      - name: Compila la build di prova
+      - name: Compila la build di prova (con proot dal sorgente)
         run: |
           set -o pipefail
-          gradle :app:assembleDebug --no-daemon --stacktrace 2>&1 | tail -n 40
+          gradle :app:assembleDebug --no-daemon --stacktrace 2>&1 | tail -n 60
+          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -E 'lib/.*proot'
 
       - name: KVM
         run: |

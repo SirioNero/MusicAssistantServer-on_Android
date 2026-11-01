@@ -11,6 +11,3 @@ captures/
 
 # Python
 __pycache__/
-
-# proot di Termux per la prova di Soloist: lo mette tools/soloist/prepare.sh sul runner.
-app/src/debug/jniLibs/

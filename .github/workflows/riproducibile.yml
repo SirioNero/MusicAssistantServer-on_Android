@@ -46,6 +46,25 @@ jobs:
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "Release v$VERSION, commit $(git rev-parse HEAD)"
 
+      - name: NDK (come "ndk:" nella ricetta)
+        run: |
+          # Dalla 0.1.49 l'APK ha proot, compilato con l'NDK scritto in app/build.gradle.kts (ndkVersion).
+          NDK=$(sed -n 's/^ *ndkVersion = "\(.*\)"/\1/p' app/build.gradle.kts)
+          if [ -z "$NDK" ] || [ -f "$ANDROID_HOME/ndk/$NDK/source.properties" ]; then
+            echo "NDK: ${NDK:-non serve}"
+            exit 0
+          fi
+          # Gli archivi di Google hanno il nome della release (r27d), non il numero di versione.
+          case "$NDK" in
+            27.3.13750724) RELEASE=r27d ;;
+            *) echo "::error title=NDK::Aggiungi qui la sigla r.. dell'NDK $NDK"; exit 1 ;;
+          esac
+          curl -sSfL -o /tmp/ndk.zip "https://dl.google.com/android/repository/android-ndk-$RELEASE-linux.zip"
+          mkdir -p "$ANDROID_HOME/ndk"
+          unzip -q /tmp/ndk.zip -d /tmp/ndk
+          mv /tmp/ndk/android-ndk-$RELEASE "$ANDROID_HOME/ndk/$NDK"
+          grep Pkg.Revision "$ANDROID_HOME/ndk/$NDK/source.properties"
+
       - name: Compila come F-Droid
         run: |
           rm -rf tools server

@@ -170,8 +170,10 @@ LINUX_PROGRAMS = {"pulseaudio", "pactl", "pacat", "parec"}
 GUEST_ENV_DROP = {"LD_LIBRARY_PATH", "LD_PRELOAD", "PYTHONHOME", "PYTHONPATH", "SSL_CERT_FILE", "SSL_CERT_DIR"}
 FALLBACK_DNS = "nameserver 1.1.1.1\nnameserver 8.8.8.8\n"
 MULTICAST_PREFIX = "XONOS_MULTICAST"
-# Ogni quanto il registro dice quanto processore usano proot e i programmi Linux, mentre girano.
+# Ogni quanto il registro dice quanto processore usano proot e i programmi Linux, mentre girano, e ogni quanto
+# li si guarda (un Soloist per brano: guardando di rado, quello di un brano finito non si vedeva).
 CPU_EVERY_S = 60
+CPU_SAMPLE_S = 5
 
 # I gruppi di processi dei programmi Linux: uno per ogni proot avviato, con il numero di proot (vedi _linux_programs).
 _guest_groups: set[int] = set()
@@ -365,7 +367,8 @@ def _watch_cpu() -> None:
     """
     Ogni CPU_EVERY_S secondi, se girano programmi Linux, scrive nel registro quanto processore hanno usato nel
     frattempo (100% = un core intero), per nome: proot, soloist, pulseaudio... Serve a capire, dal registro di una
-    persona, se proot pesa troppo sul telefono.
+    persona, se proot pesa troppo sul telefono. Guarda ogni CPU_SAMPLE_S secondi: Music Assistant avvia un Soloist
+    per brano, e uno finito tra due righe (quando si guardava solo una volta al minuto) non compariva affatto.
     """
     import time  # noqa: PLC0415
 
@@ -374,29 +377,45 @@ def _watch_cpu() -> None:
     except (ValueError, OSError):
         ticks = 100
     logger = logging.getLogger("xonos")
+    window = _CpuWindow(time.monotonic())
     before: dict[int, int] = {}
-    started = time.monotonic()
     while True:
-        time.sleep(CPU_EVERY_S)
+        time.sleep(CPU_SAMPLE_S)
         try:
-            before, started = _cpu_round(logger, ticks, before, started)
+            before = _cpu_sample(ticks, before, window)
+            now = time.monotonic()
+            if now - window.started >= CPU_EVERY_S:
+                window.log(logger, now)
+                window = _CpuWindow(now)
         except Exception:  # noqa: BLE001 - solo un aiuto per capire: non deve mai fermarsi
             logger.debug("Conto del processore non riuscito", exc_info=True)
 
 
-def _cpu_round(
-    logger: logging.Logger, ticks: int, before: dict[int, int], started: float
-) -> tuple[dict[int, int], float]:
-    """Un giro di _watch_cpu: scrive la riga se girano programmi Linux; dà i tick visti e il momento del giro."""
-    import time  # noqa: PLC0415
+class _CpuWindow:
+    """Il processore usato dai programmi Linux in un intervallo, per nome, e quanti ne giravano insieme al massimo."""
 
-    now = time.monotonic()
-    seconds = max(now - started, 1.0)
+    def __init__(self, started: float) -> None:
+        self.started = started
+        self.used: dict[str, float] = {}
+        self.most: dict[str, int] = {}
+
+    def log(self, logger: logging.Logger, now: float) -> None:
+        if not self.used:
+            return
+        seconds = max(now - self.started, 1.0)
+        parts = [
+            f"{name} {100 * value / seconds:.0f}%" + (f" ({self.most[name]} processi)" if self.most[name] > 1 else "")
+            for name, value in sorted(self.used.items(), key=lambda item: -item[1])
+        ]
+        logger.info("Processore dei programmi Linux negli ultimi %.0f s: %s", seconds, ", ".join(parts))
+
+
+def _cpu_sample(ticks: int, before: dict[int, int], window: _CpuWindow) -> dict[int, int]:
+    """Un'occhiata: aggiunge a [window] il processore usato dall'occhiata prima; dà i tick visti per processo."""
     groups = set(_guest_groups)
-    used: dict[str, float] = {}
-    counted: dict[str, int] = {}
     current: dict[int, int] = {}
     alive: set[int] = set()
+    together: dict[str, int] = {}
     for pid, (argv, group, total) in _processes().items():
         if group not in groups:
             continue
@@ -404,18 +423,14 @@ def _cpu_round(
         current[pid] = total
         name = os.path.basename(argv[0])
         name = "proot" if name.startswith("libproot") else name
-        # Un processo nato nel frattempo conta tutto il suo tempo.
-        used[name] = used.get(name, 0.0) + (total - before.get(pid, 0)) / ticks
-        counted[name] = counted.get(name, 0) + 1
+        # Un processo nato nel frattempo (al più CPU_SAMPLE_S secondi fa) conta tutto il suo tempo.
+        window.used[name] = window.used.get(name, 0.0) + (total - before.get(pid, 0)) / ticks
+        together[name] = together.get(name, 0) + 1
+    for name, count in together.items():
+        window.most[name] = max(window.most.get(name, 0), count)
     for group in groups - alive:
         _guest_groups.discard(group)
-    if used:
-        parts = [
-            f"{name} {100 * value / seconds:.0f}%" + (f" ({counted[name]} processi)" if counted[name] > 1 else "")
-            for name, value in sorted(used.items(), key=lambda item: -item[1])
-        ]
-        logger.info("Processore dei programmi Linux negli ultimi %.0f s: %s", seconds, ", ".join(parts))
-    return current, now
+    return current
 
 
 def _rootfs(package: Path) -> Path | None:

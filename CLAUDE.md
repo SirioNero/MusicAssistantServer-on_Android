@@ -493,7 +493,12 @@ di Xonos suona dal server sul telefono; la release ridotta con R8, da capo come 
     reale: PulseAudio 1%, proot 1%, pacat 0% (3,87 MB letti su 3,53 MB del tempo reale).
   - **Il processore nel registro**: ogni minuto (`CPU_EVERY_S`), finché gira un programma Linux, una riga
     "Processore dei programmi Linux negli ultimi 60 s: soloist N%, proot N%, pulseaudio N%" (100% = un core, i nomi
-    dall'argv[0] di /proc; gli zombie non contano), così dal registro di una persona si vede quanto pesa proot.
+    dall'argv[0] di /proc; gli zombie non contano), così dal registro di una persona si vede quanto pesa proot. Sul
+    telefono dell'utente (0.1.50, Soloist che suona): soloist 16%, proot 14% (2 processi), pulseaudio 13%. Dal
+    pacchetto 2.10.8-6 si guarda ogni 5 s (`CPU_SAMPLE_S`): con un'occhiata al minuto il Soloist di un brano finito
+    prima della riga non compariva; "(N processi)" è quanti ne giravano insieme al massimo. Il proot di Termux
+    intercetta anche `sendto`, `recvfrom`, `sendmsg`, `recvmsg`, `close`, `ioctl`, `brk` (`proot_sysnums` in
+    `syscall/seccomp.c`): la rete di Soloist e il protocollo di PulseAudio passano tutti da lui, da qui il suo peso.
     In CI la riga non compare (le prove con i programmi Linux durano 21 s, prima del primo minuto): provata in
     locale; `_processes` e `SC_CLK_TCK` sull'emulatore li usa anche `cpu-audio`.
   - **prepare.py** (`_soloist`): `_resolve_architecture` accetta Android quando c'è XONOS_PROOT; il flusso di Spotify

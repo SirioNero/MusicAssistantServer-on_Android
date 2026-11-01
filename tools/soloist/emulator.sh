@@ -61,6 +61,8 @@ run "proot da solo" $P --version
 run "il caricatore di glibc (Ubuntu 24.04) dentro proot" $P "${GUEST[@]}" /lib64/ld-linux-x86-64.so.2 --version
 run "le librerie di Soloist dentro proot" $P "${GUEST[@]}" /lib64/ld-linux-x86-64.so.2 --list "$SOLOIST"
 run "Soloist --version dentro proot" $P "${GUEST[@]}" "$SOLOIST" --version
+# Come un programma glibc dentro proot vede le interfacce di rete: Soloist le elenca per l'annuncio mDNS.
+run "le interfacce di rete viste da glibc dentro proot" $P "${GUEST[@]}" /opt/ifaddrs-test
 # PulseAudio come lo avvia Music Assistant, un suono nel tubo, poi Soloist con PulseAudio (inside.sh).
 run "PulseAudio e Soloist dentro proot" $P "${GUEST[@]}" /bin/busybox sh /opt/xonos-test.sh
 exit 0

@@ -188,50 +188,92 @@ async def _soloist(binary: Path, server: Any, sink: Any, cache: Path) -> tuple[l
 
 async def _find_spotify_connect() -> dict[str, Any]:
     """
-    Cerca i dispositivi Spotify Connect come l'app Spotify: una domanda mDNS (_spotify-connect._tcp.local) in
-    multicast e a 127.0.0.1, poi la pagina getInfo del primo che risponde (il suo indirizzo e CPath dal TXT).
+    Cerca i dispositivi Spotify Connect come l'app Spotify: un socket sulla porta 5353 nel gruppo 224.0.0.251
+    (le risposte mDNS di solito vanno a tutto il gruppo) più uno su una porta qualsiasi (risposte dirette), una
+    domanda per _spotify-connect._tcp.local ogni secondo, in multicast e a 127.0.0.1; poi la pagina getInfo del
+    primo che risponde (porta dal SRV, CPath dal TXT).
     """
     import socket  # noqa: PLC0415
+    import struct  # noqa: PLC0415
 
     loop = asyncio.get_running_loop()
-    found: dict[str, Any] = {"seen": []}
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.setblocking(False)
-    sock.bind(("0.0.0.0", 0))
+    found: dict[str, Any] = {"seen": [], "local": _local_ipv4()}
+    sockets = []
+    group = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+    try:
+        group.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        with suppress(AttributeError, OSError):
+            group.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+        group.bind(("", 5353))
+        membership = struct.pack("4s4s", socket.inet_aton("224.0.0.251"), socket.inet_aton("0.0.0.0"))
+        group.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, membership)
+        group.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_LOOP, 1)
+        group.setblocking(False)
+        sockets.append(group)
+    except OSError as err:
+        found["group_error"] = repr(err)
+        group.close()
+    direct = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    direct.bind(("0.0.0.0", 0))
+    direct.setblocking(False)
     with suppress(OSError):
-        sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_LOOP, 1)
+        direct.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_LOOP, 1)
+    sockets.append(direct)
     query = _mdns_query("_spotify-connect._tcp.local")
-    deadline = loop.time() + 10
+    deadline = loop.time() + 12
     next_send = 0.0
     try:
         while loop.time() < deadline and "port" not in found:
             if loop.time() >= next_send:
-                for target in (("224.0.0.251", 5353), ("127.0.0.1", 5353)):
-                    with suppress(OSError):
-                        sock.sendto(query, target)
+                for sender_socket in sockets:
+                    for target in (("224.0.0.251", 5353), ("127.0.0.1", 5353)):
+                        with suppress(OSError):
+                            sender_socket.sendto(query, target)
                 next_send = loop.time() + 1
-            try:
-                data, sender = sock.recvfrom(9000)
-            except BlockingIOError:
+            got = False
+            for receiver in sockets:
+                try:
+                    data, sender = receiver.recvfrom(9000)
+                except (BlockingIOError, OSError):
+                    continue
+                got = True
+                try:
+                    records = _dns_records(data)
+                except Exception:  # noqa: BLE001
+                    continue
+                for kind, name, value in records:
+                    found["seen"].append(f"{sender[0]} {kind} {name} {value}"[:140])
+                    if "spotify-connect" in name and kind == "SRV":
+                        found["port"], found["instance"], found["from"] = value, name, sender[0]
+                    if "spotify-connect" in name and kind == "TXT":
+                        found["txt"] = value
+            if not got:
                 await asyncio.sleep(0.1)
-                continue
-            try:
-                records = _dns_records(data)
-            except Exception:  # noqa: BLE001
-                continue
-            for kind, name, value in records:
-                found["seen"].append(f"{kind} {name} {value}"[:120])
-                if "spotify-connect" in name and kind == "SRV":
-                    found["port"], found["instance"], found["from"] = value, name, sender[0]
-                if "spotify-connect" in name and kind == "TXT":
-                    found["txt"] = value
     finally:
-        sock.close()
+        for sender_socket in sockets:
+            sender_socket.close()
+    # Le nostre domande tornano indietro sul gruppo: si tengono solo le prime righe, per capire cosa passa.
     found["seen"] = found["seen"][:12]
     if "port" in found:
         path = next((item.split("=", 1)[1] for item in found.get("txt", []) if item.lower().startswith("cpath=")), "/")
-        found["getinfo"] = await _http_get("127.0.0.1", int(found["port"]), f"{path}?action=getInfo")
+        for host in dict.fromkeys(["127.0.0.1", found.get("from", "127.0.0.1")]):
+            found[f"getinfo {host}"] = (await _http_get(host, int(found["port"]), f"{path}?action=getInfo"))[:300]
+        found["getinfo"] = next((value for key, value in found.items() if key.startswith("getinfo ") and "errore" not in value), None)
     return found
+
+
+def _local_ipv4() -> str:
+    """L'indirizzo IPv4 del telefono sulla rete di default (connect su UDP non manda niente)."""
+    import socket  # noqa: PLC0415
+
+    probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        probe.connect(("8.8.8.8", 53))
+        return probe.getsockname()[0]
+    except OSError as err:
+        return repr(err)
+    finally:
+        probe.close()
 
 
 def _mdns_query(name: str) -> bytes:

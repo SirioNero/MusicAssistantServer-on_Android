@@ -71,9 +71,12 @@ async def run(mass: Any) -> None:
 
     if binary is not None and server is not None and sink is not None:
         try:
-            lines = await _soloist(binary, server, sink, Path(mass.cache_path))
+            lines, found = await _soloist(binary, server, sink, Path(mass.cache_path))
             waiting = any("waiting for login" in line for line in lines)
             say("soloist-acceso", waiting, " | ".join(lines[:10]))
+            # Come la cerca l'app Spotify per l'abbinamento: mDNS, poi la pagina getInfo di Spotify Connect.
+            say("soloist-mdns", found.get("port") is not None, str(found))
+            say("soloist-getinfo", bool(found.get("getinfo")), str(found.get("getinfo"))[:300])
         except Exception as err:  # noqa: BLE001
             say("soloist-acceso", False, repr(err))
 
@@ -142,8 +145,11 @@ async def _play_into(server: Any, sink: Any) -> int:
     return received
 
 
-async def _soloist(binary: Path, server: Any, sink: Any, cache: Path) -> list[str]:
-    """Soloist con PulseAudio e una chiave finta: le prime righe, fino a quando aspetta l'abbinamento."""
+async def _soloist(binary: Path, server: Any, sink: Any, cache: Path) -> tuple[list[str], dict[str, Any]]:
+    """
+    Soloist con PulseAudio e una chiave finta: le prime righe, fino a quando aspetta l'abbinamento, e cosa trova
+    di lui chi lo cerca come l'app Spotify (mDNS e getInfo), mentre è acceso.
+    """
     folder = cache / "selftest-soloist"
     folder.mkdir(parents=True, exist_ok=True)
     proc = await asyncio.create_subprocess_exec(
@@ -154,6 +160,7 @@ async def _soloist(binary: Path, server: Any, sink: Any, cache: Path) -> list[st
         env=server.child_env(sink.sink_name),
     )
     lines: list[str] = []
+    found: dict[str, Any] = {}
     assert proc.stdout is not None
     try:
         async with asyncio.timeout(SOLOIST_WAIT_S):
@@ -165,6 +172,8 @@ async def _soloist(binary: Path, server: Any, sink: Any, cache: Path) -> list[st
                 lines.append(text)
                 if "waiting for login" in text:
                     break
+        if proc.returncode is None:
+            found = await _find_spotify_connect()
     except TimeoutError:
         lines.append(f"(dopo {SOLOIST_WAIT_S} s ancora niente)")
     finally:
@@ -174,4 +183,121 @@ async def _soloist(binary: Path, server: Any, sink: Any, cache: Path) -> list[st
                 await asyncio.wait_for(proc.wait(), 10)
             except TimeoutError:
                 proc.kill()
-    return lines
+    return lines, found
+
+
+async def _find_spotify_connect() -> dict[str, Any]:
+    """
+    Cerca i dispositivi Spotify Connect come l'app Spotify: una domanda mDNS (_spotify-connect._tcp.local) in
+    multicast e a 127.0.0.1, poi la pagina getInfo del primo che risponde (il suo indirizzo e CPath dal TXT).
+    """
+    import socket  # noqa: PLC0415
+
+    loop = asyncio.get_running_loop()
+    found: dict[str, Any] = {"seen": []}
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setblocking(False)
+    sock.bind(("0.0.0.0", 0))
+    with suppress(OSError):
+        sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_LOOP, 1)
+    query = _mdns_query("_spotify-connect._tcp.local")
+    deadline = loop.time() + 10
+    next_send = 0.0
+    try:
+        while loop.time() < deadline and "port" not in found:
+            if loop.time() >= next_send:
+                for target in (("224.0.0.251", 5353), ("127.0.0.1", 5353)):
+                    with suppress(OSError):
+                        sock.sendto(query, target)
+                next_send = loop.time() + 1
+            try:
+                data, sender = sock.recvfrom(9000)
+            except BlockingIOError:
+                await asyncio.sleep(0.1)
+                continue
+            try:
+                records = _dns_records(data)
+            except Exception:  # noqa: BLE001
+                continue
+            for kind, name, value in records:
+                found["seen"].append(f"{kind} {name} {value}"[:120])
+                if "spotify-connect" in name and kind == "SRV":
+                    found["port"], found["instance"], found["from"] = value, name, sender[0]
+                if "spotify-connect" in name and kind == "TXT":
+                    found["txt"] = value
+    finally:
+        sock.close()
+    found["seen"] = found["seen"][:12]
+    if "port" in found:
+        path = next((item.split("=", 1)[1] for item in found.get("txt", []) if item.lower().startswith("cpath=")), "/")
+        found["getinfo"] = await _http_get("127.0.0.1", int(found["port"]), f"{path}?action=getInfo")
+    return found
+
+
+def _mdns_query(name: str) -> bytes:
+    """Una domanda DNS per i PTR di name (classe IN)."""
+    import struct  # noqa: PLC0415
+
+    question = b"".join(bytes([len(part)]) + part.encode() for part in name.split(".")) + b"\x00"
+    return struct.pack("!HHHHHH", 0, 0, 1, 0, 0, 0) + question + struct.pack("!HH", 12, 1)
+
+
+def _dns_records(data: bytes) -> list[tuple[str, str, Any]]:
+    """Le risposte di un pacchetto DNS: (tipo, nome, valore) per PTR, SRV (la porta), TXT e A."""
+    import struct  # noqa: PLC0415
+
+    def name_at(offset: int) -> tuple[str, int]:
+        labels: list[str] = []
+        end = -1
+        for _ in range(64):
+            length = data[offset]
+            if length & 0xC0 == 0xC0:
+                if end < 0:
+                    end = offset + 2
+                offset = ((length & 0x3F) << 8) | data[offset + 1]
+                continue
+            if length == 0:
+                return ".".join(labels), (end if end >= 0 else offset + 1)
+            labels.append(data[offset + 1:offset + 1 + length].decode(errors="replace"))
+            offset += 1 + length
+        raise ValueError("nome DNS troppo lungo")
+
+    _, _, questions, answers, authority, additional = struct.unpack("!HHHHHH", data[:12])
+    offset = 12
+    for _ in range(questions):
+        _, offset = name_at(offset)
+        offset += 4
+    records: list[tuple[str, str, Any]] = []
+    for _ in range(answers + authority + additional):
+        name, offset = name_at(offset)
+        kind, _, _, length = struct.unpack("!HHIH", data[offset:offset + 10])
+        offset += 10
+        body = data[offset:offset + length]
+        if kind == 12:
+            records.append(("PTR", name, name_at(offset)[0]))
+        elif kind == 33:
+            records.append(("SRV", name, struct.unpack("!HHH", body[:6])[2]))
+        elif kind == 16:
+            texts, index = [], 0
+            while index < len(body):
+                size = body[index]
+                texts.append(body[index + 1:index + 1 + size].decode(errors="replace"))
+                index += 1 + size
+            records.append(("TXT", name, texts))
+        elif kind == 1 and length == 4:
+            records.append(("A", name, ".".join(str(byte) for byte in body)))
+        offset += length
+    return records
+
+
+async def _http_get(host: str, port: int, path: str) -> str:
+    """Un GET HTTP/1.0 semplice: il corpo della risposta (al massimo 4 KB), o l'errore."""
+    try:
+        reader, writer = await asyncio.wait_for(asyncio.open_connection(host, port), 5)
+        writer.write(f"GET {path} HTTP/1.0\r\nHost: {host}:{port}\r\n\r\n".encode())
+        await writer.drain()
+        response = await asyncio.wait_for(reader.read(4096), 5)
+        writer.close()
+    except Exception as err:  # noqa: BLE001
+        return f"errore: {err!r}"
+    return response.decode(errors="replace").split("\r\n\r\n", 1)[-1]

@@ -70,6 +70,9 @@ class SendspinClient(
     private var target: Pair<String, String>? = null
     @Volatile private var session: Session? = null
 
+    /** Il ciclo di connessione sta solo aspettando il prossimo tentativo (dopo molti errori fino a 30 s). */
+    @Volatile private var backingOff = false
+
     private val _phase = MutableStateFlow(Phase.STOPPED)
 
     /** READY quando il server ci conosce come lettore e l'orologio è allineato. */
@@ -83,7 +86,9 @@ class SendspinClient(
     /** Si collega (o resta collegato) a [baseUrl]; [force] riapre comunque la connessione. */
     @Synchronized
     fun start(baseUrl: String, token: String, force: Boolean = false) {
-        if (!force && job?.isActive == true && target == (baseUrl to token)) return
+        // Se il ciclo sta solo aspettando il prossimo tentativo, si riprova subito: Music Assistant è appena tornato
+        // (l'API si è ricollegata) e l'audio non deve restare indietro fino a 30 s.
+        if (!force && !backingOff && job?.isActive == true && target == (baseUrl to token)) return
         job?.cancel()
         session?.close(goodbye = false)
         target = baseUrl to token
@@ -130,7 +135,12 @@ class SendspinClient(
             }
             _error.value = outcome.reason
             Log.w(TAG, "Audio scollegato: ${outcome.reason}")
-            delay(if (failures == 0) 1_000L else (2_000L * failures).coerceAtMost(30_000L))
+            backingOff = true
+            try {
+                delay(if (failures == 0) 1_000L else (2_000L * failures).coerceAtMost(30_000L))
+            } finally {
+                backingOff = false
+            }
         }
     }
 

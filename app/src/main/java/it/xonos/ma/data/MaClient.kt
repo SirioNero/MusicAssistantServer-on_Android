@@ -46,6 +46,9 @@ class MaClient(
 
     // Chi vuole vedere un elenco lungo mentre arriva: riceve gli elementi fin lì a ogni pezzo.
     private val progress = ConcurrentHashMap<String, (List<Any?>) -> Unit>()
+
+    // Quando è arrivato l'ultimo pezzo di un elenco (System.nanoTime): il tempo per rispondere conta da lì.
+    private val lastPart = ConcurrentHashMap<String, Long>()
     private val serverInfo = CompletableDeferred<JSONObject>()
 
     /** Si completa (con il motivo) quando la connessione si chiude. */
@@ -169,7 +172,15 @@ class MaClient(
             withTimeoutOrNull(2_000) { closed.await() }
             throw closeError ?: MaException("Invio a Music Assistant non riuscito", problem = Problem.LOST)
         }
-        val box = withTimeoutOrNull(timeoutMs) { deferred.await() }
+        var box = withTimeoutOrNull(timeoutMs) { deferred.await() }
+        // Un elenco lungo arriva a pezzi, e con i servizi lenti (Spotify dà 50 brani ogni 1-2 s) una playlist di
+        // migliaia di brani supera il tempo concesso mentre i pezzi arrivano ancora: si aspetta finché ne arrivano.
+        while (box == null) {
+            val last = lastPart[id] ?: break
+            val quiet = (System.nanoTime() - last) / 1_000_000
+            if (quiet >= timeoutMs) break
+            box = withTimeoutOrNull(timeoutMs - quiet) { deferred.await() }
+        }
         if (box == null) {
             forget(id)
             throw MaException("Music Assistant non risponde", problem = Problem.NO_ANSWER)
@@ -183,6 +194,7 @@ class MaClient(
         transforms.remove(id)
         converted.remove(id)
         progress.remove(id)
+        lastPart.remove(id)
     }
 
     fun close() {
@@ -255,6 +267,7 @@ class MaClient(
             val list = converted.getOrPut(id) { ArrayList() }
             (result as? JSONArray)?.let { chunk -> traced("Xonos.items") { chunk.objects().mapNotNullTo(list, transform) } }
             if (msg.optBoolean("partial")) {
+                lastPart[id] = System.nanoTime()
                 progress[id]?.let { show ->
                     try {
                         show(ArrayList(list))
@@ -270,6 +283,9 @@ class MaClient(
             return
         }
         if (msg.optBoolean("partial")) {
+            // I pezzi di una richiesta già lasciata (tempo scaduto) si buttano: resterebbero in memoria per sempre.
+            if (!pending.containsKey(id)) return
+            lastPart[id] = System.nanoTime()
             val chunk = result as? JSONArray ?: return
             val all = partials.getOrPut(id) { JSONArray() }
             for (i in 0 until chunk.length()) all.put(chunk.get(i))
@@ -295,6 +311,7 @@ class MaClient(
         partials.clear()
         transforms.clear()
         converted.clear()
+        lastPart.clear()
         closed.complete(reason)
     }
 

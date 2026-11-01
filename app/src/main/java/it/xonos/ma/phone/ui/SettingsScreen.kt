@@ -60,6 +60,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import it.xonos.ma.Language
 import it.xonos.ma.R
+import it.xonos.ma.data.Connection
 import it.xonos.ma.phone.model.ConnectionCheck
 import it.xonos.ma.phone.model.PhoneModel
 import it.xonos.ma.phone.model.SettingsPage
@@ -194,6 +195,8 @@ internal fun SettingsScreen(page: SettingsPage, model: PhoneModel, host: Host, o
                         Icon(XIcons.Chevron, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
+                // Il registro del server a cui Xonos è collegato; quello sul telefono ha il suo tasto nella sua scheda.
+                if (!model.onPhoneServer) ServerLogRow(model, host)
             }
             if (onboarding && page.results.any { it is ConnectionCheck.Result.Ok }) {
                 FilledTonalButton(onClick = onDone, modifier = Modifier.testTag("onboarding_done").fillMaxWidth().height(52.dp)) { Text(stringResource(R.string.onboarding_done)) }
@@ -596,6 +599,34 @@ private fun InfoCard(icon: ImageVector, text: String, action: (@Composable () ->
                 Text(text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
             }
             if (action != null) Box(Modifier.padding(start = 40.dp, top = 12.dp)) { action() }
+        }
+    }
+}
+
+/** "Registro di Music Assistant": le ultime righe del registro del server collegato, da condividere con chi aiuta. */
+@Composable
+private fun ServerLogRow(model: PhoneModel, host: Host) {
+    val connection by model.connection.collectAsState()
+    val connected = connection as? Connection.Connected ?: return
+    // Il nome del server, o il suo indirizzo se si chiama solo "Music Assistant": che si capisca quale.
+    val server = connected.server.name.takeIf { it != "Music Assistant" }
+        ?: "Music Assistant (${connected.url.substringAfter("://").trimEnd('/')})"
+    val subject = stringResource(R.string.server_log_subject, server)
+    Surface(
+        onClick = { model.shareServerLog { host.shareText(subject, "Xonos ${host.version}, $it") } },
+        enabled = !model.fetchingServerLog,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.testTag("share_server_log").fillMaxWidth(),
+    ) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(XIcons.Server, null, tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(16.dp))
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.server_log_title), style = MaterialTheme.typography.bodyLarge)
+                Text(stringResource(R.string.server_log_help, server), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (model.fetchingServerLog) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
         }
     }
 }

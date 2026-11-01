@@ -1,0 +1,1 @@
+Logs that say which server they come from. In the card of the server on this phone the button is now "Share the log of the server on this phone". For any other Music Assistant (a computer, umbrel…), Settings has "Music Assistant log", which fetches the latest lines of the log from the server Xonos is connected to and says which one it is (administrators only).

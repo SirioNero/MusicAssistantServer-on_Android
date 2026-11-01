@@ -48,7 +48,7 @@
     <string name="phone_server_remove">Удалить с этого телефона</string>
     <string name="phone_server_remove_title">Удалить Music Assistant с этого телефона?</string>
     <string name="phone_server_remove_text">Его сервисы и медиатека на этом телефоне тоже будут удалены. Вы сможете снова скачать его в любой момент.</string>
-    <string name="phone_server_share_log">Поделиться журналом Music Assistant</string>
+    <string name="phone_server_share_log">Поделиться журналом сервера на этом телефоне</string>
     <string name="phone_server_log_subject">Журнал Music Assistant из Xonos</string>
     <string name="show_password">Показать пароль</string>
     <string name="hide_password">Скрыть пароль</string>
@@ -232,6 +232,9 @@
     <string name="volume">Громкость</string>
     <string name="services_title">Сервисы Music Assistant</string>
     <string name="services_help">Добавьте или настройте источники музыки: Spotify, Tidal, Jellyfin, подкасты, радио…</string>
+    <string name="server_log_title">Журнал Music Assistant</string>
+    <string name="server_log_help">Отправьте последние строки журнала %1$s тому, кто вам помогает.</string>
+    <string name="server_log_subject">Журнал Music Assistant (%1$s) из Xonos</string>
     <string name="services_add">Добавить сервис</string>
     <string name="services_none">Сервисов пока нет</string>
     <string name="services_old_server">Чтобы добавлять и настраивать сервисы отсюда, нужен Music Assistant 2.10 или новее. Смотреть и удалять их можно и так.</string>

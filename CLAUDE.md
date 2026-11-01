@@ -390,9 +390,13 @@ di Xonos suona dal server sul telefono; la release ridotta con R8, da capo come 
   spiegato passa com'è. Con un'app personale (Development Mode) Spotify dà i brani (`playlists/{id}/items`) solo
   delle playlist della persona (o collaborative): per le altre (seguite, di Spotify come Daily Mix) Music
   Assistant passa alla sua chiave, che qui non c'è; ora `xonos_playlist_not_yours` (owner `provider.spotify`) dice di
-  copiare i brani in una propria playlist. Nelle Impostazioni "Condividi il registro di Music Assistant"
-  (`PhoneServer.log`: le ultime 96 KB di `musicassistant.log`, versioni in testa, condivisione di Android come
-  testo). Verificato: col server sul computer il motivo nel messaggio (`check.py`, anche in CI), con la rete finta
+  copiare i brani in una propria playlist. Nella scheda del server sul telefono "Condividi il registro del
+  server sul telefono" (`PhoneServer.log`: le ultime 96 KB di `musicassistant.log`, versioni in testa,
+  condivisione di Android come testo). Prima diceva solo "del registro di Music Assistant" e l'utente, collegato a
+  umbrel, mandava quello del telefono: dalla 0.1.48 per qualsiasi altro Music Assistant c'è nelle Impostazioni
+  "Registro di Music Assistant" (sotto i servizi, solo admin), che lo prende dal server collegato con
+  `logging/get` (scope `SYSTEM_MANAGE`; risponde con tutto il file, `Library.serverLog` tiene le ultime 96 KB da
+  una riga intera; `LogCheckKt`) e dice di quale server è (il nome, o l'indirizzo se si chiama solo "Music Assistant"). Verificato: col server sul computer il motivo nel messaggio (`check.py`, anche in CI), con la rete finta
   il messaggio solo per le playlist non proprie (non per le proprie né per i brani piaciuti); il banco JVM compila.
   Poi l'utente: "qualsiasi brano non funziona". Un brano della libreria al play non passa da Spotify
   (`get_library_item_by_prov_id`, poi `[track]`): se non suona è la sua mappatura `available` falsa, cioè

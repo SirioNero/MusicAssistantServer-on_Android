@@ -1,0 +1,1 @@
+Registri che dicono da quale server arrivano. Nella scheda del server sul telefono il tasto ora è «Condividi il registro del server sul telefono». Per qualsiasi altro Music Assistant (un computer, umbrel…) nelle Impostazioni c'è «Registro di Music Assistant», che prende le ultime righe del registro dal server a cui è collegato Xonos e dice quale è (solo per gli amministratori).

@@ -48,7 +48,7 @@
     <string name="phone_server_remove">Retirer de ce téléphone</string>
     <string name="phone_server_remove_title">Retirer Music Assistant de ce téléphone ?</string>
     <string name="phone_server_remove_text">Ses services et sa bibliothèque sur ce téléphone sont aussi supprimés. Vous pourrez le télécharger à nouveau quand vous voudrez.</string>
-    <string name="phone_server_share_log">Partager le journal de Music Assistant</string>
+    <string name="phone_server_share_log">Partager le journal du serveur de ce téléphone</string>
     <string name="phone_server_log_subject">Journal de Music Assistant depuis Xonos</string>
     <string name="show_password">Afficher le mot de passe</string>
     <string name="hide_password">Masquer le mot de passe</string>
@@ -212,6 +212,9 @@
     <string name="volume">Volume</string>
     <string name="services_title">Services de Music Assistant</string>
     <string name="services_help">Ajoutez ou configurez d’où vient la musique : Spotify, Tidal, Jellyfin, podcasts, radio…</string>
+    <string name="server_log_title">Journal de Music Assistant</string>
+    <string name="server_log_help">Partagez les dernières lignes du journal de %1$s avec la personne qui vous aide.</string>
+    <string name="server_log_subject">Journal de Music Assistant (%1$s) depuis Xonos</string>
     <string name="services_add">Ajouter un service</string>
     <string name="services_none">Aucun service pour l’instant</string>
     <string name="services_old_server">Pour ajouter et configurer des services d’ici, il faut Music Assistant 2.10 ou plus récent. Vous pouvez quand même les voir et les retirer.</string>

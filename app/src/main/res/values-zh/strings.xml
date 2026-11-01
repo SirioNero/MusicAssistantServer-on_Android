@@ -48,7 +48,7 @@
     <string name="phone_server_remove">从这部手机移除</string>
     <string name="phone_server_remove_title">要从这部手机移除 Music Assistant 吗？</string>
     <string name="phone_server_remove_text">它在这部手机上的服务和音乐库也会被删除。你可以随时重新下载。</string>
-    <string name="phone_server_share_log">分享 Music Assistant 日志</string>
+    <string name="phone_server_share_log">分享此手机上服务器的日志</string>
     <string name="phone_server_log_subject">来自 Xonos 的 Music Assistant 日志</string>
     <string name="show_password">显示密码</string>
     <string name="hide_password">隐藏密码</string>
@@ -202,6 +202,9 @@
     <string name="volume">音量</string>
     <string name="services_title">Music Assistant 服务</string>
     <string name="services_help">添加或设置音乐来源：Spotify、Tidal、Jellyfin、播客、电台……</string>
+    <string name="server_log_title">Music Assistant 日志</string>
+    <string name="server_log_help">把 %1$s 日志的最后几行分享给帮助你的人。</string>
+    <string name="server_log_subject">来自 Xonos 的 Music Assistant 日志（%1$s）</string>
     <string name="services_add">添加服务</string>
     <string name="services_none">还没有服务</string>
     <string name="services_old_server">要在这里添加和设置服务，需要 Music Assistant 2.10 或更高版本。仍可查看和移除服务。</string>

@@ -67,7 +67,7 @@ async def run(mass: Any) -> None:
         received = await _play_into(server, sink)
         say("audio-nel-tubo", received > 0, f"{received} byte in {FIFO_READ_S} s")
     except Exception as err:  # noqa: BLE001
-        say("pulseaudio", False, repr(err))
+        say("pulseaudio", False, f"{err!r}; {await _pulseaudio_alone(Path(mass.cache_path))}")
 
     if binary is not None and server is not None and sink is not None:
         try:
@@ -84,6 +84,28 @@ async def run(mass: Any) -> None:
         with suppress(Exception):
             await server.release()
     LOGGER.info("XONOS_SELFTEST fine %d/%d", sum(results), len(results))
+
+
+async def _pulseaudio_alone(cache: Path) -> str:
+    """Quando PulseAudio non parte: lo stesso avvio di Music Assistant, con -v, e le ultime righe che scrive."""
+    folder = cache / "pulse_capture"
+    config = folder / "pulse_capture.pa"
+    folder.mkdir(parents=True, exist_ok=True)
+    if not config.exists():
+        config.write_text(f"load-module module-native-protocol-unix socket={folder / 'native'} auth-anonymous=1\n")
+    env = {**os.environ, "HOME": str(folder), "XDG_RUNTIME_DIR": str(folder), "PULSE_RUNTIME_PATH": str(folder),
+           "PULSE_STATE_PATH": str(folder)}
+    proc = await asyncio.create_subprocess_exec(
+        "pulseaudio", "--daemonize=no", "-n", "--exit-idle-time=0", f"--file={config}", "-v",
+        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, env=env,
+    )
+    try:
+        output, _ = await asyncio.wait_for(proc.communicate(), 8)
+    except TimeoutError:
+        proc.kill()
+        output = b"(dopo 8 s ancora acceso)"
+    lines = output.decode(errors="replace").strip().splitlines()
+    return f"uscita {proc.returncode}: " + " | ".join(lines[-12:])
 
 
 async def _play_into(server: Any, sink: Any) -> int:

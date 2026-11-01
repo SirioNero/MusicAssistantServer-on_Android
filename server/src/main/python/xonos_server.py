@@ -199,6 +199,9 @@ def _linux_programs(data_dir: str, cache_dir: str) -> None:
     data = os.path.realpath(data_dir)
     cache = os.path.realpath(cache_dir)
     Path(data).mkdir(parents=True, exist_ok=True)
+    # Su Android /data/user/0 è un collegamento a /data/data: Music Assistant usa i percorsi come glieli si passano,
+    # quindi dentro proot si vedono tutti e due.
+    folders = list(dict.fromkeys([os.path.abspath(data_dir), data, os.path.abspath(cache_dir), cache]))
     tmp = Path(cache) / "proot-tmp"
     tmp.mkdir(parents=True, exist_ok=True)
     dns = os.environ.get("XONOS_DNS_FILE") or os.path.join(data, "resolv.conf")
@@ -212,7 +215,7 @@ def _linux_programs(data_dir: str, cache_dir: str) -> None:
     base = [
         proot, "--kill-on-exit", "-r", str(rootfs),
         "-b", "/dev", "-b", "/proc", "-b", "/sys",
-        "-b", data, "-b", cache,
+        *[arg for folder in folders for arg in ("-b", folder)],
         "-b", f"{dns}:/etc/resolv.conf", "-b", f"{machine_id}:/etc/machine-id",
     ]
 

@@ -1,0 +1,5 @@
+server 0.0.0, schema 65, base http://127.0.0.1:8095
+brani: 2; suono 01 Tone 1 (library://track/2)
+lettore Xonos (xonos-67a8695a7492) pronto
+lettore xonos-67a8695a7492: playing, 15.1 s suonati
+suona

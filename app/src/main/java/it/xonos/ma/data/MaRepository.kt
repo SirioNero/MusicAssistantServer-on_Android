@@ -32,6 +32,13 @@ class MaRepository(private val settings: Settings) {
         .pingInterval(20, TimeUnit.SECONDS)
         .build()
 
+    /**
+     * Per l'indirizzo di casa quando c'è anche quello remoto. Fuori casa un indirizzo come 192.168.1.10 di solito
+     * non risponde affatto (i pacchetti si perdono) e si aspettavano 8 s a ogni collegamento prima di provare il
+     * remoto; un server nella stessa rete risponde in millisecondi. Stessa coda e stesse connessioni di [http].
+     */
+    private val homeHttp: OkHttpClient = http.newBuilder().connectTimeout(HOME_CONNECT_S, TimeUnit.SECONDS).build()
+
     private val _connection = MutableStateFlow<Connection>(Connection.Connecting(""))
     val connection: StateFlow<Connection> = _connection.asStateFlow()
 
@@ -126,7 +133,8 @@ class MaRepository(private val settings: Settings) {
             var lastError = MaException("Music Assistant non raggiungibile", problem = Problem.NETWORK)
             for (url in config.urls) {
                 _connection.value = Connection.Connecting(url)
-                val candidate = MaClient(http, settings.language.maLocale)
+                val quick = url == config.homeUrl && config.urls.size > 1
+                val candidate = MaClient(if (quick) homeHttp else http, settings.language.maLocale)
                 try {
                     server = candidate.connect(url, config.token)
                     session = candidate
@@ -204,6 +212,9 @@ class MaRepository(private val settings: Settings) {
 
     companion object {
         private const val TAG = "Xonos"
+
+        /** Il tempo per aprire la connessione all'indirizzo di casa, quando dopo c'è quello remoto. */
+        const val HOME_CONNECT_S = 3L
 
         /** Quanto prima della scadenza si chiede un token nuovo: Xonos deve collegarsi almeno una volta in quel tempo. */
         const val RENEW_BEFORE_S = 30L * 86_400

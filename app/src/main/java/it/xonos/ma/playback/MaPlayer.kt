@@ -425,7 +425,9 @@ class MaPlayer(
     }
 
     override fun handlePrepare(): ListenableFuture<*> {
-        if (repo.connection.value !is Connection.Connected) repo.reconnect()
+        // Solo se il collegamento è fallito: mentre si collega, ricominciare da capo a ogni play (Media3 chiama
+        // prepare a ogni play finché la coda non c'è) farebbe ripartire ogni volta dall'indirizzo di casa.
+        if (repo.connection.value is Connection.Failed) repo.reconnect()
         return Futures.immediateVoidFuture()
     }
 

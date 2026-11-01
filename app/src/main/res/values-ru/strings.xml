@@ -266,7 +266,7 @@
     <string name="flow_next">Далее</string>
     <string name="flow_open_browser">Открыть в браузере</string>
     <string name="flow_external_wait">Завершите в браузере и вернитесь сюда: Xonos продолжит сам.</string>
-    <string name="spotify_old_accounts">На этом телефоне Spotify играет только с аккаунтами Premium, созданными до декабря 2024 года (точную дату Spotify не называл). С более новым аккаунтом музыка видна, но не играет: тогда используйте Music Assistant на компьютере или домашнем сервере, где можно выбрать Soloist.</string>
+    <string name="spotify_old_accounts">У Spotify два движка. librespot работает только с аккаунтами Premium, созданными до декабря 2024 года (точную дату Spotify не называл). Soloist, официальный движок Spotify, работает с любым аккаунтом Premium: нужен ваш собственный API-ключ Soloist (на developer.spotify.com) и один раз выбрать «Music Assistant Pairing» среди устройств в приложении Spotify, когда телефон подключён к Wi-Fi.</string>
     <string name="flow_working">Минутку…</string>
     <string name="flow_finished">Готово: сервис настроен. Его музыка может появиться в медиатеке через несколько минут.</string>
     <string name="flow_done">Готово</string>

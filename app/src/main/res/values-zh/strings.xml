@@ -236,7 +236,7 @@
     <string name="flow_next">下一步</string>
     <string name="flow_open_browser">在浏览器中打开</string>
     <string name="flow_external_wait">在浏览器中完成后回到这里，Xonos 会自动继续。</string>
-    <string name="spotify_old_accounts">在这部手机上，Spotify 只能播放 2024 年 12 月之前创建的 Premium 账户（Spotify 从未公布确切日期）。较新的账户能看到音乐，但无法播放：这时请在电脑或家庭服务器上使用 Music Assistant，并在那里选择 Soloist。</string>
+    <string name="spotify_old_accounts">Spotify 有两个播放引擎。librespot 只适用于 2024 年 12 月之前创建的 Premium 账户（Spotify 从未公布确切日期）。Soloist 是 Spotify 的官方引擎，适用于所有 Premium 账户：需要你自己的 Soloist API 密钥（在 developer.spotify.com 获取），并且只需一次：在手机连接 Wi-Fi 时，在 Spotify 应用的设备列表中选择“Music Assistant Pairing”。</string>
     <string name="flow_working">请稍候…</string>
     <string name="flow_finished">完成：服务已就绪。它的音乐可能需要几分钟才会出现在音乐库中。</string>
     <string name="flow_done">完成</string>

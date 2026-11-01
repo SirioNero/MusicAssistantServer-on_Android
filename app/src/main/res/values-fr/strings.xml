@@ -246,7 +246,7 @@
     <string name="flow_next">Suivant</string>
     <string name="flow_open_browser">Ouvrir dans le navigateur</string>
     <string name="flow_external_wait">Terminez dans le navigateur, puis revenez ici : Xonos continue tout seul.</string>
-    <string name="spotify_old_accounts">Sur ce téléphone, Spotify ne joue qu’avec les comptes Premium créés avant décembre 2024 (Spotify n’a jamais donné le jour exact). Avec un compte plus récent, votre musique apparaît mais ne se lance pas : utilisez alors Music Assistant sur un ordinateur ou un serveur à la maison, où vous pouvez choisir Soloist.</string>
+    <string name="spotify_old_accounts">Spotify a deux moteurs. librespot ne fonctionne qu’avec les comptes Premium créés avant décembre 2024 (Spotify n’a jamais donné le jour exact). Soloist, le moteur officiel de Spotify, fonctionne avec tous les comptes Premium : il faut votre propre clé API Soloist (sur developer.spotify.com) et, une seule fois, choisir « Music Assistant Pairing » parmi les appareils de l’app Spotify, avec le téléphone en Wi-Fi.</string>
     <string name="flow_working">Un instant…</string>
     <string name="flow_finished">C’est fait : le service est prêt. Sa musique peut mettre quelques minutes à apparaître dans la bibliothèque.</string>
     <string name="flow_done">OK</string>

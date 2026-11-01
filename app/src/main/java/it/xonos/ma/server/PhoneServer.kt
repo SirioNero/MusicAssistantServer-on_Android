@@ -39,7 +39,7 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
     private val cache = File(context.cacheDir, "music-assistant")
     private val dnsFile = File(data, "resolv.conf")
     private var dnsWatch: ConnectivityManager.NetworkCallback? = null
-    private val multicast: WifiManager.MulticastLock? by lazy {
+    private val multicastLock: WifiManager.MulticastLock? by lazy {
         app.getSystemService(WifiManager::class.java)?.createMulticastLock("xonos-soloist")?.apply {
             setReferenceCounted(false)
         }
@@ -222,7 +222,7 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
 
     /** Il multicast del Wi-Fi mentre Soloist si fa trovare dall'app Spotify (mDNS); spento il resto del tempo. */
     private fun multicast(on: Boolean) {
-        val lock = multicast ?: return
+        val lock = multicastLock ?: return
         runCatching { if (on) lock.acquire() else if (lock.isHeld) lock.release() }
             .onFailure { Log.w(TAG, "Multicast del Wi-Fi", it) }
     }

@@ -246,7 +246,7 @@
     <string name="flow_next">Επόμενο</string>
     <string name="flow_open_browser">Άνοιγμα στο πρόγραμμα περιήγησης</string>
     <string name="flow_external_wait">Ολοκληρώστε στο πρόγραμμα περιήγησης και επιστρέψτε εδώ: το Xonos συνεχίζει μόνο του.</string>
-    <string name="spotify_old_accounts">Σε αυτό το τηλέφωνο το Spotify παίζει μόνο με λογαριασμούς Premium που δημιουργήθηκαν πριν από τον Δεκέμβριο του 2024 (το Spotify δεν έδωσε ποτέ ακριβή ημερομηνία). Με νεότερο λογαριασμό η μουσική σας εμφανίζεται αλλά δεν παίζει: τότε χρησιμοποιήστε το Music Assistant σε υπολογιστή ή οικιακό διακομιστή, όπου μπορείτε να επιλέξετε το Soloist.</string>
+    <string name="spotify_old_accounts">Το Spotify έχει δύο μηχανές αναπαραγωγής. Το librespot λειτουργεί μόνο με λογαριασμούς Premium που δημιουργήθηκαν πριν από τον Δεκέμβριο του 2024 (το Spotify δεν έδωσε ποτέ ακριβή ημερομηνία). Το Soloist, η επίσημη μηχανή του Spotify, λειτουργεί με όλους τους λογαριασμούς Premium: χρειάζεται το δικό σας κλειδί API του Soloist (από το developer.spotify.com) και, μία φορά, να επιλέξετε «Music Assistant Pairing» στις συσκευές της εφαρμογής Spotify, με το τηλέφωνο σε Wi-Fi.</string>
     <string name="flow_working">Μια στιγμή…</string>
     <string name="flow_finished">Έτοιμο: η υπηρεσία είναι έτοιμη. Η μουσική της μπορεί να χρειαστεί λίγα λεπτά για να εμφανιστεί στη βιβλιοθήκη.</string>
     <string name="flow_done">Τέλος</string>

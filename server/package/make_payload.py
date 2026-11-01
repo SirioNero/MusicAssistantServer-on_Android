@@ -39,7 +39,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 SERVER = HERE.parent
-REPO_URL = "https://github.com/SirioNero/Music-Assistant-on-Gearslip"
+REPO_URL = "https://github.com/SirioNero/MusicAssistantServer-on_Android"
 PYTHON = "3.13"
 FIXED_TIME = (1980, 1, 1, 0, 0, 0)
 # I programmi che Android installa dall'APK come librerie (lib<nome>.so): qui tornano programmi.

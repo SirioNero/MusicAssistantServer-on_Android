@@ -10,6 +10,8 @@ prima di cominciare: le cose scritte qui sono già state verificate, non vanno r
 
 ## Regole
 
+- Il repository si chiama `SirioNero/MusicAssistantServer-on_Android` dal 1° novembre 2026 (prima
+  `Music-Assistant-on-Gearslip`: GitHub rimanda, anche git, le API e i download delle release, ma i link si scrivono col nome nuovo).
 - Codice, commenti, commit e log in italiano, con frasi semplici come nel resto del codice. README in
   inglese, poi spagnolo, francese, tedesco, italiano e portoghese: stesse sezioni, con i nomi dei menu e
   dei tasti presi dalle stringhe dell'app in quella lingua; come si compila e la mappa del codice solo in
@@ -19,7 +21,7 @@ prima di cominciare: le cose scritte qui sono già state verificate, non vanno r
   "fai un aggiornamento"): ogni push in `main` che cambia l'app crea una release.
 - All'utente si danno **sempre i link per rilasciare**, appena una versione è pronta e senza aspettare
   che li chieda: quello per unire il ramo in `main`
-  (`https://github.com/SirioNero/Music-Assistant-on-Gearslip/compare/main...<ramo>`, poi Create pull
+  (`https://github.com/SirioNero/MusicAssistantServer-on_Android/compare/main...<ramo>`, poi Create pull
   request e Merge: la release parte da sola), e dopo il link della release.
 - Niente pull request se non richiesta.
 - Niente copie offline o permanenti dei brani di Spotify, Tidal, YouTube Music e degli altri servizi
@@ -34,7 +36,7 @@ prima di cominciare: le cose scritte qui sono già state verificate, non vanno r
 - In questa sandbox non c'è l'SDK Android (dl.google.com, cioè il Maven di Google, è bloccato): l'app
   si compila solo su GitHub Actions, workflow "Compila Xonos" (`.github/workflows/build.yml`), a ogni push.
 - Lo stato dei workflow: gli strumenti GitHub (`actions_list`, `get_job_logs` a job finito) o
-  `curl https://api.github.com/repos/SirioNero/Music-Assistant-on-Gearslip/actions/runs?branch=...`
+  `curl https://api.github.com/repos/SirioNero/MusicAssistantServer-on_Android/actions/runs?branch=...`
   (senza token: `gh` qui non è autenticato). Gli errori di compilazione finiscono anche in
   un'annotazione del check run. Non si può leggere l'elenco dei secret.
 - Release: solo da `main`, solo se l'app è cambiata, solo con la chiave. File `Xonos.apk` e il pacchetto di

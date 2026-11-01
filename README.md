@@ -10,10 +10,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/SirioNero/Music-Assistant-on-Gearslip/releases/latest"><img src="https://img.shields.io/github/v/release/SirioNero/Music-Assistant-on-Gearslip?style=flat-square&label=release&color=ffc27a" alt="Latest release"></a>
+  <a href="https://github.com/SirioNero/MusicAssistantServer-on_Android/releases/latest"><img src="https://img.shields.io/github/v/release/SirioNero/MusicAssistantServer-on_Android?style=flat-square&label=release&color=ffc27a" alt="Latest release"></a>
   <img src="https://img.shields.io/badge/Android-8.0%2B-3ddc84?style=flat-square&logo=android&logoColor=white" alt="Android 8.0+">
   <img src="https://img.shields.io/badge/Music%20Assistant-2.7.5%2B-03a9f4?style=flat-square" alt="Music Assistant 2.7.5+">
-  <a href="https://github.com/SirioNero/Music-Assistant-on-Gearslip/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-8a63d2?style=flat-square" alt="License: AGPL-3.0"></a>
+  <a href="https://github.com/SirioNero/MusicAssistantServer-on_Android/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-8a63d2?style=flat-square" alt="License: AGPL-3.0"></a>
   <img src="https://img.shields.io/badge/languages-9-5c6b80?style=flat-square" alt="9 languages">
 </p>
 
@@ -91,7 +91,7 @@ If you reach Music Assistant through Tailscale: to connect to the car wirelessly
 
 ### Get started
 
-1. From the [Releases](https://github.com/SirioNero/Music-Assistant-on-Gearslip/releases) page, download `Xonos.apk` to your phone and install it. Android asks you to allow installing unknown apps; Play Protect may warn that it doesn’t know the app.
+1. From the [Releases](https://github.com/SirioNero/MusicAssistantServer-on_Android/releases) page, download `Xonos.apk` to your phone and install it. Android asks you to allow installing unknown apps; Play Protect may warn that it doesn’t know the app.
 2. Open Xonos: the first time, it shows its settings. Pick your language at the top (English until you choose), then enter:
    - your Music Assistant address at home: Xonos lists the Music Assistant servers it finds on your network, so tap yours; otherwise type it, for example `http://homeassistant.local:8095` (the Home Assistant add-on) or `http://192.168.1.10:8095`;
    - the address to use away from home (see below);
@@ -102,7 +102,7 @@ If you reach Music Assistant through Tailscale: to connect to the car wirelessly
 3. Tap **Allow in background**, so Android doesn’t stop the music with the screen off. The settings are behind the gear icon, on Home and in Library.
 4. In the car, open Gearslip: Xonos is among the music apps. In myCar it’s built in (see above).
 
-**Updates**: add `https://github.com/SirioNero/Music-Assistant-on-Gearslip` to [Obtainium](https://github.com/ImranR98/Obtainium). Each release is named after the app version (`v0.1.N`), so Obtainium can tell when an update is out.
+**Updates**: add `https://github.com/SirioNero/MusicAssistantServer-on_Android` to [Obtainium](https://github.com/ImranR98/Obtainium). Each release is named after the app version (`v0.1.N`), so Obtainium can tell when an update is out.
 
 ### Away from home
 
@@ -259,7 +259,7 @@ Si llegas a Music Assistant por Tailscale: para conectarse al coche sin cables, 
 
 ### Primeros pasos
 
-1. Desde la página [Releases](https://github.com/SirioNero/Music-Assistant-on-Gearslip/releases), descarga `Xonos.apk` en el teléfono e instálalo. Android te pedirá permitir la instalación de apps desconocidas; Play Protect puede avisar de que no conoce la app.
+1. Desde la página [Releases](https://github.com/SirioNero/MusicAssistantServer-on_Android/releases), descarga `Xonos.apk` en el teléfono e instálalo. Android te pedirá permitir la instalación de apps desconocidas; Play Protect puede avisar de que no conoce la app.
 2. Abre Xonos: la primera vez muestra sus ajustes. Elige el idioma arriba (inglés hasta que lo cambies) y escribe:
    - la dirección de Music Assistant en casa: Xonos muestra los Music Assistant que encuentra en tu red, así que toca el tuyo; si no, escríbela, por ejemplo `http://homeassistant.local:8095` (el complemento de Home Assistant) o `http://192.168.1.10:8095`;
    - la dirección para fuera de casa (mira más abajo);
@@ -270,7 +270,7 @@ Si llegas a Music Assistant por Tailscale: para conectarse al coche sin cables, 
 3. Pulsa **Permitir en segundo plano**, para que Android no detenga la música con la pantalla apagada. Los ajustes están tras el icono del engranaje, en Inicio y en Biblioteca.
 4. En el coche, abre Gearslip: Xonos aparece entre las apps de música. En myCar viene integrado (mira arriba).
 
-**Actualizaciones**: añade `https://github.com/SirioNero/Music-Assistant-on-Gearslip` a [Obtainium](https://github.com/ImranR98/Obtainium). Cada release lleva el nombre de la versión de la app (`v0.1.N`), así Obtainium sabe cuándo hay una actualización.
+**Actualizaciones**: añade `https://github.com/SirioNero/MusicAssistantServer-on_Android` a [Obtainium](https://github.com/ImranR98/Obtainium). Cada release lleva el nombre de la versión de la app (`v0.1.N`), así Obtainium sabe cuándo hay una actualización.
 
 ### Fuera de casa
 
@@ -387,7 +387,7 @@ Si vous accédez à Music Assistant par Tailscale : pour se connecter à la voit
 
 ### Pour commencer
 
-1. Depuis la page [Releases](https://github.com/SirioNero/Music-Assistant-on-Gearslip/releases), téléchargez `Xonos.apk` sur le téléphone et installez-le. Android demande d’autoriser l’installation d’apps inconnues ; Play Protect peut signaler qu’il ne connaît pas l’app.
+1. Depuis la page [Releases](https://github.com/SirioNero/MusicAssistantServer-on_Android/releases), téléchargez `Xonos.apk` sur le téléphone et installez-le. Android demande d’autoriser l’installation d’apps inconnues ; Play Protect peut signaler qu’il ne connaît pas l’app.
 2. Ouvrez Xonos : la première fois, il affiche ses réglages. Choisissez la langue en haut (l’anglais tant que vous n’avez pas choisi), puis saisissez :
    - l’adresse de Music Assistant à la maison : Xonos liste les Music Assistant qu’il trouve sur votre réseau, touchez le vôtre ; sinon tapez-la, par exemple `http://homeassistant.local:8095` (le module complémentaire de Home Assistant) ou `http://192.168.1.10:8095` ;
    - l’adresse hors de la maison (voir plus bas) ;
@@ -398,7 +398,7 @@ Si vous accédez à Music Assistant par Tailscale : pour se connecter à la voit
 3. Touchez **Autoriser en arrière-plan**, pour qu’Android n’arrête pas la musique écran éteint. Les réglages sont derrière l’icône d’engrenage, sur l’Accueil et dans la Bibliothèque.
 4. En voiture, ouvrez Gearslip : Xonos figure parmi les apps de musique. Dans myCar, il est intégré (voir plus haut).
 
-**Mises à jour** : ajoutez `https://github.com/SirioNero/Music-Assistant-on-Gearslip` à [Obtainium](https://github.com/ImranR98/Obtainium). Chaque release porte le numéro de version de l’app (`v0.1.N`), ainsi Obtainium sait quand une mise à jour est disponible.
+**Mises à jour** : ajoutez `https://github.com/SirioNero/MusicAssistantServer-on_Android` à [Obtainium](https://github.com/ImranR98/Obtainium). Chaque release porte le numéro de version de l’app (`v0.1.N`), ainsi Obtainium sait quand une mise à jour est disponible.
 
 ### Hors de la maison
 
@@ -515,7 +515,7 @@ Wenn du Music Assistant über Tailscale erreichst: Um sich drahtlos mit dem Auto
 
 ### Los geht’s
 
-1. Lade auf der Seite [Releases](https://github.com/SirioNero/Music-Assistant-on-Gearslip/releases) `Xonos.apk` aufs Handy und installiere sie. Android fragt, ob du die Installation unbekannter Apps erlaubst; Play Protect warnt vielleicht, dass es die App nicht kennt.
+1. Lade auf der Seite [Releases](https://github.com/SirioNero/MusicAssistantServer-on_Android/releases) `Xonos.apk` aufs Handy und installiere sie. Android fragt, ob du die Installation unbekannter Apps erlaubst; Play Protect warnt vielleicht, dass es die App nicht kennt.
 2. Öffne Xonos: Beim ersten Mal zeigt es seine Einstellungen. Wähle oben die Sprache (Englisch, bis du eine wählst) und gib ein:
    - die Adresse von Music Assistant zu Hause: Xonos listet die Music-Assistant-Server auf, die es in deinem Netzwerk findet, tippe also auf deinen; sonst tipp sie ein, zum Beispiel `http://homeassistant.local:8095` (das Home-Assistant-Add-on) oder `http://192.168.1.10:8095`;
    - die Adresse für unterwegs (siehe unten);
@@ -526,7 +526,7 @@ Wenn du Music Assistant über Tailscale erreichst: Um sich drahtlos mit dem Auto
 3. Tippe auf **Im Hintergrund erlauben**, damit Android die Musik bei ausgeschaltetem Bildschirm nicht stoppt. Die Einstellungen liegen hinter dem Zahnrad, auf Start und in der Bibliothek.
 4. Öffne im Auto Gearslip: Xonos ist bei den Musik-Apps. In myCar ist es eingebaut (siehe oben).
 
-**Updates**: Füge `https://github.com/SirioNero/Music-Assistant-on-Gearslip` in [Obtainium](https://github.com/ImranR98/Obtainium) hinzu. Jedes Release trägt die Version der App (`v0.1.N`), so erkennt Obtainium, wann ein Update da ist.
+**Updates**: Füge `https://github.com/SirioNero/MusicAssistantServer-on_Android` in [Obtainium](https://github.com/ImranR98/Obtainium) hinzu. Jedes Release trägt die Version der App (`v0.1.N`), so erkennt Obtainium, wann ein Update da ist.
 
 ### Unterwegs
 
@@ -643,7 +643,7 @@ Se raggiungi Music Assistant con Tailscale: per collegarsi all’auto senza fili
 
 ### Per cominciare
 
-1. Dalla pagina [Releases](https://github.com/SirioNero/Music-Assistant-on-Gearslip/releases) scarica `Xonos.apk` sul telefono e installalo. Android chiede di consentire l’installazione di app sconosciute; Play Protect può avvisare che l’app non è nota.
+1. Dalla pagina [Releases](https://github.com/SirioNero/MusicAssistantServer-on_Android/releases) scarica `Xonos.apk` sul telefono e installalo. Android chiede di consentire l’installazione di app sconosciute; Play Protect può avvisare che l’app non è nota.
 2. Apri Xonos: la prima volta mostra le impostazioni. Scegli in cima la lingua (finché non la scegli è l’inglese) e inserisci:
    - l’indirizzo di casa di Music Assistant: Xonos elenca i Music Assistant che trova nella tua rete, tocca il tuo; altrimenti scrivilo, per esempio `http://homeassistant.local:8095` (il componente aggiuntivo di Home Assistant) oppure `http://192.168.1.10:8095`;
    - l’indirizzo da fuori casa (vedi sotto);
@@ -654,7 +654,7 @@ Se raggiungi Music Assistant con Tailscale: per collegarsi all’auto senza fili
 3. Premi **Consenti in background**, così Android non ferma la musica a schermo spento. Le impostazioni stanno dietro l’ingranaggio, nella Home e nella Libreria.
 4. In auto apri Gearslip: Xonos compare tra le app musicali. In myCar c’è già dentro (vedi sopra).
 
-**Aggiornamenti**: aggiungi `https://github.com/SirioNero/Music-Assistant-on-Gearslip` a [Obtainium](https://github.com/ImranR98/Obtainium). Ogni release ha il nome della versione dell’app (`v0.1.N`), così Obtainium capisce quando c’è un aggiornamento.
+**Aggiornamenti**: aggiungi `https://github.com/SirioNero/MusicAssistantServer-on_Android` a [Obtainium](https://github.com/ImranR98/Obtainium). Ogni release ha il nome della versione dell’app (`v0.1.N`), così Obtainium capisce quando c’è un aggiornamento.
 
 ### Fuori casa
 
@@ -771,7 +771,7 @@ Se você chega ao Music Assistant pelo Tailscale: para se conectar ao carro sem 
 
 ### Para começar
 
-1. Na página [Releases](https://github.com/SirioNero/Music-Assistant-on-Gearslip/releases), baixe o `Xonos.apk` no telefone e instale. O Android pede para permitir a instalação de apps desconhecidos; o Play Protect pode avisar que não conhece o app.
+1. Na página [Releases](https://github.com/SirioNero/MusicAssistantServer-on_Android/releases), baixe o `Xonos.apk` no telefone e instale. O Android pede para permitir a instalação de apps desconhecidos; o Play Protect pode avisar que não conhece o app.
 2. Abra o Xonos: na primeira vez, ele mostra as configurações. Escolha o idioma no topo (inglês até você escolher) e informe:
    - o endereço do Music Assistant em casa: o Xonos lista os Music Assistant que encontra na sua rede, então toque no seu; se não, digite, por exemplo `http://homeassistant.local:8095` (o add-on do Home Assistant) ou `http://192.168.1.10:8095`;
    - o endereço para fora de casa (veja abaixo);
@@ -782,7 +782,7 @@ Se você chega ao Music Assistant pelo Tailscale: para se conectar ao carro sem 
 3. Toque em **Permitir em segundo plano**, para o Android não parar a música com a tela apagada. As configurações ficam atrás do ícone de engrenagem, no Início e na Biblioteca.
 4. No carro, abra o Gearslip: o Xonos aparece entre os apps de música. No myCar ele já vem embutido (veja acima).
 
-**Atualizações**: adicione `https://github.com/SirioNero/Music-Assistant-on-Gearslip` ao [Obtainium](https://github.com/ImranR98/Obtainium). Cada release tem o nome da versão do app (`v0.1.N`), assim o Obtainium sabe quando há uma atualização.
+**Atualizações**: adicione `https://github.com/SirioNero/MusicAssistantServer-on_Android` ao [Obtainium](https://github.com/ImranR98/Obtainium). Cada release tem o nome da versão do app (`v0.1.N`), assim o Obtainium sabe quando há uma atualização.
 
 ### Fora de casa
 

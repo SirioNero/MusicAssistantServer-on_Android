@@ -5,6 +5,6 @@
   "description": "A fake service to test Xonos: a form, a sign-in in the browser (to the fake server of tools/ma-test/podcasts.py) and editable options.",
   "codeowners": ["@SirioNero"],
   "requirements": [],
-  "documentation": "https://github.com/SirioNero/Music-Assistant-on-Gearslip/tree/main/tools",
+  "documentation": "https://github.com/SirioNero/MusicAssistantServer-on_Android/tree/main/tools",
   "multi_instance": true
 }

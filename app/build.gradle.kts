@@ -40,7 +40,7 @@ android {
         buildConfigField(
             "String",
             "SERVER_PACKAGE_URL",
-            "\"https://github.com/SirioNero/Music-Assistant-on-Gearslip/releases/download/v$versionName/\"",
+            "\"https://github.com/SirioNero/MusicAssistantServer-on_Android/releases/download/v$versionName/\"",
         )
     }
 

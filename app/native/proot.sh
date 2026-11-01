@@ -57,6 +57,8 @@ for ABI in "$@"; do
     "$CC" -std=gnu11 -O2 -fPIC -g0 $MAP -I"$BUILD/talloc" -c "$BUILD/talloc/talloc.c" -o "$BUILD/talloc/talloc.o"
     "$TOOLCHAIN/bin/llvm-ar" rcsD "$BUILD/talloc/libtalloc.a" "$BUILD/talloc/talloc.o"
     echo "proot $PROOT_VERSION per $ABI"
+    # ashmem_memfd.c usa strcmp e memset senza includere string.h: il clang dell'NDK 27 lo tratta come un errore.
+    sed -i '1i #include <string.h>' "$BUILD/proot-$PROOT_VERSION/src/extension/ashmem_memfd/ashmem_memfd.c"
     # Le opzioni passano dall'ambiente: il GNUmakefile di proot ci aggiunge le sue (-ltalloc...). Il caricatore
     # resta un file a sé (PROOT_UNBUNDLE_LOADER; Xonos lo indica con PROOT_LOADER); niente caricatore a 32 bit,
     # perché i programmi da avviare sono a 64; GIT=false: la versione è quella scritta qui, non quella del

@@ -8,10 +8,13 @@ import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.svg.SvgDecoder
 import coil3.request.crossfade
+import android.util.Log
+import it.xonos.ma.data.Account
 import it.xonos.ma.data.ArtCache
 import it.xonos.ma.data.Connection
 import it.xonos.ma.data.Library
 import it.xonos.ma.data.MaRepository
+import it.xonos.ma.data.Problem
 import it.xonos.ma.data.ScreenCache
 import it.xonos.ma.data.Settings
 import it.xonos.ma.phone.NsdFinder
@@ -19,6 +22,7 @@ import it.xonos.ma.phone.model.PhoneModel
 import it.xonos.ma.phone.model.PhoneServerControl
 import it.xonos.ma.phone.model.PhoneServerControl.State
 import it.xonos.ma.server.PhoneServer
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -70,9 +74,38 @@ class XonosApp : Application(), SingletonImageLoader.Factory {
                 scope.launch { if (server.start()) repo.reconnect() }
             }
         }
+        // Il server sul telefono non accetta più il token (scaduto: dalla 2.10 durano un anno, e di solito
+        // MaRepository lo rinnova prima). Xonos ha la password del suo account e se ne fa dare uno nuovo, una volta
+        // per token: se non riesce resta l'avviso del token, come con ogni Music Assistant.
+        var refused = ""
+        fun signInAgain() {
+            val config = settings.load()
+            val password = settings.phoneServerPassword ?: return
+            if (config.homeUrl != server.url || config.token == refused) return
+            refused = config.token
+            scope.launch {
+                try {
+                    val login = Account(repo).login(server.url, PhoneModel.PHONE_SERVER_USER, password, "Xonos (${Build.MODEL})")
+                    val now = settings.load()
+                    if (now.token == config.token) {
+                        settings.save(now.copy(token = login.token))
+                        repo.reconnect()
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.w("Xonos", "Nuovo accesso al server sul telefono non riuscito: ${e.message}")
+                }
+            }
+        }
         startIfUsed()
         scope.launch {
-            repo.connection.collect { connection -> if (connection is Connection.Failed) startIfUsed() }
+            repo.connection.collect { connection ->
+                if (connection is Connection.Failed) {
+                    startIfUsed()
+                    if (connection.problem == Problem.BAD_TOKEN) signInAgain()
+                }
+            }
         }
     }
 

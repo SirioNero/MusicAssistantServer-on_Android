@@ -38,6 +38,9 @@ class MaRepository(private val settings: Settings) {
     private val listeners = CopyOnWriteArrayList<(String, String?, Any?) -> Unit>()
 
     @Volatile private var client: MaClient? = null
+
+    /** L'ora in millisecondi; il banco di prova la sposta avanti per vedere il rinnovo del token. */
+    @Volatile internal var clock: () -> Long = System::currentTimeMillis
     private var loop: Job? = null
     private var users = 0
 
@@ -152,6 +155,7 @@ class MaRepository(private val settings: Settings) {
             try {
                 Log.i(TAG, "Collegato a ${server.name} (${server.version}) su $usedUrl")
                 _connection.value = Connection.Connected(usedUrl, server)
+                scope.launch { renewToken(active, config.token) }
                 val reason = active.closed.await()
                 _connection.value = Connection.Failed("Connessione persa ($reason), riprovo", Problem.LOST, reason)
             } catch (e: CancellationException) {
@@ -171,8 +175,38 @@ class MaRepository(private val settings: Settings) {
         }
     }
 
+    /**
+     * Dalla 2.10 i token a lunga durata di Music Assistant scadono dopo un anno e non si rinnovano da soli (prima
+     * duravano dieci anni): scaduto quello di Xonos, niente musica finché non si rientra a mano. Così, quando
+     * mancano meno di [RENEW_BEFORE_S], Xonos se ne fa dare uno nuovo con lo stesso nome e lo salva al posto del
+     * vecchio. Il vecchio vale fino alla sua scadenza: revocarlo chiuderebbe anche questa connessione (e quella di
+     * myCar, che lo usa finché non chiede di nuovo l'account).
+     */
+    private suspend fun renewToken(active: MaClient, token: String) {
+        val info = TokenInfo.read(token) ?: return
+        val left = info.expiresAt - clock() / 1000
+        if (!info.longLived || left > RENEW_BEFORE_S) return
+        try {
+            val fresh = active.command("auth/token/create") { put("name", info.name ?: "Xonos") } as? String ?: return
+            synchronized(settings) {
+                val now = settings.load()
+                // Intanto si è cambiato server o token: quello nuovo non serve.
+                if (now.token != token) return
+                settings.save(now.copy(token = fresh))
+            }
+            Log.i(TAG, "Token rinnovato: quello di prima scadeva tra ${left / 86_400} giorni")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Token non rinnovato: ${e.message}")
+        }
+    }
+
     companion object {
         private const val TAG = "Xonos"
+
+        /** Quanto prima della scadenza si chiede un token nuovo: Xonos deve collegarsi almeno una volta in quel tempo. */
+        const val RENEW_BEFORE_S = 30L * 86_400
 
         /**
          * L'indirizzo di un'immagine: dal proxy di Music Assistant, che la rimpicciolisce, oppure

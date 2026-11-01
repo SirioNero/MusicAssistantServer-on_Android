@@ -334,10 +334,28 @@ class AudioEngine(
         if (_outputting.value && clock() - lastAudioAt > STARVED_US) _outputting.value = false
     }
 
+    /** Quando si è preso l'ultimo decoder nuovo dopo un guasto (System.nanoTime). */
+    private var decoderResetNs = 0L
+
     private fun decode(chunk: Chunk) {
         val decoder = decoder ?: return
-        decoder.decode(chunk.data, chunk.offset, chunk.length, chunk.timestampUs) { pcm, frames, timestampUs ->
-            render(pcm, frames, timestampUs, chunk.generation)
+        var rendering = false
+        try {
+            decoder.decode(chunk.data, chunk.offset, chunk.length, chunk.timestampUs) { pcm, frames, timestampUs ->
+                rendering = true
+                render(pcm, frames, timestampUs, chunk.generation)
+                rendering = false
+            }
+        } catch (e: Exception) {
+            if (rendering) throw e
+            // Un decoder guasto (MediaCodec in errore) non torna da solo: senza questo, silenzio fino al brano dopo e un
+            // errore per ogni pacchetto. Se ne prende uno nuovo, al massimo una volta al secondo; si perde solo il pezzo.
+            runCatching { decoder.release() }
+            val now = System.nanoTime()
+            val again = now - decoderResetNs > DECODER_RESET_NS
+            this.decoder = if (again) format?.let(decoders) else null
+            decoderResetNs = now
+            Log.w(TAG, if (again) "Decoder guasto, ne prendo uno nuovo: ${e.message}" else "Decoder guasto di nuovo: aspetto il prossimo brano")
         }
     }
 
@@ -546,5 +564,6 @@ class AudioEngine(
         const val SLEEP_STEP_MS = 50L
         const val IDLE_WAIT_MS = 250L
         const val MAX_QUEUED = 4_000
+        const val DECODER_RESET_NS = 1_000_000_000L
     }
 }

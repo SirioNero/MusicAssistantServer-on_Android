@@ -1,1 +1,1 @@
-A Music Assistant server on your phone, for the car with Gearslip and myCar
+Spotify and your music without Google or a server: your phone is the server

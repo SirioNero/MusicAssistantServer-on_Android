@@ -5,8 +5,9 @@
 <h1 align="center">Xonos</h1>
 
 <p align="center">
-  <strong>A Music Assistant server on your Android phone, made for the car.</strong><br>
-  Spotify, SoundCloud, Plex, Jellyfin, podcasts, radio and your own files in one library: on the phone and on the car’s screen with Gearslip and myCar. No Google account needed.
+  <strong>Spotify and all your music on a phone without Google.<br>
+  No server to set up: the phone is the server.</strong><br>
+  Xonos runs Music Assistant, a free music server, on the phone itself: Spotify, SoundCloud, Plex, Jellyfin, podcasts, radio and your own files in one app, also in the car with Gearslip and myCar.
 </p>
 
 <p align="center">
@@ -28,16 +29,16 @@
 
 ## English
 
-**Xonos runs a Music Assistant server on your phone and brings it into the car.** It gathers your music services in one library (Spotify, SoundCloud, Plex, Jellyfin, Subsonic, Audiobookshelf, podcasts, radio and the music on the phone itself) and plays it on the phone and on the car’s screen with [Gearslip](https://github.com/twinksoftware/Gearslip) or [myCar](https://github.com/SirioNero/MyCar), out of the car’s speakers. No Google account and no Google Play services: install it from this page with Obtainium, and each service only asks for its own account. Already have [Music Assistant](https://music-assistant.io) at home? Xonos connects to it too, as a private player and a complete music app.
+**Spotify and all your music on a phone without Google, and no server to set up: the phone is the server.** Xonos runs [Music Assistant](https://music-assistant.io), a free music server that brings your streaming services and your own music together, right on the phone: no computer, no home server. Spotify (Premium), SoundCloud, Plex, Jellyfin, podcasts, radio and the songs on the phone end up in one library, which you play on the phone and on the car’s screen with [Gearslip](https://github.com/twinksoftware/Gearslip) or [myCar](https://github.com/SirioNero/MyCar). No Google account and no Google Play services: install it from this page with Obtainium, and each service only asks for its own account. Already have Music Assistant at home? Xonos connects to it too.
 
 ### Highlights
 
-- 🏠 **A Music Assistant server in your pocket.** No computer and no home server: Xonos downloads Music Assistant when you ask (about 75 MB) and runs it on the phone, just for you and for myCar.
-- 🧩 **All your services, one library.** Spotify, SoundCloud, Plex, Jellyfin, Emby, Subsonic/Navidrome, Audiobookshelf, TuneIn, podcasts and the phone’s own files, side by side and in one search. Spotify plays with every Premium account, through Spotify’s official engine.
-- 🚫 **No Google account.** Xonos uses neither Google Play services nor a Google sign-in: it runs on phones without Google, such as GrapheneOS.
+- 📱 **The phone is the server.** No computer and no home server: Xonos downloads Music Assistant when you ask (about 75 MB) and runs it on the phone itself, just for you and for myCar.
+- 🎧 **Spotify without Google.** Spotify with any Premium account, through Spotify’s official engine, on a phone with no Google account and no Google Play services, such as GrapheneOS.
+- 🧩 **All your music, one app.** SoundCloud, Plex, Jellyfin, Emby, Subsonic/Navidrome, Audiobookshelf, TuneIn, podcasts, radio and the phone’s own files, next to Spotify in one library and one search.
 - 🚗 **Everything, in the car.** Playlists, albums, artists, podcasts, audiobooks and radio from every service in Music Assistant, with the full menu, search, lyrics and the player beside the map.
 - 🎶 **Your Spotify library too.** Spotify won’t show its library to Gearslip: add Spotify to Music Assistant, and your playlists, liked songs, albums and artists are in Xonos.
-- 📱 **A real player on the phone.** Recommendations on Home, search as you type, the whole library, synced lyrics, a queue and playlists you can edit.
+- ▶️ **A real player on the phone.** Recommendations on Home, search as you type, the whole library, synced lyrics, a queue and playlists you can edit.
 - 🔊 **Play on any speaker.** Send the music to the speakers Music Assistant knows (Chromecast, AirPlay, Sonos, DLNA, groups) and bring it back to the phone, from the same point.
 - 🛠️ **Music Assistant in your hand.** Administrators add services, sign in to them and set them up right from the phone.
 - 🌍 **Nine languages.** English, Español, Français, Deutsch, Italiano, Português, Ελληνικά, Русский, 简体中文.
@@ -202,16 +203,16 @@ Xonos is an independent project, not affiliated with Music Assistant, Gearslip o
 
 ## Español
 
-**Xonos lleva un servidor de Music Assistant a tu teléfono y lo mete en el coche.** Reúne tus servicios de música en una sola biblioteca (Spotify, SoundCloud, Plex, Jellyfin, Subsonic, Audiobookshelf, pódcasts, radio y la música del propio teléfono) y la reproduce en el teléfono y en la pantalla del coche con [Gearslip](https://github.com/twinksoftware/Gearslip) o [myCar](https://github.com/SirioNero/MyCar), por los altavoces del coche. Sin cuenta de Google ni servicios de Google Play: se instala desde esta página con Obtainium, y cada servicio solo pide su propia cuenta. ¿Ya tienes [Music Assistant](https://music-assistant.io) en casa? Xonos también se conecta a él, como reproductor privado y app de música completa.
+**Spotify y toda tu música en un teléfono sin Google, y sin servidor que montar: el servidor es el propio teléfono.** Xonos ejecuta [Music Assistant](https://music-assistant.io), un servidor de música libre que reúne tus servicios de streaming y tu propia música, en el propio teléfono: sin ordenador ni servidor en casa. Spotify (Premium), SoundCloud, Plex, Jellyfin, pódcasts, radio y las canciones del teléfono quedan en una sola biblioteca, que escuchas en el teléfono y en la pantalla del coche con [Gearslip](https://github.com/twinksoftware/Gearslip) o [myCar](https://github.com/SirioNero/MyCar). Sin cuenta de Google ni servicios de Google Play: se instala desde esta página con Obtainium, y cada servicio solo pide su propia cuenta. ¿Ya tienes Music Assistant en casa? Xonos también se conecta a él.
 
 ### Lo mejor
 
-- 🏠 **Un servidor de Music Assistant en el bolsillo.** Sin ordenador ni servidor en casa: Xonos descarga Music Assistant cuando se lo pides (unos 75 MB) y lo ejecuta en el teléfono, solo para ti y para myCar.
-- 🧩 **Todos tus servicios, una sola biblioteca.** Spotify, SoundCloud, Plex, Jellyfin, Emby, Subsonic/Navidrome, Audiobookshelf, TuneIn, pódcasts y los archivos del propio teléfono, juntos y en una sola búsqueda. Spotify suena con todas las cuentas Premium, con el motor oficial de Spotify.
-- 🚫 **Sin cuenta de Google.** Xonos no usa los servicios de Google Play ni el inicio de sesión de Google: funciona en teléfonos sin Google, como GrapheneOS.
+- 📱 **El servidor es el teléfono.** Sin ordenador ni servidor en casa: Xonos descarga Music Assistant cuando se lo pides (unos 75 MB) y lo ejecuta en el propio teléfono, solo para ti y para myCar.
+- 🎧 **Spotify sin Google.** Spotify con cualquier cuenta Premium, con el motor oficial de Spotify, en un teléfono sin cuenta de Google ni servicios de Google Play, como GrapheneOS.
+- 🧩 **Toda tu música, una sola app.** SoundCloud, Plex, Jellyfin, Emby, Subsonic/Navidrome, Audiobookshelf, TuneIn, pódcasts, radio y los archivos del propio teléfono, junto a Spotify en una sola biblioteca y una sola búsqueda.
 - 🚗 **Todo, en el coche.** Playlists, álbumes, artistas, pódcasts, audiolibros y radio de todos los servicios de Music Assistant, con el menú completo, la búsqueda, la letra y el reproductor junto al mapa.
 - 🎶 **También tu biblioteca de Spotify.** Spotify no le enseña su biblioteca a Gearslip: añade Spotify a Music Assistant y tus playlists, canciones que te gustan, álbumes y artistas estarán en Xonos.
-- 📱 **Un reproductor de verdad en el teléfono.** Recomendaciones en Inicio, búsqueda mientras escribes, toda la biblioteca, letras sincronizadas, una cola y playlists que puedes editar.
+- ▶️ **Un reproductor de verdad en el teléfono.** Recomendaciones en Inicio, búsqueda mientras escribes, toda la biblioteca, letras sincronizadas, una cola y playlists que puedes editar.
 - 🔊 **Suena en cualquier altavoz.** Envía la música a los altavoces que conoce Music Assistant (Chromecast, AirPlay, Sonos, DLNA, grupos) y tráela de vuelta al teléfono, desde el mismo punto.
 - 🛠️ **Music Assistant en tu mano.** Quien lo administra añade servicios, inicia sesión en ellos y los configura desde el propio teléfono.
 - 🌍 **Nueve idiomas.** English, Español, Français, Deutsch, Italiano, Português, Ελληνικά, Русский, 简体中文.
@@ -332,16 +333,16 @@ Xonos es un proyecto independiente, sin relación con Music Assistant, Gearslip 
 
 ## Français
 
-**Xonos fait tourner un serveur Music Assistant sur votre téléphone et l’emmène dans la voiture.** Il réunit vos services de musique dans une seule bibliothèque (Spotify, SoundCloud, Plex, Jellyfin, Subsonic, Audiobookshelf, podcasts, radio et la musique du téléphone lui-même) et la joue sur le téléphone et sur l’écran de la voiture avec [Gearslip](https://github.com/twinksoftware/Gearslip) ou [myCar](https://github.com/SirioNero/MyCar), par les haut-parleurs de la voiture. Sans compte Google ni services Google Play : il s’installe depuis cette page avec Obtainium, et chaque service ne demande que son propre compte. Vous avez déjà [Music Assistant](https://music-assistant.io) à la maison ? Xonos s’y connecte aussi, comme lecteur privé et application de musique complète.
+**Spotify et toute votre musique sur un téléphone sans Google, sans serveur à installer : le serveur, c’est le téléphone.** Xonos fait tourner [Music Assistant](https://music-assistant.io), un serveur de musique libre qui réunit vos services de streaming et votre propre musique, sur le téléphone lui-même : ni ordinateur ni serveur à la maison. Spotify (Premium), SoundCloud, Plex, Jellyfin, podcasts, radio et les morceaux du téléphone se retrouvent dans une seule bibliothèque, que vous écoutez sur le téléphone et sur l’écran de la voiture avec [Gearslip](https://github.com/twinksoftware/Gearslip) ou [myCar](https://github.com/SirioNero/MyCar). Sans compte Google ni services Google Play : il s’installe depuis cette page avec Obtainium, et chaque service ne demande que son propre compte. Vous avez déjà Music Assistant à la maison ? Xonos s’y connecte aussi.
 
 ### Points forts
 
-- 🏠 **Un serveur Music Assistant dans la poche.** Ni ordinateur ni serveur à la maison : Xonos télécharge Music Assistant quand vous le demandez (environ 75 Mo) et le fait tourner sur le téléphone, rien que pour vous et pour myCar.
-- 🧩 **Tous vos services, une seule bibliothèque.** Spotify, SoundCloud, Plex, Jellyfin, Emby, Subsonic/Navidrome, Audiobookshelf, TuneIn, podcasts et les fichiers du téléphone, côte à côte et dans une seule recherche. Spotify joue avec tous les comptes Premium, grâce au moteur officiel de Spotify.
-- 🚫 **Sans compte Google.** Xonos n’utilise ni les services Google Play ni la connexion Google : il fonctionne sur les téléphones sans Google, comme GrapheneOS.
+- 📱 **Le serveur, c’est le téléphone.** Ni ordinateur ni serveur à la maison : Xonos télécharge Music Assistant quand vous le demandez (environ 75 Mo) et le fait tourner sur le téléphone lui-même, rien que pour vous et pour myCar.
+- 🎧 **Spotify sans Google.** Spotify avec n’importe quel compte Premium, grâce au moteur officiel de Spotify, sur un téléphone sans compte Google ni services Google Play, comme GrapheneOS.
+- 🧩 **Toute votre musique, une seule app.** SoundCloud, Plex, Jellyfin, Emby, Subsonic/Navidrome, Audiobookshelf, TuneIn, podcasts, radio et les fichiers du téléphone, à côté de Spotify dans une seule bibliothèque et une seule recherche.
 - 🚗 **Tout, dans la voiture.** Playlists, albums, artistes, podcasts, livres audio et radio de tous les services de Music Assistant, avec le menu complet, la recherche, les paroles et le lecteur à côté de la carte.
 - 🎶 **Votre bibliothèque Spotify aussi.** Spotify refuse de montrer sa bibliothèque à Gearslip : ajoutez Spotify à Music Assistant, et vos playlists, titres likés, albums et artistes sont dans Xonos.
-- 📱 **Un vrai lecteur sur le téléphone.** Des recommandations sur l’Accueil, la recherche pendant la saisie, toute la bibliothèque, les paroles synchronisées, une file d’attente et des playlists modifiables.
+- ▶️ **Un vrai lecteur sur le téléphone.** Des recommandations sur l’Accueil, la recherche pendant la saisie, toute la bibliothèque, les paroles synchronisées, une file d’attente et des playlists modifiables.
 - 🔊 **Sur n’importe quelle enceinte.** Envoyez la musique vers les enceintes que Music Assistant connaît (Chromecast, AirPlay, Sonos, DLNA, groupes) et ramenez-la sur le téléphone, au même endroit.
 - 🛠️ **Music Assistant en main.** Les administrateurs ajoutent des services, s’y connectent et les configurent depuis le téléphone.
 - 🌍 **Neuf langues.** English, Español, Français, Deutsch, Italiano, Português, Ελληνικά, Русский, 简体中文.
@@ -462,16 +463,16 @@ Xonos est un projet indépendant, sans lien avec Music Assistant, Gearslip ni au
 
 ## Deutsch
 
-**Xonos bringt einen Music-Assistant-Server aufs Handy und ins Auto.** Es fasst deine Musikdienste in einer Bibliothek zusammen (Spotify, SoundCloud, Plex, Jellyfin, Subsonic, Audiobookshelf, Podcasts, Radio und die Musik auf dem Handy selbst) und spielt sie auf dem Handy und auf dem Bildschirm im Auto mit [Gearslip](https://github.com/twinksoftware/Gearslip) oder [myCar](https://github.com/SirioNero/MyCar), aus den Lautsprechern des Autos. Ohne Google-Konto und ohne Google-Play-Dienste: Du installierst es von dieser Seite mit Obtainium, und jeder Dienst braucht nur sein eigenes Konto. Du hast schon [Music Assistant](https://music-assistant.io) zu Hause? Xonos verbindet sich auch damit, als privater Player und vollständige Musik-App.
+**Spotify und deine ganze Musik auf einem Handy ohne Google, und ohne Server: Der Server ist das Handy selbst.** Xonos führt [Music Assistant](https://music-assistant.io) aus, einen freien Musikserver, der deine Streamingdienste und deine eigene Musik zusammenbringt, direkt auf dem Handy: kein Computer, kein Heimserver. Spotify (Premium), SoundCloud, Plex, Jellyfin, Podcasts, Radio und die Songs auf dem Handy landen in einer Bibliothek, die du auf dem Handy und auf dem Bildschirm im Auto mit [Gearslip](https://github.com/twinksoftware/Gearslip) oder [myCar](https://github.com/SirioNero/MyCar) hörst. Ohne Google-Konto und ohne Google-Play-Dienste: Du installierst es von dieser Seite mit Obtainium, und jeder Dienst braucht nur sein eigenes Konto. Du hast schon Music Assistant zu Hause? Xonos verbindet sich auch damit.
 
 ### Das Beste
 
-- 🏠 **Ein Music-Assistant-Server in der Tasche.** Kein Computer und kein Heimserver: Xonos lädt Music Assistant herunter, wenn du es willst (etwa 75 MB), und führt ihn auf dem Handy aus, nur für dich und für myCar.
-- 🧩 **Alle deine Dienste, eine Bibliothek.** Spotify, SoundCloud, Plex, Jellyfin, Emby, Subsonic/Navidrome, Audiobookshelf, TuneIn, Podcasts und die Dateien auf dem Handy, nebeneinander und in einer Suche. Spotify spielt mit jedem Premium-Konto, über die offizielle Engine von Spotify.
-- 🚫 **Kein Google-Konto.** Xonos nutzt weder die Google-Play-Dienste noch eine Google-Anmeldung: Es läuft auf Handys ohne Google, etwa mit GrapheneOS.
+- 📱 **Das Handy ist der Server.** Kein Computer und kein Heimserver: Xonos lädt Music Assistant herunter, wenn du es willst (etwa 75 MB), und führt ihn auf dem Handy selbst aus, nur für dich und für myCar.
+- 🎧 **Spotify ohne Google.** Spotify mit jedem Premium-Konto, über die offizielle Engine von Spotify, auf einem Handy ohne Google-Konto und ohne Google-Play-Dienste, etwa mit GrapheneOS.
+- 🧩 **Deine ganze Musik, eine App.** SoundCloud, Plex, Jellyfin, Emby, Subsonic/Navidrome, Audiobookshelf, TuneIn, Podcasts, Radio und die Dateien auf dem Handy, neben Spotify in einer Bibliothek und einer Suche.
 - 🚗 **Alles im Auto.** Playlists, Alben, Künstler, Podcasts, Hörbücher und Radio aus allen Diensten in Music Assistant, mit dem kompletten Menü, der Suche, Songtexten und dem Player neben der Karte.
 - 🎶 **Auch deine Spotify-Bibliothek.** Spotify zeigt Gearslip seine Bibliothek nicht: Füge Spotify zu Music Assistant hinzu, und deine Playlists, Lieblingssongs, Alben und Künstler sind in Xonos.
-- 📱 **Ein echter Player auf dem Handy.** Empfehlungen auf Start, Suche beim Tippen, die ganze Bibliothek, synchronisierte Songtexte, eine Warteschlange und Playlists, die du bearbeiten kannst.
+- ▶️ **Ein echter Player auf dem Handy.** Empfehlungen auf Start, Suche beim Tippen, die ganze Bibliothek, synchronisierte Songtexte, eine Warteschlange und Playlists, die du bearbeiten kannst.
 - 🔊 **Auf jedem Lautsprecher.** Schick die Musik an die Lautsprecher, die Music Assistant kennt (Chromecast, AirPlay, Sonos, DLNA, Gruppen), und hol sie an derselben Stelle zurück aufs Handy.
 - 🛠️ **Music Assistant in der Hand.** Admins fügen Dienste hinzu, melden sich bei ihnen an und richten sie direkt auf dem Handy ein.
 - 🌍 **Neun Sprachen.** English, Español, Français, Deutsch, Italiano, Português, Ελληνικά, Русский, 简体中文.
@@ -592,16 +593,16 @@ Xonos ist ein unabhängiges Projekt und steht in keiner Verbindung zu Music Assi
 
 ## Italiano
 
-**Xonos fa girare un server Music Assistant sul telefono e lo porta in auto.** Riunisce i tuoi servizi musicali in un’unica libreria (Spotify, SoundCloud, Plex, Jellyfin, Subsonic, Audiobookshelf, podcast, radio e la musica del telefono stesso) e la suona sul telefono e sullo schermo dell’auto con [Gearslip](https://github.com/twinksoftware/Gearslip) o [myCar](https://github.com/SirioNero/MyCar), dalle casse dell’auto. Niente account Google né servizi Google Play: si installa da questa pagina con Obtainium, e ogni servizio chiede solo il suo account. Hai già [Music Assistant](https://music-assistant.io) a casa? Xonos si collega anche a quello, come lettore privato e app musicale completa.
+**Spotify e tutta la tua musica su un telefono senza Google, e senza server da preparare: il server è il telefono stesso.** Xonos fa girare [Music Assistant](https://music-assistant.io), un server musicale libero che riunisce i tuoi servizi di streaming e la tua musica, direttamente sul telefono: niente computer né server di casa. Spotify (Premium), SoundCloud, Plex, Jellyfin, podcast, radio e i brani del telefono finiscono in un’unica libreria, che ascolti sul telefono e sullo schermo dell’auto con [Gearslip](https://github.com/twinksoftware/Gearslip) o [myCar](https://github.com/SirioNero/MyCar). Niente account Google né servizi Google Play: si installa da questa pagina con Obtainium, e ogni servizio chiede solo il suo account. Hai già Music Assistant a casa? Xonos si collega anche a quello.
 
 ### Il meglio
 
-- 🏠 **Un server Music Assistant in tasca.** Niente computer né server di casa: Xonos scarica Music Assistant quando glielo chiedi (circa 75 MB) e lo fa girare sul telefono, solo per te e per myCar.
-- 🧩 **Tutti i tuoi servizi, un’unica libreria.** Spotify, SoundCloud, Plex, Jellyfin, Emby, Subsonic/Navidrome, Audiobookshelf, TuneIn, podcast e i file del telefono, insieme e in un’unica ricerca. Spotify suona con tutti gli account Premium, con il motore ufficiale di Spotify.
-- 🚫 **Niente account Google.** Xonos non usa i servizi Google Play né l’accesso con Google: funziona sui telefoni senza Google, come GrapheneOS.
+- 📱 **Il server è il telefono.** Niente computer né server di casa: Xonos scarica Music Assistant quando glielo chiedi (circa 75 MB) e lo fa girare sul telefono stesso, solo per te e per myCar.
+- 🎧 **Spotify senza Google.** Spotify con qualsiasi account Premium, con il motore ufficiale di Spotify, su un telefono senza account Google né servizi Google Play, come GrapheneOS.
+- 🧩 **Tutta la tua musica, un’unica app.** SoundCloud, Plex, Jellyfin, Emby, Subsonic/Navidrome, Audiobookshelf, TuneIn, podcast, radio e i file del telefono, accanto a Spotify in un’unica libreria e un’unica ricerca.
 - 🚗 **Tutto, in auto.** Playlist, album, artisti, podcast, audiolibri e radio da tutti i servizi di Music Assistant, con il menu completo, la ricerca, i testi e il lettore accanto alla mappa.
 - 🎶 **Anche la tua libreria di Spotify.** Spotify a Gearslip non mostra la sua libreria: aggiungi Spotify a Music Assistant, e playlist, brani che ti piacciono, album e artisti sono in Xonos.
-- 📱 **Un lettore vero anche sul telefono.** Consigli nella Home, ricerca mentre scrivi, tutta la libreria, testi sincronizzati, una coda e playlist che puoi modificare.
+- ▶️ **Un lettore vero anche sul telefono.** Consigli nella Home, ricerca mentre scrivi, tutta la libreria, testi sincronizzati, una coda e playlist che puoi modificare.
 - 🔊 **Suona su qualsiasi cassa.** Manda la musica alle casse che Music Assistant conosce (Chromecast, AirPlay, Sonos, DLNA, gruppi) e riportala sul telefono, dallo stesso punto.
 - 🛠️ **Music Assistant in mano.** Chi lo amministra aggiunge i servizi, ci fa l’accesso e li configura direttamente dal telefono.
 - 🌍 **Nove lingue.** English, Español, Français, Deutsch, Italiano, Português, Ελληνικά, Русский, 简体中文.
@@ -722,16 +723,16 @@ Xonos è un progetto indipendente, non legato a Music Assistant, a Gearslip né 
 
 ## Português
 
-**O Xonos roda um servidor Music Assistant no seu telefone e o leva para o carro.** Ele reúne seus serviços de música em uma só biblioteca (Spotify, SoundCloud, Plex, Jellyfin, Subsonic, Audiobookshelf, podcasts, rádio e a música do próprio telefone) e toca no telefone e na tela do carro com o [Gearslip](https://github.com/twinksoftware/Gearslip) ou o [myCar](https://github.com/SirioNero/MyCar), pelos alto-falantes do carro. Sem conta do Google nem serviços do Google Play: você instala por esta página com o Obtainium, e cada serviço só pede a própria conta. Já tem o [Music Assistant](https://music-assistant.io) em casa? O Xonos também se conecta a ele, como reprodutor privado e app de música completo.
+**Spotify e toda a sua música em um telefone sem Google, e sem servidor para montar: o servidor é o próprio telefone.** O Xonos roda o [Music Assistant](https://music-assistant.io), um servidor de música livre que reúne seus serviços de streaming e a sua própria música, direto no telefone: sem computador nem servidor em casa. Spotify (Premium), SoundCloud, Plex, Jellyfin, podcasts, rádio e as músicas do telefone ficam em uma só biblioteca, que você ouve no telefone e na tela do carro com o [Gearslip](https://github.com/twinksoftware/Gearslip) ou o [myCar](https://github.com/SirioNero/MyCar). Sem conta do Google nem serviços do Google Play: você instala por esta página com o Obtainium, e cada serviço só pede a própria conta. Já tem o Music Assistant em casa? O Xonos também se conecta a ele.
 
 ### Destaques
 
-- 🏠 **Um servidor Music Assistant no bolso.** Sem computador nem servidor em casa: o Xonos baixa o Music Assistant quando você pede (cerca de 75 MB) e o roda no telefone, só para você e para o myCar.
-- 🧩 **Todos os seus serviços, uma só biblioteca.** Spotify, SoundCloud, Plex, Jellyfin, Emby, Subsonic/Navidrome, Audiobookshelf, TuneIn, podcasts e os arquivos do telefone, lado a lado e em uma só busca. O Spotify toca com todas as contas Premium, pelo motor oficial do Spotify.
-- 🚫 **Sem conta do Google.** O Xonos não usa os serviços do Google Play nem o login do Google: funciona em telefones sem Google, como o GrapheneOS.
+- 📱 **O servidor é o telefone.** Sem computador nem servidor em casa: o Xonos baixa o Music Assistant quando você pede (cerca de 75 MB) e o roda no próprio telefone, só para você e para o myCar.
+- 🎧 **Spotify sem Google.** Spotify com qualquer conta Premium, pelo motor oficial do Spotify, em um telefone sem conta do Google nem serviços do Google Play, como o GrapheneOS.
+- 🧩 **Toda a sua música, um só app.** SoundCloud, Plex, Jellyfin, Emby, Subsonic/Navidrome, Audiobookshelf, TuneIn, podcasts, rádio e os arquivos do telefone, ao lado do Spotify em uma só biblioteca e uma só busca.
 - 🚗 **Tudo, no carro.** Playlists, álbuns, artistas, podcasts, audiolivros e rádio de todos os serviços do Music Assistant, com o menu completo, a busca, as letras e o reprodutor ao lado do mapa.
 - 🎶 **A sua biblioteca do Spotify também.** O Spotify não mostra a biblioteca dele para o Gearslip: adicione o Spotify ao Music Assistant, e suas playlists, músicas curtidas, álbuns e artistas estão no Xonos.
-- 📱 **Um reprodutor de verdade no telefone.** Recomendações no Início, busca enquanto você digita, a biblioteca inteira, letras sincronizadas, uma fila e playlists que você pode editar.
+- ▶️ **Um reprodutor de verdade no telefone.** Recomendações no Início, busca enquanto você digita, a biblioteca inteira, letras sincronizadas, uma fila e playlists que você pode editar.
 - 🔊 **Toque em qualquer caixa de som.** Envie a música para as caixas de som que o Music Assistant conhece (Chromecast, AirPlay, Sonos, DLNA, grupos) e traga de volta para o telefone, do mesmo ponto.
 - 🛠️ **O Music Assistant na mão.** Quem administra adiciona serviços, entra neles e os configura direto do telefone.
 - 🌍 **Nove idiomas.** English, Español, Français, Deutsch, Italiano, Português, Ελληνικά, Русский, 简体中文.

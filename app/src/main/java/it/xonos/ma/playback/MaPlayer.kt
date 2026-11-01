@@ -542,6 +542,9 @@ class MaPlayer(
     override fun handleRemoveMediaItems(fromIndex: Int, toIndex: Int): ListenableFuture<*> {
         val ids = stateItems.subList(fromIndex.coerceIn(0, stateItems.size), toIndex.coerceIn(0, stateItems.size)).map { it.id }
         if (ids.isEmpty()) return Futures.immediateVoidFuture()
+        // Media3 mostra già la coda senza quei brani: una seconda modifica fatta prima della risposta di Music
+        // Assistant arriva con le posizioni di quella coda, quindi anche qui si tolgono subito.
+        stateItems = stateItems.filterNot { it.id in ids }
         return windowCommand({ window, _ -> window.none { it.id in ids } }) {
             for (id in ids) {
                 repo.command("player_queues/delete_item") {
@@ -559,6 +562,8 @@ class MaPlayer(
         // Per Music Assistant uno spostamento di 0 vuol dire "in testa ai prossimi".
         val shift = if (newIndex == stateCurrent + 1) 0 else newIndex - fromIndex
         val target = stateStart + newIndex
+        // Come per i brani tolti: le posizioni della prossima modifica sono quelle della coda già spostata.
+        stateItems = stateItems.toMutableList().apply { add(newIndex.coerceAtMost(size - 1), removeAt(fromIndex)) }
         return windowCommand({ window, start -> window.indexOfFirst { it.id == item.id }.let { it >= 0 && start + it == target } }) {
             repo.command("player_queues/move_item") {
                 put("queue_id", queueId)

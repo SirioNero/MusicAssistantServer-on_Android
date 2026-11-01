@@ -184,6 +184,7 @@
     <string name="close_player">Закрыть плеер</string>
     <string name="play">Воспроизвести</string>
     <string name="pause">Пауза</string>
+    <string name="play_starting">Запускаю музыку…</string>
     <string name="shuffle">Перемешать</string>
     <string name="next">Следующий</string>
     <string name="previous">Предыдущий</string>

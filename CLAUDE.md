@@ -583,6 +583,10 @@ di Xonos suona dal server sul telefono; la release ridotta con R8, da capo come 
   `XonosApp.phone`, così sopravvive a rotazione e cambio di lingua (`recreate()`). Tre schede (Home,
   Cerca, Libreria) con la loro pila di pagine; il lettore a schermo intero sta sopra tutto, e la sua
   vista (copertina, testo, coda) è nel modello.
+- Music Assistant risponde a `play_media` solo quando la musica parte (con Soloist circa 7 s sul telefono
+  dell'utente): `PhoneModel.starting` accende subito la rotella al posto di play (o `StartingBar` se prima non
+  suonava niente) e lo stesso "suona" toccato di nuovo nel frattempo non parte una seconda volta (con Soloist
+  rifarebbe tutto da capo). Dalla 0.1.51.
 - Si suona con `Library.playMedia` sulla coda del telefono (id del lettore), dopo aver aspettato
   `XonosApp.playerReady`, che il servizio accende quando API e Sendspin sono pronti e Music Assistant ha la
   coda del telefono (`player_queues/get` con `available`, al massimo 10 s): MA registra il lettore un attimo

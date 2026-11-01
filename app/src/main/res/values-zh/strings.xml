@@ -154,6 +154,7 @@
     <string name="close_player">关闭播放器</string>
     <string name="play">播放</string>
     <string name="pause">暂停</string>
+    <string name="play_starting">正在开始播放…</string>
     <string name="shuffle">随机播放</string>
     <string name="next">下一首</string>
     <string name="previous">上一首</string>

@@ -164,6 +164,7 @@
     <string name="close_player">Cerrar el reproductor</string>
     <string name="play">Reproducir</string>
     <string name="pause">Pausa</string>
+    <string name="play_starting">Iniciando la música…</string>
     <string name="shuffle">Aleatorio</string>
     <string name="next">Siguiente</string>
     <string name="previous">Anterior</string>

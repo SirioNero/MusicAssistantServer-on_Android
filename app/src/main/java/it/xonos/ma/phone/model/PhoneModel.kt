@@ -676,9 +676,29 @@ class PhoneModel(
 
     fun addToQueue(item: MaItem) = play(listOf(item.uri), option = "add")
 
+    /** Un "suona" (non "dopo" né "in coda") mandato a Music Assistant, che non ha ancora risposto. */
+    private data class PlayRequest(val target: String?, val media: List<String>, val start: String?, val shuffle: Boolean)
+
+    private var pendingPlay: PlayRequest? = null
+
+    /**
+     * Music Assistant sta preparando un "suona": risponde solo quando la musica parte, e con Spotify (Soloist) ci
+     * vogliono diversi secondi. Intanto il mini-lettore mostra la rotella, anche se prima non suonava niente.
+     */
+    var starting by mutableStateOf(false)
+        private set
+
     private fun play(media: List<String>, start: String? = null, option: String = "replace", shuffle: Boolean = false) {
         // Suona dove si è scelto con "Suona su": il telefono, o un lettore di Music Assistant.
         val target = remote?.device?.id
+        val request = if (option == "replace") PlayRequest(target, media, start, shuffle) else null
+        // Lo stesso "suona" toccato di nuovo mentre Music Assistant prepara il primo: con Spotify (Soloist) farebbe
+        // ripartire tutto da capo. Un "suona" diverso invece passa (Music Assistant li fa uno dopo l'altro).
+        if (request != null && request == pendingPlay) return
+        if (request != null) {
+            pendingPlay = request
+            starting = true
+        }
         scope.launch {
             try {
                 if (target == null) awaitReady()
@@ -691,6 +711,11 @@ class PhoneModel(
                 throw e
             } catch (e: Exception) {
                 notice = Notice.Failed(e)
+            } finally {
+                if (request != null && pendingPlay === request) {
+                    pendingPlay = null
+                    starting = false
+                }
             }
         }
     }

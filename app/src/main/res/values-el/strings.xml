@@ -164,6 +164,7 @@
     <string name="close_player">Κλείσιμο του προγράμματος αναπαραγωγής</string>
     <string name="play">Αναπαραγωγή</string>
     <string name="pause">Παύση</string>
+    <string name="play_starting">Ξεκινά η μουσική…</string>
     <string name="shuffle">Τυχαία σειρά</string>
     <string name="next">Επόμενο</string>
     <string name="previous">Προηγούμενο</string>

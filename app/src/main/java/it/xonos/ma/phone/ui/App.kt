@@ -110,6 +110,7 @@ fun XonosScreen(model: PhoneModel, player: PlayerLink, host: Host) {
                         val remote = model.remote
                         when {
                             now != null -> MiniPlayer(now, link, model)
+                            model.starting -> StartingBar()
                             remote != null -> RemoteBar(remote.device, model)
                         }
                         TabBar(model)

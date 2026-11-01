@@ -167,6 +167,7 @@
     <string name="close_player">Close the player</string>
     <string name="play">Play</string>
     <string name="pause">Pause</string>
+    <string name="play_starting">Starting the music…</string>
     <string name="shuffle">Shuffle</string>
     <string name="next">Next</string>
     <string name="previous">Previous</string>

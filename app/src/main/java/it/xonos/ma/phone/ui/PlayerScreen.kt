@@ -65,6 +65,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -96,6 +98,29 @@ private fun rememberPosition(player: PlayerLink, now: NowPlaying): State<Long> {
         }
     }
     return position
+}
+
+/** La rotella al posto di play mentre la musica parte; chi usa un lettore di schermo sente "Avvio la musica…". */
+@Composable
+private fun Waiting(modifier: Modifier, stroke: Dp, color: Color) {
+    val text = stringResource(R.string.play_starting)
+    CircularProgressIndicator(modifier.semantics { contentDescription = text }, strokeWidth = stroke, color = color)
+}
+
+/** Al posto del mini-lettore quando prima non suonava niente: Music Assistant sta preparando la musica. */
+@Composable
+internal fun StartingBar() {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.testTag("starting_bar").fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+    ) {
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+            Spacer(Modifier.width(12.dp))
+            Text(stringResource(R.string.play_starting), style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
 }
 
 /** Il mini-lettore sopra le schede: copertina, titolo, play e avanti; toccandolo si apre il lettore. */
@@ -130,7 +155,7 @@ internal fun MiniPlayer(now: NowPlaying, player: PlayerLink, model: PhoneModel) 
                         }
                     }
                 }
-                PlayPauseButton(now, player, Modifier.size(48.dp), 28.dp)
+                PlayPauseButton(now, player, Modifier.size(48.dp), 28.dp, busy = model.starting)
                 IconButton(onClick = player::next) { Icon(XIcons.Next, stringResource(R.string.next)) }
             }
             if (now.durationMs > 0) {
@@ -148,10 +173,10 @@ internal fun MiniPlayer(now: NowPlaying, player: PlayerLink, model: PhoneModel) 
 }
 
 @Composable
-private fun PlayPauseButton(now: NowPlaying, player: PlayerLink, modifier: Modifier, iconSize: Dp) {
+private fun PlayPauseButton(now: NowPlaying, player: PlayerLink, modifier: Modifier, iconSize: Dp, busy: Boolean = false) {
     IconButton(onClick = player::playPause, modifier = modifier) {
-        if (now.playing && now.buffering) {
-            CircularProgressIndicator(Modifier.size(iconSize - 4.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onSurface)
+        if (busy || now.playing && now.buffering) {
+            Waiting(Modifier.size(iconSize - 4.dp), 2.dp, MaterialTheme.colorScheme.onSurface)
         } else {
             Icon(
                 if (now.playing) XIcons.Pause else XIcons.Play,
@@ -229,7 +254,7 @@ internal fun PlayerScreen(now: NowPlaying, player: PlayerLink, model: PhoneModel
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, maxLines = 2)
             }
             Spacer(Modifier.height(8.dp))
-            Controls(now, player)
+            Controls(now, player, busy = model.starting)
             (player as? RemoteLink)?.let { RemoteVolume(it) }
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -284,7 +309,7 @@ private fun SeekBar(now: NowPlaying, player: PlayerLink, position: State<Long>) 
 }
 
 @Composable
-private fun Controls(now: NowPlaying, player: PlayerLink) {
+private fun Controls(now: NowPlaying, player: PlayerLink, busy: Boolean) {
     val accent = MaterialTheme.colorScheme.primary
     val normal = MaterialTheme.colorScheme.onSurface
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
@@ -299,8 +324,8 @@ private fun Controls(now: NowPlaying, player: PlayerLink) {
             modifier = Modifier.size(76.dp),
             colors = IconButtonDefaults.filledIconButtonColors(containerColor = normal, contentColor = MaterialTheme.colorScheme.background),
         ) {
-            if (now.playing && now.buffering) {
-                CircularProgressIndicator(Modifier.size(32.dp), strokeWidth = 3.dp, color = MaterialTheme.colorScheme.background)
+            if (busy || now.playing && now.buffering) {
+                Waiting(Modifier.size(32.dp), 3.dp, MaterialTheme.colorScheme.background)
             } else {
                 Icon(
                     if (now.playing) XIcons.Pause else XIcons.Play,

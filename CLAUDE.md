@@ -1,9 +1,16 @@
 # Xonos: appunti per chi ci lavora
 
-Xonos è un'app Android che fa del telefono un lettore privato di Music Assistant (MA) e porta la
-libreria nel lettore di Gearslip (alternativa ad Android Auto), anche in vista doppia con le mappe.
-La musica esce dal telefono, quindi dall'auto via Bluetooth: mai dalle casse di casa. Serve anche ad
-aggirare Spotify, che a Gearslip non mostra la libreria: Spotify si aggiunge come servizio in MA.
+Xonos è un'app Android che fa girare un server Music Assistant (MA) sul telefono, un aggregatore di
+servizi (Spotify, SoundCloud, Plex, Jellyfin, podcast, radio, i file del telefono), e porta la musica nel
+lettore di Gearslip (alternativa ad Android Auto) e di myCar, anche in vista doppia con le mappe; si collega
+anche a un MA di casa, come lettore privato. Non chiede un account Google né i servizi Google Play: va sui
+telefoni senza Google (l'utente usa GrapheneOS). La musica esce dal telefono, quindi dall'auto via Bluetooth:
+mai dalle casse di casa. Serve anche ad aggirare Spotify, che a Gearslip non mostra la libreria: Spotify si
+aggiunge come servizio in MA. Dal 1° novembre 2026 la presentazione (README, About di GitHub, testi per
+F-Droid) mette al centro il server sul telefono, i servizi in un'unica libreria e l'assenza di Google, detta per
+chi non conosce Music Assistant: Spotify e tutta la musica su un telefono senza Google e senza un server esterno,
+perché il server è il telefono stesso (Music Assistant spiegato in mezza frase: un server musicale libero). Scelta
+dell'utente, che ha rinominato il repository di conseguenza.
 
 L'utente (SirioNero) parla italiano e prova l'app sul telefono con Obtainium. Leggi tutto questo file
 prima di cominciare: le cose scritte qui sono già state verificate, non vanno riscoperte.
@@ -84,7 +91,8 @@ prima di cominciare: le cose scritte qui sono già state verificate, non vanno r
   estraggono all'installazione (`useLegacyPackaging`). Sorgenti scaricati da versioni fissate con lo SHA-256 (quelli
   di Termux): termux/proot 5.1.107.101 e talloc 2.5.0 di Samba, compilato da solo con `talloc-replace.h` al posto
   di waf; percorsi tolti, niente build-id, pagine da 16 KB. Nella ricetta di F-Droid le build nuove vogliono
-  `ndk: r27d`; "Riproducibile" installa quell'NDK. In locale (sandbox) non si compila né si esegue: solo in CI.
+  `ndk: r27d` e `sudo: [apt-get update, apt-get install -y make]` (l'immagine `buildserver-trixie` non ha make);
+  "Riproducibile" fa le stesse due cose. In locale (sandbox) non si compila né si esegue: solo in CI.
 - R8 è acceso nella release (`isMinifyEnabled` e `isShrinkResources`, regole in `app/proguard-rules.pro`,
   `-dontobfuscate` così gli errori restano leggibili). L'APK ridotto si prova sull'emulatore con le misure
   (sotto): parte, si collega, suona Opus, nessun arresto.

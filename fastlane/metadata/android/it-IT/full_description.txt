@@ -1,19 +1,31 @@
-Xonos fa del telefono un lettore privato di Music Assistant e porta la libreria di Music Assistant nel lettore musicale di Gearslip in auto, anche nella vista doppia accanto alla mappa. La musica suona sul telefono, quindi arriva all'auto via Bluetooth (o con l'audio USB di Gearslip), mai alle casse di casa.
+Spotify e tutta la tua musica su un telefono senza Google, senza server da preparare: il server è il telefono stesso. Xonos fa girare Music Assistant, un server musicale libero che riunisce i tuoi servizi di streaming e la tua musica, direttamente sul telefono. Spotify (Premium), SoundCloud, Plex, Jellyfin, Emby, Subsonic/Navidrome, Audiobookshelf, TuneIn, podcast, radio e i brani del telefono finiscono in un'unica libreria, che ascolti sul telefono e sullo schermo dell'auto con Gearslip o myCar, anche nella vista doppia accanto alla mappa. La musica suona sul telefono, quindi arriva all'auto via Bluetooth, mai alle casse di casa.
 
-Serve un tuo server Music Assistant, versione 2.7.5 o successiva (per aggiungere servizi dall'app serve la 2.10). In Xonos c'è tutto ciò che Music Assistant sa suonare: i tuoi file e i tuoi server (Jellyfin, Plex, Subsonic, Navidrome), podcast, radio e i servizi che colleghi a Music Assistant.
+Niente account Google né servizi Google Play: ogni servizio chiede solo il suo account.
+
+<b>Music Assistant su questo telefono</b>
+<ul>
+<li>Si scarica solo se lo chiedi (circa 75 MB) e si usa solo se è firmato con la chiave di Xonos; gli store come F-Droid non controllano questo download</li>
+<li>Gira sul telefono, solo per te e per myCar, e risponde solo sul telefono</li>
+<li>Spotify con tutti gli account Premium grazie al motore ufficiale di Spotify (Soloist, scaricato da Spotify col tuo consenso e una tua chiave API), oppure librespot per gli account più vecchi</li>
+<li>Serve un telefono a 64 bit</li>
+</ul>
+
+<b>Oppure il tuo Music Assistant</b>
+<ul>
+<li>Trova Music Assistant nella tua rete e accede con nome utente e password (versione 2.7.5 o successiva)</li>
+<li>Suona su: mandi la musica alle casse che Music Assistant conosce (Chromecast, AirPlay, Sonos, DLNA…) e la riporti sul telefono, dallo stesso punto</li>
+</ul>
 
 <b>Sul telefono</b>
 <ul>
 <li>Home con gli ascolti recenti e i consigli di Music Assistant</li>
 <li>Ricerca mentre scrivi, nella libreria e in tutti i servizi</li>
 <li>Tutta la libreria: playlist, album, artisti, brani, podcast, audiolibri, radio, generi</li>
-<li>Un lettore con il testo sincronizzato e la coda</li>
-<li>Suona su: mandi la musica alle casse che Music Assistant conosce (Chromecast, AirPlay, Sonos, DLNA…) e la riporti sul telefono, dallo stesso punto</li>
-<li>Trova Music Assistant nella tua rete e accede con nome utente e password</li>
-<li>Chi amministra Music Assistant può aggiungere, configurare e togliere i servizi dall'app</li>
+<li>Un lettore con il testo sincronizzato, una coda e playlist che puoi modificare</li>
+<li>Chi amministra aggiunge, configura e toglie i servizi dall'app</li>
 </ul>
 
-<b>In auto, con Gearslip</b>
+<b>In auto, con Gearslip o myCar</b>
 <ul>
 <li>Tutto il menu e la ricerca, nella lingua scelta</li>
 <li>Telefonate e indicazioni del navigatore fermano o abbassano la musica</li>
@@ -22,4 +34,4 @@ Serve un tuo server Music Assistant, versione 2.7.5 o successiva (per aggiungere
 
 In English, Italiano, Español, Deutsch, Français, Português, Ελληνικά, Русский e 简体中文.
 
-Xonos è un progetto indipendente, non legato a Music Assistant né a Gearslip.
+Xonos è un progetto indipendente, non legato a Music Assistant, Spotify né Gearslip.

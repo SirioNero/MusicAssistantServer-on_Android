@@ -5,8 +5,9 @@
 <h1 align="center">Xonos</h1>
 
 <p align="center">
-  <strong>Your whole Music Assistant library, in the car.</strong><br>
-  Spotify, Tidal, Plex, Jellyfin, your own files, podcasts and radio: on the car’s screen with Gearslip and myCar, and in your pocket.
+  <strong>Spotify and all your music on a phone without Google.<br>
+  No server to set up: the phone is the server.</strong><br>
+  Xonos runs Music Assistant, a free music server, on the phone itself: Spotify, SoundCloud, Plex, Jellyfin, podcasts, radio and your own files in one app, also in the car with Gearslip and myCar.
 </p>
 
 <p align="center">
@@ -14,6 +15,7 @@
   <img src="https://img.shields.io/badge/Android-8.0%2B-3ddc84?style=flat-square&logo=android&logoColor=white" alt="Android 8.0+">
   <img src="https://img.shields.io/badge/Music%20Assistant-2.7.5%2B-03a9f4?style=flat-square" alt="Music Assistant 2.7.5+">
   <a href="https://github.com/SirioNero/MusicAssistantServer-on_Android/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-8a63d2?style=flat-square" alt="License: AGPL-3.0"></a>
+  <img src="https://img.shields.io/badge/Google%20account-not%20needed-34a853?style=flat-square" alt="No Google account needed">
   <img src="https://img.shields.io/badge/languages-9-5c6b80?style=flat-square" alt="9 languages">
 </p>
 
@@ -27,18 +29,34 @@
 
 ## English
 
-**Xonos turns your phone into a Music Assistant player and puts your whole library on the car’s screen.** Pick an album, a playlist, a podcast or a radio station in [Gearslip](https://github.com/twinksoftware/Gearslip) or [myCar](https://github.com/SirioNero/MyCar): it plays on the phone and comes out of the car’s speakers, never out of your speakers at home. Out of the car, Xonos is a complete music player for your [Music Assistant](https://music-assistant.io).
+**Spotify and all your music on a phone without Google, and no server to set up: the phone is the server.** Xonos runs [Music Assistant](https://music-assistant.io), a free music server that brings your streaming services and your own music together, right on the phone: no computer, no home server. Spotify (Premium), SoundCloud, Plex, Jellyfin, podcasts, radio and the songs on the phone end up in one library, which you play on the phone and on the car’s screen with [Gearslip](https://github.com/twinksoftware/Gearslip) or [myCar](https://github.com/SirioNero/MyCar). No Google account and no Google Play services: install it from this page with Obtainium, and each service only asks for its own account. Already have Music Assistant at home? Xonos connects to it too.
 
 ### Highlights
 
+- 📱 **The phone is the server.** No computer and no home server: Xonos downloads Music Assistant when you ask (about 75 MB) and runs it on the phone itself, just for you and for myCar.
+- 🎧 **Spotify without Google.** Spotify with any Premium account, through Spotify’s official engine, on a phone with no Google account and no Google Play services, such as GrapheneOS.
+- 🧩 **All your music, one app.** SoundCloud, Plex, Jellyfin, Emby, Subsonic/Navidrome, Audiobookshelf, TuneIn, podcasts, radio and the phone’s own files, next to Spotify in one library and one search.
 - 🚗 **Everything, in the car.** Playlists, albums, artists, podcasts, audiobooks and radio from every service in Music Assistant, with the full menu, search, lyrics and the player beside the map.
 - 🎶 **Your Spotify library too.** Spotify won’t show its library to Gearslip: add Spotify to Music Assistant, and your playlists, liked songs, albums and artists are in Xonos.
-- 📱 **A real player on the phone.** Recommendations on Home, search as you type, the whole library, synced lyrics, a queue and playlists you can edit.
+- ▶️ **A real player on the phone.** Recommendations on Home, search as you type, the whole library, synced lyrics, a queue and playlists you can edit.
 - 🔊 **Play on any speaker.** Send the music to the speakers Music Assistant knows (Chromecast, AirPlay, Sonos, DLNA, groups) and bring it back to the phone, from the same point.
 - 🛠️ **Music Assistant in your hand.** Administrators add services, sign in to them and set them up right from the phone.
-- 🏠 **No Music Assistant? Xonos can be one.** It runs Music Assistant on the phone itself, just for you and for myCar, downloaded only if you ask.
 - 🌍 **Nine languages.** English, Español, Français, Deutsch, Italiano, Português, Ελληνικά, Русский, 简体中文.
 - 🔒 **Yours alone.** No ads, no tracking, no account with anyone but your own Music Assistant. Free software (AGPL-3.0), with reproducible builds.
+
+### Music Assistant on this phone
+
+No Music Assistant at home? Xonos can run one on the phone itself, just for itself and for myCar.
+
+- In **Settings**, or the first time you open Xonos, tap **Make Xonos your Music Assistant server**. Xonos tells you how big the download is (about 75 MB, 200 MB once installed) and downloads it only after you tap **Download**: Music Assistant with Python, FFmpeg, librespot and a small Linux system for Soloist, from the release of the same Xonos version on this page. App stores such as F-Droid don’t check this download; Xonos uses it only if it’s signed with the same key as Xonos itself.
+- Android asks to let Xonos read the music on the phone: allow it, and Music Assistant’s local disk service starts from the phone’s Music folder.
+- Then Xonos starts Music Assistant, creates its first account and connects to it by itself; the first start takes about a minute. Add your music from **Music Assistant services**: the phone’s files, radio, podcasts, Jellyfin, Plex, Subsonic, Spotify…
+- It answers only on the phone, not to the rest of your network, and runs while Xonos runs. myCar reaches it through Xonos.
+- **Use another Music Assistant** goes back to a server at home; **Remove from this phone** deletes it, with its services and library.
+- It needs a 64-bit phone. Not available on the phone: Apple Music, Deezer, YouTube Music, Tidal, Qobuz, BBC Sounds and network shares (SMB, NFS). Tidal and Qobuz sign in with Music Assistant’s own keys, which only its official builds have.
+- ⚠️ **Spotify has two engines here.** librespot plays only with Premium accounts created before December 2024 (Spotify never gave the exact day): with a newer account your music shows up but won’t play. **Soloist**, Spotify’s official engine, plays with every Premium account: choose it when you add Spotify. It needs your own Soloist API key (from the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard), Premium), Music Assistant downloads Soloist from Spotify only after you agree, and once you pick **Music Assistant Pairing** among the devices in the Spotify app, with the phone on Wi-Fi. Soloist is a program for Linux: on the phone it runs inside proot, in a small Linux system that comes with the download. On GrapheneOS, if you blocked native code debugging for new apps, allow it for Xonos in its app settings.
+- **Spotify** asks, for the same reason, for the Client ID of your own Spotify app: create one for free in the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) (you need Spotify Premium), with Web API and the Redirect URI `https://music-assistant.io/callback`; Xonos shows the steps. Then you sign in in the browser (with librespot you also approve playback there). A personal app gets less from Spotify than Music Assistant’s: only the songs of your own playlists, not of those you follow or of Spotify’s own (such as Daily Mix), so copy those songs into a playlist of yours in Spotify; artists’ top tracks and new releases are missing too.
+- If something doesn’t work, **Share the log of the server on this phone** (in **Settings**, in the card of the server on this phone) sends its latest lines to whoever helps you. With another Music Assistant (a computer, umbrel…), **Music Assistant log** in **Settings** sends the log of the server Xonos is connected to (administrators only). They can contain the names of your services and songs.
 
 ### In the car
 
@@ -68,20 +86,6 @@ Xonos signs in to Music Assistant and registers the phone as a private player th
 <p align="center">
   <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/5_search.jpg" width="190" alt="Search"> <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/6_library.jpg" width="190" alt="Library"> <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/7_play_on.jpg" width="190" alt="Play on">
 </p>
-
-### Music Assistant on this phone
-
-No Music Assistant at home? Xonos can run one on the phone itself, just for itself and for myCar.
-
-- In **Settings**, or the first time you open Xonos, tap **Make Xonos your Music Assistant server**. Xonos tells you how big the download is (about 75 MB, 200 MB once installed) and downloads it only after you tap **Download**: Music Assistant with Python, FFmpeg, librespot and a small Linux system for Soloist, from the release of the same Xonos version on this page. App stores such as F-Droid don’t check this download; Xonos uses it only if it’s signed with the same key as Xonos itself.
-- Android asks to let Xonos read the music on the phone: allow it, and Music Assistant’s local disk service starts from the phone’s Music folder.
-- Then Xonos starts Music Assistant, creates its first account and connects to it by itself; the first start takes about a minute. Add your music from **Music Assistant services**: the phone’s files, radio, podcasts, Jellyfin, Plex, Subsonic, Spotify…
-- It answers only on the phone, not to the rest of your network, and runs while Xonos runs. myCar reaches it through Xonos.
-- **Use another Music Assistant** goes back to a server at home; **Remove from this phone** deletes it, with its services and library.
-- It needs a 64-bit phone. Not available on the phone: Apple Music, Deezer, YouTube Music, Tidal, Qobuz, BBC Sounds and network shares (SMB, NFS). Tidal and Qobuz sign in with Music Assistant’s own keys, which only its official builds have.
-- ⚠️ **Spotify has two engines here.** librespot plays only with Premium accounts created before December 2024 (Spotify never gave the exact day): with a newer account your music shows up but won’t play. **Soloist**, Spotify’s official engine, plays with every Premium account: choose it when you add Spotify. It needs your own Soloist API key (from the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard), Premium), Music Assistant downloads Soloist from Spotify only after you agree, and once you pick **Music Assistant Pairing** among the devices in the Spotify app, with the phone on Wi-Fi. Soloist is a program for Linux: on the phone it runs inside proot, in a small Linux system that comes with the download. On GrapheneOS, if you blocked native code debugging for new apps, allow it for Xonos in its app settings.
-- **Spotify** asks, for the same reason, for the Client ID of your own Spotify app: create one for free in the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) (you need Spotify Premium), with Web API and the Redirect URI `https://music-assistant.io/callback`; Xonos shows the steps. Then you sign in in the browser (with librespot you also approve playback there). A personal app gets less from Spotify than Music Assistant’s: only the songs of your own playlists, not of those you follow or of Spotify’s own (such as Daily Mix), so copy those songs into a playlist of yours in Spotify; artists’ top tracks and new releases are missing too.
-- If something doesn’t work, **Share the log of the server on this phone** (in **Settings**, in the card of the server on this phone) sends its latest lines to whoever helps you. With another Music Assistant (a computer, umbrel…), **Music Assistant log** in **Settings** sends the log of the server Xonos is connected to (administrators only). They can contain the names of your services and songs.
 
 ### With myCar
 
@@ -199,18 +203,34 @@ Xonos is an independent project, not affiliated with Music Assistant, Gearslip o
 
 ## Español
 
-**Xonos convierte tu teléfono en un reproductor de Music Assistant y lleva toda tu biblioteca a la pantalla del coche.** Elige un álbum, una playlist, un pódcast o una emisora en [Gearslip](https://github.com/twinksoftware/Gearslip) o en [myCar](https://github.com/SirioNero/MyCar): suena en el teléfono y sale por los altavoces del coche, nunca por los de casa. Fuera del coche, Xonos es un reproductor completo para tu [Music Assistant](https://music-assistant.io).
+**Spotify y toda tu música en un teléfono sin Google, y sin servidor que montar: el servidor es el propio teléfono.** Xonos ejecuta [Music Assistant](https://music-assistant.io), un servidor de música libre que reúne tus servicios de streaming y tu propia música, en el propio teléfono: sin ordenador ni servidor en casa. Spotify (Premium), SoundCloud, Plex, Jellyfin, pódcasts, radio y las canciones del teléfono quedan en una sola biblioteca, que escuchas en el teléfono y en la pantalla del coche con [Gearslip](https://github.com/twinksoftware/Gearslip) o [myCar](https://github.com/SirioNero/MyCar). Sin cuenta de Google ni servicios de Google Play: se instala desde esta página con Obtainium, y cada servicio solo pide su propia cuenta. ¿Ya tienes Music Assistant en casa? Xonos también se conecta a él.
 
 ### Lo mejor
 
+- 📱 **El servidor es el teléfono.** Sin ordenador ni servidor en casa: Xonos descarga Music Assistant cuando se lo pides (unos 75 MB) y lo ejecuta en el propio teléfono, solo para ti y para myCar.
+- 🎧 **Spotify sin Google.** Spotify con cualquier cuenta Premium, con el motor oficial de Spotify, en un teléfono sin cuenta de Google ni servicios de Google Play, como GrapheneOS.
+- 🧩 **Toda tu música, una sola app.** SoundCloud, Plex, Jellyfin, Emby, Subsonic/Navidrome, Audiobookshelf, TuneIn, pódcasts, radio y los archivos del propio teléfono, junto a Spotify en una sola biblioteca y una sola búsqueda.
 - 🚗 **Todo, en el coche.** Playlists, álbumes, artistas, pódcasts, audiolibros y radio de todos los servicios de Music Assistant, con el menú completo, la búsqueda, la letra y el reproductor junto al mapa.
 - 🎶 **También tu biblioteca de Spotify.** Spotify no le enseña su biblioteca a Gearslip: añade Spotify a Music Assistant y tus playlists, canciones que te gustan, álbumes y artistas estarán en Xonos.
-- 📱 **Un reproductor de verdad en el teléfono.** Recomendaciones en Inicio, búsqueda mientras escribes, toda la biblioteca, letras sincronizadas, una cola y playlists que puedes editar.
+- ▶️ **Un reproductor de verdad en el teléfono.** Recomendaciones en Inicio, búsqueda mientras escribes, toda la biblioteca, letras sincronizadas, una cola y playlists que puedes editar.
 - 🔊 **Suena en cualquier altavoz.** Envía la música a los altavoces que conoce Music Assistant (Chromecast, AirPlay, Sonos, DLNA, grupos) y tráela de vuelta al teléfono, desde el mismo punto.
 - 🛠️ **Music Assistant en tu mano.** Quien lo administra añade servicios, inicia sesión en ellos y los configura desde el propio teléfono.
-- 🏠 **¿Sin Music Assistant? Xonos puede serlo.** Ejecuta Music Assistant en el propio teléfono, solo para ti y para myCar, y lo descarga solo si se lo pides.
 - 🌍 **Nueve idiomas.** English, Español, Français, Deutsch, Italiano, Português, Ελληνικά, Русский, 简体中文.
 - 🔒 **Solo tuyo.** Sin anuncios, sin rastreo, sin más cuentas que la de tu propio Music Assistant. Software libre (AGPL-3.0), con compilaciones reproducibles.
+
+### Music Assistant en este teléfono
+
+¿No tienes Music Assistant en casa? Xonos puede ejecutar uno en el propio teléfono, solo para sí mismo y para myCar.
+
+- En **Ajustes**, o la primera vez que abres Xonos, pulsa **Convierte Xonos en tu servidor de Music Assistant**. Xonos te dice cuánto ocupa la descarga (unos 75 MB, 200 MB una vez instalado) y solo descarga después de que pulses **Descargar**: Music Assistant con Python, FFmpeg, librespot y un pequeño sistema Linux para Soloist, desde la release de la misma versión de Xonos en esta página. Las tiendas de apps como F-Droid no revisan esta descarga; Xonos la usa solo si está firmada con la misma clave que Xonos.
+- Android pide permiso para que Xonos lea la música del teléfono: permítelo, y el servicio de disco local de Music Assistant empieza por la carpeta Music del teléfono.
+- Después Xonos inicia Music Assistant, crea su primera cuenta y se conecta solo; el primer inicio tarda un minuto. Añade tu música desde **Servicios de Music Assistant**: los archivos del teléfono, radio, pódcasts, Jellyfin, Plex, Subsonic, Spotify…
+- Solo responde en el teléfono, no al resto de tu red, y funciona mientras Xonos funciona. myCar llega a él a través de Xonos.
+- **Usar otro Music Assistant** vuelve a un servidor de casa; **Quitar de este teléfono** lo borra, con sus servicios y su biblioteca.
+- Hace falta un teléfono de 64 bits. No están disponibles en el teléfono: Apple Music, Deezer, YouTube Music, Tidal, Qobuz, BBC Sounds y las carpetas de red (SMB, NFS). Tidal y Qobuz inician sesión con las claves de Music Assistant, que solo tienen sus versiones oficiales.
+- ⚠️ **Aquí Spotify tiene dos motores.** librespot solo suena con cuentas Premium creadas antes de diciembre de 2024 (Spotify nunca indicó el día exacto): con una cuenta más reciente tu música aparece pero no se reproduce. **Soloist**, el motor oficial de Spotify, suena con todas las cuentas Premium: elígelo al añadir Spotify. Necesita tu propia clave API de Soloist (del [Spotify Developer Dashboard](https://developer.spotify.com/dashboard), Premium), Music Assistant descarga Soloist de Spotify solo si aceptas y, una sola vez, eliges **Music Assistant Pairing** entre los dispositivos de la app de Spotify, con el teléfono en Wi-Fi. Soloist es un programa para Linux: en el teléfono funciona dentro de proot, en un pequeño sistema Linux que llega con la descarga. En GrapheneOS, si bloqueaste la depuración de código nativo para las apps nuevas, permítela para Xonos en los ajustes de la app.
+- **Spotify** pide, por el mismo motivo, el Client ID de tu propia app de Spotify: créala gratis en el [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) (hace falta Spotify Premium), con Web API y la Redirect URI `https://music-assistant.io/callback`; Xonos te muestra los pasos. Luego inicias sesión en el navegador (con librespot también apruebas allí la reproducción). Una app personal recibe menos de Spotify que la de Music Assistant: solo las canciones de tus playlists, no las de las que sigues ni las del propio Spotify (como Daily Mix), así que copia esas canciones a una playlist tuya en Spotify; también faltan las canciones más escuchadas de los artistas y las novedades.
+- Si algo no funciona, **Compartir el registro del servidor de este teléfono** (en **Ajustes**, en la tarjeta del servidor del teléfono) envía sus últimas líneas a quien te ayuda. Con otro Music Assistant (un ordenador, umbrel…), **Registro de Music Assistant** en **Ajustes** envía el registro del servidor al que está conectado Xonos (solo administradores). Pueden contener los nombres de tus servicios y canciones.
 
 ### En el coche
 
@@ -236,20 +256,6 @@ Xonos inicia sesión en Music Assistant y registra el teléfono como reproductor
 - **Un reproductor, una cola**: lo que empiezas en el teléfono suena en el teléfono, y el coche lo muestra igual.
 - **Reproducir en**: desde el reproductor, o desde el icono de enviar en Inicio, manda la música a un altavoz que conozca Music Assistant. La cola pasa allí y sigue desde el mismo punto, y el teléfono se detiene; desde entonces la pantalla controla ese altavoz, volumen incluido, y lo que reproduces va allí. Elige «Este teléfono» para recuperar la música. En el coche no cambia nada: el coche siempre suena en el teléfono.
 - **Servicios de Music Assistant** (para quien lo administra, desde Ajustes, o desde Inicio cuando la biblioteca está vacía): mira los servicios, añade uno (Spotify, Tidal, YouTube Music, Deezer, Qobuz, Jellyfin, Plex, Subsonic, pódcasts, radio, carpetas…), inicia sesión en el navegador cuando lo pida, cambia sus opciones, configúralo de nuevo o quítalo. Los formularios son los de Music Assistant, en tu idioma cuando Music Assistant tiene la traducción. Para añadir y configurar servicios hace falta Music Assistant 2.10 o posterior.
-
-### Music Assistant en este teléfono
-
-¿No tienes Music Assistant en casa? Xonos puede ejecutar uno en el propio teléfono, solo para sí mismo y para myCar.
-
-- En **Ajustes**, o la primera vez que abres Xonos, pulsa **Convierte Xonos en tu servidor de Music Assistant**. Xonos te dice cuánto ocupa la descarga (unos 75 MB, 200 MB una vez instalado) y solo descarga después de que pulses **Descargar**: Music Assistant con Python, FFmpeg, librespot y un pequeño sistema Linux para Soloist, desde la release de la misma versión de Xonos en esta página. Las tiendas de apps como F-Droid no revisan esta descarga; Xonos la usa solo si está firmada con la misma clave que Xonos.
-- Android pide permiso para que Xonos lea la música del teléfono: permítelo, y el servicio de disco local de Music Assistant empieza por la carpeta Music del teléfono.
-- Después Xonos inicia Music Assistant, crea su primera cuenta y se conecta solo; el primer inicio tarda un minuto. Añade tu música desde **Servicios de Music Assistant**: los archivos del teléfono, radio, pódcasts, Jellyfin, Plex, Subsonic, Spotify…
-- Solo responde en el teléfono, no al resto de tu red, y funciona mientras Xonos funciona. myCar llega a él a través de Xonos.
-- **Usar otro Music Assistant** vuelve a un servidor de casa; **Quitar de este teléfono** lo borra, con sus servicios y su biblioteca.
-- Hace falta un teléfono de 64 bits. No están disponibles en el teléfono: Apple Music, Deezer, YouTube Music, Tidal, Qobuz, BBC Sounds y las carpetas de red (SMB, NFS). Tidal y Qobuz inician sesión con las claves de Music Assistant, que solo tienen sus versiones oficiales.
-- ⚠️ **Aquí Spotify tiene dos motores.** librespot solo suena con cuentas Premium creadas antes de diciembre de 2024 (Spotify nunca indicó el día exacto): con una cuenta más reciente tu música aparece pero no se reproduce. **Soloist**, el motor oficial de Spotify, suena con todas las cuentas Premium: elígelo al añadir Spotify. Necesita tu propia clave API de Soloist (del [Spotify Developer Dashboard](https://developer.spotify.com/dashboard), Premium), Music Assistant descarga Soloist de Spotify solo si aceptas y, una sola vez, eliges **Music Assistant Pairing** entre los dispositivos de la app de Spotify, con el teléfono en Wi-Fi. Soloist es un programa para Linux: en el teléfono funciona dentro de proot, en un pequeño sistema Linux que llega con la descarga. En GrapheneOS, si bloqueaste la depuración de código nativo para las apps nuevas, permítela para Xonos en los ajustes de la app.
-- **Spotify** pide, por el mismo motivo, el Client ID de tu propia app de Spotify: créala gratis en el [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) (hace falta Spotify Premium), con Web API y la Redirect URI `https://music-assistant.io/callback`; Xonos te muestra los pasos. Luego inicias sesión en el navegador (con librespot también apruebas allí la reproducción). Una app personal recibe menos de Spotify que la de Music Assistant: solo las canciones de tus playlists, no las de las que sigues ni las del propio Spotify (como Daily Mix), así que copia esas canciones a una playlist tuya en Spotify; también faltan las canciones más escuchadas de los artistas y las novedades.
-- Si algo no funciona, **Compartir el registro del servidor de este teléfono** (en **Ajustes**, en la tarjeta del servidor del teléfono) envía sus últimas líneas a quien te ayuda. Con otro Music Assistant (un ordenador, umbrel…), **Registro de Music Assistant** en **Ajustes** envía el registro del servidor al que está conectado Xonos (solo administradores). Pueden contener los nombres de tus servicios y canciones.
 
 ### Con myCar
 
@@ -327,18 +333,34 @@ Xonos es un proyecto independiente, sin relación con Music Assistant, Gearslip 
 
 ## Français
 
-**Xonos fait de votre téléphone un lecteur Music Assistant et met toute votre bibliothèque sur l’écran de la voiture.** Choisissez un album, une playlist, un podcast ou une radio dans [Gearslip](https://github.com/twinksoftware/Gearslip) ou [myCar](https://github.com/SirioNero/MyCar) : la musique joue sur le téléphone et sort des haut-parleurs de la voiture, jamais de ceux de la maison. Hors de la voiture, Xonos est un lecteur de musique complet pour votre [Music Assistant](https://music-assistant.io).
+**Spotify et toute votre musique sur un téléphone sans Google, sans serveur à installer : le serveur, c’est le téléphone.** Xonos fait tourner [Music Assistant](https://music-assistant.io), un serveur de musique libre qui réunit vos services de streaming et votre propre musique, sur le téléphone lui-même : ni ordinateur ni serveur à la maison. Spotify (Premium), SoundCloud, Plex, Jellyfin, podcasts, radio et les morceaux du téléphone se retrouvent dans une seule bibliothèque, que vous écoutez sur le téléphone et sur l’écran de la voiture avec [Gearslip](https://github.com/twinksoftware/Gearslip) ou [myCar](https://github.com/SirioNero/MyCar). Sans compte Google ni services Google Play : il s’installe depuis cette page avec Obtainium, et chaque service ne demande que son propre compte. Vous avez déjà Music Assistant à la maison ? Xonos s’y connecte aussi.
 
 ### Points forts
 
+- 📱 **Le serveur, c’est le téléphone.** Ni ordinateur ni serveur à la maison : Xonos télécharge Music Assistant quand vous le demandez (environ 75 Mo) et le fait tourner sur le téléphone lui-même, rien que pour vous et pour myCar.
+- 🎧 **Spotify sans Google.** Spotify avec n’importe quel compte Premium, grâce au moteur officiel de Spotify, sur un téléphone sans compte Google ni services Google Play, comme GrapheneOS.
+- 🧩 **Toute votre musique, une seule app.** SoundCloud, Plex, Jellyfin, Emby, Subsonic/Navidrome, Audiobookshelf, TuneIn, podcasts, radio et les fichiers du téléphone, à côté de Spotify dans une seule bibliothèque et une seule recherche.
 - 🚗 **Tout, dans la voiture.** Playlists, albums, artistes, podcasts, livres audio et radio de tous les services de Music Assistant, avec le menu complet, la recherche, les paroles et le lecteur à côté de la carte.
 - 🎶 **Votre bibliothèque Spotify aussi.** Spotify refuse de montrer sa bibliothèque à Gearslip : ajoutez Spotify à Music Assistant, et vos playlists, titres likés, albums et artistes sont dans Xonos.
-- 📱 **Un vrai lecteur sur le téléphone.** Des recommandations sur l’Accueil, la recherche pendant la saisie, toute la bibliothèque, les paroles synchronisées, une file d’attente et des playlists modifiables.
+- ▶️ **Un vrai lecteur sur le téléphone.** Des recommandations sur l’Accueil, la recherche pendant la saisie, toute la bibliothèque, les paroles synchronisées, une file d’attente et des playlists modifiables.
 - 🔊 **Sur n’importe quelle enceinte.** Envoyez la musique vers les enceintes que Music Assistant connaît (Chromecast, AirPlay, Sonos, DLNA, groupes) et ramenez-la sur le téléphone, au même endroit.
 - 🛠️ **Music Assistant en main.** Les administrateurs ajoutent des services, s’y connectent et les configurent depuis le téléphone.
-- 🏠 **Pas de Music Assistant ? Xonos peut en être un.** Il fait tourner Music Assistant sur le téléphone même, rien que pour vous et pour myCar, et ne le télécharge que si vous le demandez.
 - 🌍 **Neuf langues.** English, Español, Français, Deutsch, Italiano, Português, Ελληνικά, Русский, 简体中文.
 - 🔒 **Rien qu’à vous.** Pas de publicité, pas de pistage, aucun compte à part votre propre Music Assistant. Logiciel libre (AGPL-3.0), avec des builds reproductibles.
+
+### Music Assistant sur ce téléphone
+
+Pas de Music Assistant à la maison ? Xonos peut en faire tourner un sur le téléphone même, rien que pour lui et pour myCar.
+
+- Dans **Réglages**, ou la première fois que vous ouvrez Xonos, touchez **Faire de Xonos votre serveur Music Assistant**. Xonos vous indique la taille du téléchargement (environ 75 Mo, 200 Mo une fois installé) et ne télécharge qu’après que vous avez touché **Télécharger** : Music Assistant avec Python, FFmpeg, librespot et un petit système Linux pour Soloist, depuis la release de la même version de Xonos sur cette page. Les magasins d’applications comme F-Droid ne vérifient pas ce téléchargement ; Xonos ne l’utilise que s’il est signé avec la même clé que Xonos.
+- Android demande de laisser Xonos lire la musique du téléphone : autorisez-le, et le service de disque local de Music Assistant part du dossier Music du téléphone.
+- Ensuite Xonos démarre Music Assistant, crée son premier compte et s’y connecte tout seul ; le premier démarrage prend environ une minute. Ajoutez votre musique depuis **Services de Music Assistant** : les fichiers du téléphone, la radio, les podcasts, Jellyfin, Plex, Subsonic, Spotify…
+- Il ne répond que sur le téléphone, pas au reste de votre réseau, et tourne tant que Xonos tourne. myCar l’atteint à travers Xonos.
+- **Utiliser un autre Music Assistant** revient à un serveur à la maison ; **Retirer de ce téléphone** le supprime, avec ses services et sa bibliothèque.
+- Il faut un téléphone 64 bits. Pas disponibles sur le téléphone : Apple Music, Deezer, YouTube Music, Tidal, Qobuz, BBC Sounds et les partages réseau (SMB, NFS). Tidal et Qobuz se connectent avec les clés de Music Assistant, que seules ses versions officielles ont.
+- ⚠️ **Ici, Spotify a deux moteurs.** librespot ne joue qu’avec les comptes Premium créés avant décembre 2024 (Spotify n’a jamais donné le jour exact) : avec un compte plus récent, votre musique apparaît mais ne se lance pas. **Soloist**, le moteur officiel de Spotify, joue avec tous les comptes Premium : choisissez-le en ajoutant Spotify. Il faut votre propre clé API Soloist (dans le [Spotify Developer Dashboard](https://developer.spotify.com/dashboard), Premium), Music Assistant ne télécharge Soloist chez Spotify qu’avec votre accord et, une seule fois, vous choisissez **Music Assistant Pairing** parmi les appareils de l’app Spotify, avec le téléphone en Wi-Fi. Soloist est un programme pour Linux : sur le téléphone il tourne dans proot, dans un petit système Linux qui arrive avec le téléchargement. Sur GrapheneOS, si vous avez bloqué le débogage du code natif pour les nouvelles apps, autorisez-le pour Xonos dans les réglages de l’app.
+- **Spotify** demande, pour la même raison, le Client ID de votre propre app Spotify : créez-la gratuitement dans le [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) (Spotify Premium requis), avec Web API et la Redirect URI `https://music-assistant.io/callback` ; Xonos vous montre les étapes. Ensuite vous vous connectez dans le navigateur (avec librespot, vous y autorisez aussi la lecture). Une app personnelle obtient moins de Spotify que celle de Music Assistant : seulement les titres de vos playlists, pas ceux des playlists que vous suivez ni de celles de Spotify lui-même (comme Daily Mix), donc copiez ces titres dans une playlist à vous dans Spotify ; les titres les plus écoutés des artistes et les nouveautés manquent aussi.
+- Si quelque chose ne marche pas, **Partager le journal du serveur de ce téléphone** (dans **Réglages**, dans la carte du serveur du téléphone) envoie ses dernières lignes à qui vous aide. Avec un autre Music Assistant (un ordinateur, umbrel…), **Journal de Music Assistant** dans **Réglages** envoie le journal du serveur auquel Xonos est connecté (administrateurs uniquement). Elles peuvent contenir les noms de vos services et de vos titres.
 
 ### En voiture
 
@@ -364,20 +386,6 @@ Xonos se connecte à Music Assistant et enregistre le téléphone comme lecteur 
 - **Un lecteur, une file** : ce que vous lancez sur le téléphone joue sur le téléphone, et la voiture l’affiche de la même façon.
 - **Lire sur** : depuis le lecteur, ou l’icône de diffusion sur l’Accueil, envoyez la musique vers une enceinte que Music Assistant connaît. La file d’attente y passe et continue au même endroit, et le téléphone s’arrête ; l’écran commande alors cette enceinte, volume compris, et ce que vous lancez y joue. Choisissez « Ce téléphone » pour ramener la musique. En voiture rien ne change : la voiture joue toujours sur le téléphone.
 - **Services de Music Assistant** (pour les administrateurs, depuis Réglages, ou depuis l’Accueil quand la bibliothèque est vide) : voyez les services, ajoutez-en un (Spotify, Tidal, YouTube Music, Deezer, Qobuz, Jellyfin, Plex, Subsonic, podcasts, radio, dossiers…), connectez-vous dans le navigateur quand il le demande, changez ses options, reconfigurez-le ou retirez-le. Les formulaires sont ceux de Music Assistant, dans votre langue quand Music Assistant a la traduction. Ajouter et configurer des services demande Music Assistant 2.10 ou plus récent.
-
-### Music Assistant sur ce téléphone
-
-Pas de Music Assistant à la maison ? Xonos peut en faire tourner un sur le téléphone même, rien que pour lui et pour myCar.
-
-- Dans **Réglages**, ou la première fois que vous ouvrez Xonos, touchez **Faire de Xonos votre serveur Music Assistant**. Xonos vous indique la taille du téléchargement (environ 75 Mo, 200 Mo une fois installé) et ne télécharge qu’après que vous avez touché **Télécharger** : Music Assistant avec Python, FFmpeg, librespot et un petit système Linux pour Soloist, depuis la release de la même version de Xonos sur cette page. Les magasins d’applications comme F-Droid ne vérifient pas ce téléchargement ; Xonos ne l’utilise que s’il est signé avec la même clé que Xonos.
-- Android demande de laisser Xonos lire la musique du téléphone : autorisez-le, et le service de disque local de Music Assistant part du dossier Music du téléphone.
-- Ensuite Xonos démarre Music Assistant, crée son premier compte et s’y connecte tout seul ; le premier démarrage prend environ une minute. Ajoutez votre musique depuis **Services de Music Assistant** : les fichiers du téléphone, la radio, les podcasts, Jellyfin, Plex, Subsonic, Spotify…
-- Il ne répond que sur le téléphone, pas au reste de votre réseau, et tourne tant que Xonos tourne. myCar l’atteint à travers Xonos.
-- **Utiliser un autre Music Assistant** revient à un serveur à la maison ; **Retirer de ce téléphone** le supprime, avec ses services et sa bibliothèque.
-- Il faut un téléphone 64 bits. Pas disponibles sur le téléphone : Apple Music, Deezer, YouTube Music, Tidal, Qobuz, BBC Sounds et les partages réseau (SMB, NFS). Tidal et Qobuz se connectent avec les clés de Music Assistant, que seules ses versions officielles ont.
-- ⚠️ **Ici, Spotify a deux moteurs.** librespot ne joue qu’avec les comptes Premium créés avant décembre 2024 (Spotify n’a jamais donné le jour exact) : avec un compte plus récent, votre musique apparaît mais ne se lance pas. **Soloist**, le moteur officiel de Spotify, joue avec tous les comptes Premium : choisissez-le en ajoutant Spotify. Il faut votre propre clé API Soloist (dans le [Spotify Developer Dashboard](https://developer.spotify.com/dashboard), Premium), Music Assistant ne télécharge Soloist chez Spotify qu’avec votre accord et, une seule fois, vous choisissez **Music Assistant Pairing** parmi les appareils de l’app Spotify, avec le téléphone en Wi-Fi. Soloist est un programme pour Linux : sur le téléphone il tourne dans proot, dans un petit système Linux qui arrive avec le téléchargement. Sur GrapheneOS, si vous avez bloqué le débogage du code natif pour les nouvelles apps, autorisez-le pour Xonos dans les réglages de l’app.
-- **Spotify** demande, pour la même raison, le Client ID de votre propre app Spotify : créez-la gratuitement dans le [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) (Spotify Premium requis), avec Web API et la Redirect URI `https://music-assistant.io/callback` ; Xonos vous montre les étapes. Ensuite vous vous connectez dans le navigateur (avec librespot, vous y autorisez aussi la lecture). Une app personnelle obtient moins de Spotify que celle de Music Assistant : seulement les titres de vos playlists, pas ceux des playlists que vous suivez ni de celles de Spotify lui-même (comme Daily Mix), donc copiez ces titres dans une playlist à vous dans Spotify ; les titres les plus écoutés des artistes et les nouveautés manquent aussi.
-- Si quelque chose ne marche pas, **Partager le journal du serveur de ce téléphone** (dans **Réglages**, dans la carte du serveur du téléphone) envoie ses dernières lignes à qui vous aide. Avec un autre Music Assistant (un ordinateur, umbrel…), **Journal de Music Assistant** dans **Réglages** envoie le journal du serveur auquel Xonos est connecté (administrateurs uniquement). Elles peuvent contenir les noms de vos services et de vos titres.
 
 ### Avec myCar
 
@@ -455,18 +463,34 @@ Xonos est un projet indépendant, sans lien avec Music Assistant, Gearslip ni au
 
 ## Deutsch
 
-**Xonos macht dein Handy zum Music-Assistant-Player und bringt deine ganze Bibliothek auf den Bildschirm im Auto.** Wähle in [Gearslip](https://github.com/twinksoftware/Gearslip) oder [myCar](https://github.com/SirioNero/MyCar) ein Album, eine Playlist, einen Podcast oder einen Radiosender: Die Musik spielt auf dem Handy und kommt aus den Lautsprechern des Autos, nie aus denen zu Hause. Außerhalb des Autos ist Xonos ein vollständiger Musikplayer für deinen [Music Assistant](https://music-assistant.io).
+**Spotify und deine ganze Musik auf einem Handy ohne Google, und ohne Server: Der Server ist das Handy selbst.** Xonos führt [Music Assistant](https://music-assistant.io) aus, einen freien Musikserver, der deine Streamingdienste und deine eigene Musik zusammenbringt, direkt auf dem Handy: kein Computer, kein Heimserver. Spotify (Premium), SoundCloud, Plex, Jellyfin, Podcasts, Radio und die Songs auf dem Handy landen in einer Bibliothek, die du auf dem Handy und auf dem Bildschirm im Auto mit [Gearslip](https://github.com/twinksoftware/Gearslip) oder [myCar](https://github.com/SirioNero/MyCar) hörst. Ohne Google-Konto und ohne Google-Play-Dienste: Du installierst es von dieser Seite mit Obtainium, und jeder Dienst braucht nur sein eigenes Konto. Du hast schon Music Assistant zu Hause? Xonos verbindet sich auch damit.
 
 ### Das Beste
 
+- 📱 **Das Handy ist der Server.** Kein Computer und kein Heimserver: Xonos lädt Music Assistant herunter, wenn du es willst (etwa 75 MB), und führt ihn auf dem Handy selbst aus, nur für dich und für myCar.
+- 🎧 **Spotify ohne Google.** Spotify mit jedem Premium-Konto, über die offizielle Engine von Spotify, auf einem Handy ohne Google-Konto und ohne Google-Play-Dienste, etwa mit GrapheneOS.
+- 🧩 **Deine ganze Musik, eine App.** SoundCloud, Plex, Jellyfin, Emby, Subsonic/Navidrome, Audiobookshelf, TuneIn, Podcasts, Radio und die Dateien auf dem Handy, neben Spotify in einer Bibliothek und einer Suche.
 - 🚗 **Alles im Auto.** Playlists, Alben, Künstler, Podcasts, Hörbücher und Radio aus allen Diensten in Music Assistant, mit dem kompletten Menü, der Suche, Songtexten und dem Player neben der Karte.
 - 🎶 **Auch deine Spotify-Bibliothek.** Spotify zeigt Gearslip seine Bibliothek nicht: Füge Spotify zu Music Assistant hinzu, und deine Playlists, Lieblingssongs, Alben und Künstler sind in Xonos.
-- 📱 **Ein echter Player auf dem Handy.** Empfehlungen auf Start, Suche beim Tippen, die ganze Bibliothek, synchronisierte Songtexte, eine Warteschlange und Playlists, die du bearbeiten kannst.
+- ▶️ **Ein echter Player auf dem Handy.** Empfehlungen auf Start, Suche beim Tippen, die ganze Bibliothek, synchronisierte Songtexte, eine Warteschlange und Playlists, die du bearbeiten kannst.
 - 🔊 **Auf jedem Lautsprecher.** Schick die Musik an die Lautsprecher, die Music Assistant kennt (Chromecast, AirPlay, Sonos, DLNA, Gruppen), und hol sie an derselben Stelle zurück aufs Handy.
 - 🛠️ **Music Assistant in der Hand.** Admins fügen Dienste hinzu, melden sich bei ihnen an und richten sie direkt auf dem Handy ein.
-- 🏠 **Kein Music Assistant? Xonos kann einer sein.** Es führt Music Assistant auf dem Handy selbst aus, nur für dich und für myCar, und lädt ihn nur herunter, wenn du es willst.
 - 🌍 **Neun Sprachen.** English, Español, Français, Deutsch, Italiano, Português, Ελληνικά, Русский, 简体中文.
 - 🔒 **Nur deins.** Keine Werbung, kein Tracking, kein Konto außer deinem eigenen Music Assistant. Freie Software (AGPL-3.0) mit reproduzierbaren Builds.
+
+### Music Assistant auf diesem Telefon
+
+Kein Music Assistant zu Hause? Xonos kann einen auf dem Handy selbst ausführen, nur für sich und für myCar.
+
+- Tippe in den **Einstellungen**, oder beim ersten Öffnen von Xonos, auf **Xonos zu deinem Music-Assistant-Server machen**. Xonos sagt dir, wie groß der Download ist (etwa 75 MB, installiert 200 MB), und lädt erst herunter, wenn du auf **Herunterladen** tippst: Music Assistant mit Python, FFmpeg, librespot und einem kleinen Linux-System für Soloist, aus dem Release derselben Xonos-Version auf dieser Seite. App-Stores wie F-Droid prüfen diesen Download nicht; Xonos verwendet ihn nur, wenn er mit demselben Schlüssel wie Xonos signiert ist.
+- Android fragt, ob Xonos die Musik auf dem Handy lesen darf: Erlaube es, dann beginnt der Dienst für lokale Dateien von Music Assistant mit dem Ordner Music des Handys.
+- Danach startet Xonos Music Assistant, legt das erste Konto an und verbindet sich von selbst; der erste Start dauert etwa eine Minute. Füge deine Musik unter **Music-Assistant-Dienste** hinzu: Dateien auf dem Handy, Radio, Podcasts, Jellyfin, Plex, Subsonic, Spotify…
+- Er antwortet nur auf dem Handy, nicht dem Rest deines Netzwerks, und läuft, solange Xonos läuft. myCar erreicht ihn über Xonos.
+- **Einen anderen Music Assistant verwenden** führt zurück zu einem Server zu Hause; **Von diesem Telefon entfernen** löscht ihn samt Diensten und Bibliothek.
+- Du brauchst ein 64-Bit-Handy. Auf dem Handy nicht verfügbar: Apple Music, Deezer, YouTube Music, Tidal, Qobuz, BBC Sounds und Netzwerkfreigaben (SMB, NFS). Tidal und Qobuz melden sich mit den Schlüsseln von Music Assistant an, die nur seine offiziellen Versionen haben.
+- ⚠️ **Spotify hat hier zwei Engines.** librespot spielt nur mit Premium-Konten, die vor Dezember 2024 angelegt wurden (einen genauen Tag hat Spotify nie genannt): Mit einem neueren Konto erscheint deine Musik, spielt aber nicht. **Soloist**, die offizielle Engine von Spotify, spielt mit jedem Premium-Konto: Wähle sie, wenn du Spotify hinzufügst. Sie braucht deinen eigenen Soloist-API-Schlüssel (aus dem [Spotify Developer Dashboard](https://developer.spotify.com/dashboard), Premium), Music Assistant lädt Soloist nur mit deiner Zustimmung von Spotify herunter, und einmalig wählst du **Music Assistant Pairing** unter den Geräten der Spotify-App, mit dem Telefon im WLAN. Soloist ist ein Programm für Linux: Auf dem Telefon läuft es in proot, in einem kleinen Linux-System, das mit dem Download kommt. Unter GrapheneOS: Wenn du das Debugging von nativem Code für neue Apps gesperrt hast, erlaube es für Xonos in den App-Einstellungen.
+- **Spotify** fragt aus demselben Grund nach der Client ID deiner eigenen Spotify-App: Erstelle sie kostenlos im [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) (Spotify Premium nötig), mit Web API und der Redirect URI `https://music-assistant.io/callback`; Xonos zeigt dir die Schritte. Danach meldest du dich im Browser an (mit librespot gibst du dort auch die Wiedergabe frei). Eine eigene App bekommt von Spotify weniger als die von Music Assistant: nur die Titel deiner eigenen Playlists, nicht die der Playlists, denen du folgst, oder von Spotify selbst (wie Daily Mix), also kopiere diese Titel in Spotify in eine eigene Playlist; auch die Top-Titel der Künstler und Neuerscheinungen fehlen.
+- Wenn etwas nicht geht, schickt **Protokoll des Servers auf diesem Telefon teilen** (in den **Einstellungen**, in der Karte des Servers auf dem Telefon) die letzten Zeilen an die Person, die dir hilft. Mit einem anderen Music Assistant (ein Computer, umbrel…) schickt **Music-Assistant-Protokoll** in den **Einstellungen** das Protokoll des Servers, mit dem Xonos verbunden ist (nur für Administratoren). Sie können die Namen deiner Dienste und Titel enthalten.
 
 ### Im Auto
 
@@ -492,20 +516,6 @@ Xonos meldet sich bei Music Assistant an und registriert das Handy über Sendspi
 - **Ein Player, eine Warteschlange**: Was du auf dem Handy startest, spielt auf dem Handy, und das Auto zeigt es genauso.
 - **Abspielen auf**: Schick die Musik vom Player aus, oder über das Cast-Symbol auf Start, an einen Lautsprecher, den Music Assistant kennt. Die Warteschlange zieht dorthin um und läuft an derselben Stelle weiter, das Handy hört auf; ab dann steuert der Bildschirm diesen Lautsprecher, Lautstärke inklusive, und was du abspielst, läuft dort. Wähle „Dieses Telefon“, um die Musik zurückzuholen. Im Auto ändert sich nichts: Das Auto spielt immer auf dem Handy.
 - **Music-Assistant-Dienste** (für Admins, in den Einstellungen oder auf Start, wenn die Bibliothek leer ist): Sieh dir die Dienste an, füge einen hinzu (Spotify, Tidal, YouTube Music, Deezer, Qobuz, Jellyfin, Plex, Subsonic, Podcasts, Radio, Ordner…), melde dich im Browser an, wenn er danach fragt, ändere seine Optionen, richte ihn neu ein oder entferne ihn. Die Formulare sind die von Music Assistant, in deiner Sprache, wenn Music Assistant die Übersetzung hat. Zum Hinzufügen und Einrichten von Diensten braucht es Music Assistant 2.10 oder neuer.
-
-### Music Assistant auf diesem Telefon
-
-Kein Music Assistant zu Hause? Xonos kann einen auf dem Handy selbst ausführen, nur für sich und für myCar.
-
-- Tippe in den **Einstellungen**, oder beim ersten Öffnen von Xonos, auf **Xonos zu deinem Music-Assistant-Server machen**. Xonos sagt dir, wie groß der Download ist (etwa 75 MB, installiert 200 MB), und lädt erst herunter, wenn du auf **Herunterladen** tippst: Music Assistant mit Python, FFmpeg, librespot und einem kleinen Linux-System für Soloist, aus dem Release derselben Xonos-Version auf dieser Seite. App-Stores wie F-Droid prüfen diesen Download nicht; Xonos verwendet ihn nur, wenn er mit demselben Schlüssel wie Xonos signiert ist.
-- Android fragt, ob Xonos die Musik auf dem Handy lesen darf: Erlaube es, dann beginnt der Dienst für lokale Dateien von Music Assistant mit dem Ordner Music des Handys.
-- Danach startet Xonos Music Assistant, legt das erste Konto an und verbindet sich von selbst; der erste Start dauert etwa eine Minute. Füge deine Musik unter **Music-Assistant-Dienste** hinzu: Dateien auf dem Handy, Radio, Podcasts, Jellyfin, Plex, Subsonic, Spotify…
-- Er antwortet nur auf dem Handy, nicht dem Rest deines Netzwerks, und läuft, solange Xonos läuft. myCar erreicht ihn über Xonos.
-- **Einen anderen Music Assistant verwenden** führt zurück zu einem Server zu Hause; **Von diesem Telefon entfernen** löscht ihn samt Diensten und Bibliothek.
-- Du brauchst ein 64-Bit-Handy. Auf dem Handy nicht verfügbar: Apple Music, Deezer, YouTube Music, Tidal, Qobuz, BBC Sounds und Netzwerkfreigaben (SMB, NFS). Tidal und Qobuz melden sich mit den Schlüsseln von Music Assistant an, die nur seine offiziellen Versionen haben.
-- ⚠️ **Spotify hat hier zwei Engines.** librespot spielt nur mit Premium-Konten, die vor Dezember 2024 angelegt wurden (einen genauen Tag hat Spotify nie genannt): Mit einem neueren Konto erscheint deine Musik, spielt aber nicht. **Soloist**, die offizielle Engine von Spotify, spielt mit jedem Premium-Konto: Wähle sie, wenn du Spotify hinzufügst. Sie braucht deinen eigenen Soloist-API-Schlüssel (aus dem [Spotify Developer Dashboard](https://developer.spotify.com/dashboard), Premium), Music Assistant lädt Soloist nur mit deiner Zustimmung von Spotify herunter, und einmalig wählst du **Music Assistant Pairing** unter den Geräten der Spotify-App, mit dem Telefon im WLAN. Soloist ist ein Programm für Linux: Auf dem Telefon läuft es in proot, in einem kleinen Linux-System, das mit dem Download kommt. Unter GrapheneOS: Wenn du das Debugging von nativem Code für neue Apps gesperrt hast, erlaube es für Xonos in den App-Einstellungen.
-- **Spotify** fragt aus demselben Grund nach der Client ID deiner eigenen Spotify-App: Erstelle sie kostenlos im [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) (Spotify Premium nötig), mit Web API und der Redirect URI `https://music-assistant.io/callback`; Xonos zeigt dir die Schritte. Danach meldest du dich im Browser an (mit librespot gibst du dort auch die Wiedergabe frei). Eine eigene App bekommt von Spotify weniger als die von Music Assistant: nur die Titel deiner eigenen Playlists, nicht die der Playlists, denen du folgst, oder von Spotify selbst (wie Daily Mix), also kopiere diese Titel in Spotify in eine eigene Playlist; auch die Top-Titel der Künstler und Neuerscheinungen fehlen.
-- Wenn etwas nicht geht, schickt **Protokoll des Servers auf diesem Telefon teilen** (in den **Einstellungen**, in der Karte des Servers auf dem Telefon) die letzten Zeilen an die Person, die dir hilft. Mit einem anderen Music Assistant (ein Computer, umbrel…) schickt **Music-Assistant-Protokoll** in den **Einstellungen** das Protokoll des Servers, mit dem Xonos verbunden ist (nur für Administratoren). Sie können die Namen deiner Dienste und Titel enthalten.
 
 ### Mit myCar
 
@@ -583,18 +593,34 @@ Xonos ist ein unabhängiges Projekt und steht in keiner Verbindung zu Music Assi
 
 ## Italiano
 
-**Xonos fa del telefono un lettore di Music Assistant e porta tutta la tua libreria sullo schermo dell’auto.** Scegli un album, una playlist, un podcast o una radio in [Gearslip](https://github.com/twinksoftware/Gearslip) o in [myCar](https://github.com/SirioNero/MyCar): suona sul telefono ed esce dalle casse dell’auto, mai da quelle di casa. Fuori dall’auto, Xonos è un lettore musicale completo per il tuo [Music Assistant](https://music-assistant.io).
+**Spotify e tutta la tua musica su un telefono senza Google, e senza server da preparare: il server è il telefono stesso.** Xonos fa girare [Music Assistant](https://music-assistant.io), un server musicale libero che riunisce i tuoi servizi di streaming e la tua musica, direttamente sul telefono: niente computer né server di casa. Spotify (Premium), SoundCloud, Plex, Jellyfin, podcast, radio e i brani del telefono finiscono in un’unica libreria, che ascolti sul telefono e sullo schermo dell’auto con [Gearslip](https://github.com/twinksoftware/Gearslip) o [myCar](https://github.com/SirioNero/MyCar). Niente account Google né servizi Google Play: si installa da questa pagina con Obtainium, e ogni servizio chiede solo il suo account. Hai già Music Assistant a casa? Xonos si collega anche a quello.
 
 ### Il meglio
 
+- 📱 **Il server è il telefono.** Niente computer né server di casa: Xonos scarica Music Assistant quando glielo chiedi (circa 75 MB) e lo fa girare sul telefono stesso, solo per te e per myCar.
+- 🎧 **Spotify senza Google.** Spotify con qualsiasi account Premium, con il motore ufficiale di Spotify, su un telefono senza account Google né servizi Google Play, come GrapheneOS.
+- 🧩 **Tutta la tua musica, un’unica app.** SoundCloud, Plex, Jellyfin, Emby, Subsonic/Navidrome, Audiobookshelf, TuneIn, podcast, radio e i file del telefono, accanto a Spotify in un’unica libreria e un’unica ricerca.
 - 🚗 **Tutto, in auto.** Playlist, album, artisti, podcast, audiolibri e radio da tutti i servizi di Music Assistant, con il menu completo, la ricerca, i testi e il lettore accanto alla mappa.
 - 🎶 **Anche la tua libreria di Spotify.** Spotify a Gearslip non mostra la sua libreria: aggiungi Spotify a Music Assistant, e playlist, brani che ti piacciono, album e artisti sono in Xonos.
-- 📱 **Un lettore vero anche sul telefono.** Consigli nella Home, ricerca mentre scrivi, tutta la libreria, testi sincronizzati, una coda e playlist che puoi modificare.
+- ▶️ **Un lettore vero anche sul telefono.** Consigli nella Home, ricerca mentre scrivi, tutta la libreria, testi sincronizzati, una coda e playlist che puoi modificare.
 - 🔊 **Suona su qualsiasi cassa.** Manda la musica alle casse che Music Assistant conosce (Chromecast, AirPlay, Sonos, DLNA, gruppi) e riportala sul telefono, dallo stesso punto.
 - 🛠️ **Music Assistant in mano.** Chi lo amministra aggiunge i servizi, ci fa l’accesso e li configura direttamente dal telefono.
-- 🏠 **Niente Music Assistant? Xonos può esserlo.** Fa girare Music Assistant sul telefono stesso, solo per te e per myCar, e lo scarica solo se glielo chiedi.
 - 🌍 **Nove lingue.** English, Español, Français, Deutsch, Italiano, Português, Ελληνικά, Русский, 简体中文.
 - 🔒 **Solo tuo.** Niente pubblicità, niente tracciamento, nessun account se non quello del tuo Music Assistant. Software libero (AGPL-3.0), con build riproducibili.
+
+### Music Assistant su questo telefono
+
+Non hai un Music Assistant a casa? Xonos può farne girare uno sul telefono stesso, solo per sé e per myCar.
+
+- Nelle **Impostazioni**, o la prima volta che apri Xonos, premi **Fai diventare Xonos il tuo server Music Assistant**. Xonos ti dice quanto pesa il download (circa 75 MB, 200 MB una volta installato) e scarica solo dopo che hai premuto **Scarica**: Music Assistant con Python, FFmpeg, librespot e un piccolo sistema Linux per Soloist, dalla release della stessa versione di Xonos in questa pagina. Gli store come F-Droid non controllano questo download; Xonos lo usa solo se è firmato con la stessa chiave di Xonos.
+- Android chiede di lasciar leggere a Xonos la musica del telefono: consentilo, e il servizio del disco locale di Music Assistant parte dalla cartella Music del telefono.
+- Poi Xonos avvia Music Assistant, crea il primo account e ci si collega da solo; il primo avvio dura circa un minuto. Aggiungi la tua musica da **Servizi di Music Assistant**: i file del telefono, radio, podcast, Jellyfin, Plex, Subsonic, Spotify…
+- Risponde solo sul telefono, non al resto della tua rete, e gira finché gira Xonos. myCar lo raggiunge attraverso Xonos.
+- **Usa un altro Music Assistant** torna a un server di casa; **Togli da questo telefono** lo cancella, con i suoi servizi e la sua libreria.
+- Serve un telefono a 64 bit. Non ci sono sul telefono: Apple Music, Deezer, YouTube Music, Tidal, Qobuz, BBC Sounds e le cartelle di rete (SMB, NFS). Tidal e Qobuz entrano con le chiavi di Music Assistant, che hanno solo le sue versioni ufficiali.
+- ⚠️ **Qui Spotify ha due motori.** librespot suona solo con gli account Premium creati prima di dicembre 2024 (Spotify non ha mai indicato il giorno esatto): con un account più recente la tua musica compare ma non parte. **Soloist**, il motore ufficiale di Spotify, suona con tutti gli account Premium: sceglilo quando aggiungi Spotify. Serve una tua chiave API di Soloist (dalla [Spotify Developer Dashboard](https://developer.spotify.com/dashboard), Premium), Music Assistant scarica Soloist da Spotify solo se sei d’accordo e, una volta sola, scegli **Music Assistant Pairing** tra i dispositivi dell’app Spotify, con il telefono in Wi-Fi. Soloist è un programma per Linux: sul telefono gira dentro proot, in un piccolo sistema Linux che arriva con il download. Su GrapheneOS, se hai bloccato il debug del codice nativo per le app nuove, permettilo a Xonos nelle impostazioni dell’app.
+- **Spotify** chiede, per lo stesso motivo, il Client ID di una tua app Spotify: creala gratis nella [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) (serve Spotify Premium), con Web API e il Redirect URI `https://music-assistant.io/callback`; Xonos ti mostra i passi. Poi accedi nel browser (con librespot lì approvi anche la riproduzione). A un’app personale Spotify dà meno che a quella di Music Assistant: solo i brani delle tue playlist, non quelli delle playlist che segui né di quelle di Spotify stesso (come Daily Mix), quindi copia quei brani in una tua playlist in Spotify; mancano anche i brani più ascoltati degli artisti e le nuove uscite.
+- Se qualcosa non va, **Condividi il registro del server sul telefono** (nelle **Impostazioni**, nella scheda del server sul telefono) manda le sue ultime righe a chi ti aiuta. Con un altro Music Assistant (un computer, umbrel…), **Registro di Music Assistant** nelle **Impostazioni** manda il registro del server a cui è collegato Xonos (solo per gli amministratori). Possono contenere i nomi dei tuoi servizi e dei brani.
 
 ### In auto
 
@@ -620,20 +646,6 @@ Xonos accede a Music Assistant e registra il telefono come lettore privato con S
 - **Un lettore, una coda**: quello che fai partire dal telefono suona sul telefono, e l’auto lo mostra allo stesso modo.
 - **Suona su**: dal lettore, o dall’icona in alto nella Home, mandi la musica a una cassa che Music Assistant conosce. La coda passa lì e continua dallo stesso punto, e il telefono si ferma; da quel momento lo schermo comanda quella cassa, volume compreso, e quello che fai partire suona lì. Scegli “Questo telefono” per riportare indietro la musica. In auto non cambia niente: l’auto suona sempre sul telefono.
 - **I servizi di Music Assistant** (per chi lo amministra, dalle Impostazioni, o dalla Home quando la libreria è vuota): vedi i servizi, ne aggiungi uno (Spotify, Tidal, YouTube Music, Deezer, Qobuz, Jellyfin, Plex, Subsonic, podcast, radio, cartelle…), fai l’accesso nel browser quando lo chiede, cambi le opzioni, lo configuri di nuovo o lo togli. I moduli sono quelli di Music Assistant, nella tua lingua quando Music Assistant ha la traduzione. Per aggiungere e configurare i servizi serve Music Assistant 2.10 o successivo.
-
-### Music Assistant su questo telefono
-
-Non hai un Music Assistant a casa? Xonos può farne girare uno sul telefono stesso, solo per sé e per myCar.
-
-- Nelle **Impostazioni**, o la prima volta che apri Xonos, premi **Fai diventare Xonos il tuo server Music Assistant**. Xonos ti dice quanto pesa il download (circa 75 MB, 200 MB una volta installato) e scarica solo dopo che hai premuto **Scarica**: Music Assistant con Python, FFmpeg, librespot e un piccolo sistema Linux per Soloist, dalla release della stessa versione di Xonos in questa pagina. Gli store come F-Droid non controllano questo download; Xonos lo usa solo se è firmato con la stessa chiave di Xonos.
-- Android chiede di lasciar leggere a Xonos la musica del telefono: consentilo, e il servizio del disco locale di Music Assistant parte dalla cartella Music del telefono.
-- Poi Xonos avvia Music Assistant, crea il primo account e ci si collega da solo; il primo avvio dura circa un minuto. Aggiungi la tua musica da **Servizi di Music Assistant**: i file del telefono, radio, podcast, Jellyfin, Plex, Subsonic, Spotify…
-- Risponde solo sul telefono, non al resto della tua rete, e gira finché gira Xonos. myCar lo raggiunge attraverso Xonos.
-- **Usa un altro Music Assistant** torna a un server di casa; **Togli da questo telefono** lo cancella, con i suoi servizi e la sua libreria.
-- Serve un telefono a 64 bit. Non ci sono sul telefono: Apple Music, Deezer, YouTube Music, Tidal, Qobuz, BBC Sounds e le cartelle di rete (SMB, NFS). Tidal e Qobuz entrano con le chiavi di Music Assistant, che hanno solo le sue versioni ufficiali.
-- ⚠️ **Qui Spotify ha due motori.** librespot suona solo con gli account Premium creati prima di dicembre 2024 (Spotify non ha mai indicato il giorno esatto): con un account più recente la tua musica compare ma non parte. **Soloist**, il motore ufficiale di Spotify, suona con tutti gli account Premium: sceglilo quando aggiungi Spotify. Serve una tua chiave API di Soloist (dalla [Spotify Developer Dashboard](https://developer.spotify.com/dashboard), Premium), Music Assistant scarica Soloist da Spotify solo se sei d’accordo e, una volta sola, scegli **Music Assistant Pairing** tra i dispositivi dell’app Spotify, con il telefono in Wi-Fi. Soloist è un programma per Linux: sul telefono gira dentro proot, in un piccolo sistema Linux che arriva con il download. Su GrapheneOS, se hai bloccato il debug del codice nativo per le app nuove, permettilo a Xonos nelle impostazioni dell’app.
-- **Spotify** chiede, per lo stesso motivo, il Client ID di una tua app Spotify: creala gratis nella [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) (serve Spotify Premium), con Web API e il Redirect URI `https://music-assistant.io/callback`; Xonos ti mostra i passi. Poi accedi nel browser (con librespot lì approvi anche la riproduzione). A un’app personale Spotify dà meno che a quella di Music Assistant: solo i brani delle tue playlist, non quelli delle playlist che segui né di quelle di Spotify stesso (come Daily Mix), quindi copia quei brani in una tua playlist in Spotify; mancano anche i brani più ascoltati degli artisti e le nuove uscite.
-- Se qualcosa non va, **Condividi il registro del server sul telefono** (nelle **Impostazioni**, nella scheda del server sul telefono) manda le sue ultime righe a chi ti aiuta. Con un altro Music Assistant (un computer, umbrel…), **Registro di Music Assistant** nelle **Impostazioni** manda il registro del server a cui è collegato Xonos (solo per gli amministratori). Possono contenere i nomi dei tuoi servizi e dei brani.
 
 ### Con myCar
 
@@ -711,18 +723,34 @@ Xonos è un progetto indipendente, non legato a Music Assistant, a Gearslip né 
 
 ## Português
 
-**O Xonos transforma seu telefone em um reprodutor do Music Assistant e leva toda a sua biblioteca para a tela do carro.** Escolha um álbum, uma playlist, um podcast ou uma rádio no [Gearslip](https://github.com/twinksoftware/Gearslip) ou no [myCar](https://github.com/SirioNero/MyCar): a música toca no telefone e sai pelos alto-falantes do carro, nunca pelos de casa. Fora do carro, o Xonos é um reprodutor de música completo para o seu [Music Assistant](https://music-assistant.io).
+**Spotify e toda a sua música em um telefone sem Google, e sem servidor para montar: o servidor é o próprio telefone.** O Xonos roda o [Music Assistant](https://music-assistant.io), um servidor de música livre que reúne seus serviços de streaming e a sua própria música, direto no telefone: sem computador nem servidor em casa. Spotify (Premium), SoundCloud, Plex, Jellyfin, podcasts, rádio e as músicas do telefone ficam em uma só biblioteca, que você ouve no telefone e na tela do carro com o [Gearslip](https://github.com/twinksoftware/Gearslip) ou o [myCar](https://github.com/SirioNero/MyCar). Sem conta do Google nem serviços do Google Play: você instala por esta página com o Obtainium, e cada serviço só pede a própria conta. Já tem o Music Assistant em casa? O Xonos também se conecta a ele.
 
 ### Destaques
 
+- 📱 **O servidor é o telefone.** Sem computador nem servidor em casa: o Xonos baixa o Music Assistant quando você pede (cerca de 75 MB) e o roda no próprio telefone, só para você e para o myCar.
+- 🎧 **Spotify sem Google.** Spotify com qualquer conta Premium, pelo motor oficial do Spotify, em um telefone sem conta do Google nem serviços do Google Play, como o GrapheneOS.
+- 🧩 **Toda a sua música, um só app.** SoundCloud, Plex, Jellyfin, Emby, Subsonic/Navidrome, Audiobookshelf, TuneIn, podcasts, rádio e os arquivos do telefone, ao lado do Spotify em uma só biblioteca e uma só busca.
 - 🚗 **Tudo, no carro.** Playlists, álbuns, artistas, podcasts, audiolivros e rádio de todos os serviços do Music Assistant, com o menu completo, a busca, as letras e o reprodutor ao lado do mapa.
 - 🎶 **A sua biblioteca do Spotify também.** O Spotify não mostra a biblioteca dele para o Gearslip: adicione o Spotify ao Music Assistant, e suas playlists, músicas curtidas, álbuns e artistas estão no Xonos.
-- 📱 **Um reprodutor de verdade no telefone.** Recomendações no Início, busca enquanto você digita, a biblioteca inteira, letras sincronizadas, uma fila e playlists que você pode editar.
+- ▶️ **Um reprodutor de verdade no telefone.** Recomendações no Início, busca enquanto você digita, a biblioteca inteira, letras sincronizadas, uma fila e playlists que você pode editar.
 - 🔊 **Toque em qualquer caixa de som.** Envie a música para as caixas de som que o Music Assistant conhece (Chromecast, AirPlay, Sonos, DLNA, grupos) e traga de volta para o telefone, do mesmo ponto.
 - 🛠️ **O Music Assistant na mão.** Quem administra adiciona serviços, entra neles e os configura direto do telefone.
-- 🏠 **Sem Music Assistant? O Xonos pode ser um.** Ele roda o Music Assistant no próprio telefone, só para você e para o myCar, e só baixa se você pedir.
 - 🌍 **Nove idiomas.** English, Español, Français, Deutsch, Italiano, Português, Ελληνικά, Русский, 简体中文.
 - 🔒 **Só seu.** Sem anúncios, sem rastreamento, sem nenhuma conta além do seu próprio Music Assistant. Software livre (AGPL-3.0), com builds reproduzíveis.
+
+### Music Assistant neste telefone
+
+Não tem um Music Assistant em casa? O Xonos pode rodar um no próprio telefone, só para ele mesmo e para o myCar.
+
+- Nas **Configurações**, ou na primeira vez que abrir o Xonos, toque em **Transformar o Xonos no seu servidor Music Assistant**. O Xonos diz o tamanho do download (cerca de 75 MB, 200 MB depois de instalado) e só baixa depois que você tocar em **Baixar**: o Music Assistant com Python, FFmpeg, librespot e um pequeno sistema Linux para o Soloist, da release da mesma versão do Xonos nesta página. Lojas de apps como o F-Droid não verificam esse download; o Xonos só o usa se estiver assinado com a mesma chave do Xonos.
+- O Android pede para deixar o Xonos ler as músicas do telefone: permita, e o serviço de disco local do Music Assistant começa pela pasta Music do telefone.
+- Depois o Xonos inicia o Music Assistant, cria a primeira conta e se conecta sozinho; a primeira inicialização leva cerca de um minuto. Adicione sua música em **Serviços do Music Assistant**: os arquivos do telefone, rádio, podcasts, Jellyfin, Plex, Subsonic, Spotify…
+- Ele só responde no telefone, não para o resto da sua rede, e roda enquanto o Xonos roda. O myCar chega a ele através do Xonos.
+- **Usar outro Music Assistant** volta para um servidor de casa; **Remover deste telefone** o apaga, com os serviços e a biblioteca.
+- É preciso um telefone de 64 bits. Não estão disponíveis no telefone: Apple Music, Deezer, YouTube Music, Tidal, Qobuz, BBC Sounds e pastas de rede (SMB, NFS). O Tidal e o Qobuz entram com as chaves do Music Assistant, que só as versões oficiais dele têm.
+- ⚠️ **Aqui o Spotify tem dois motores.** O librespot só toca com contas Premium criadas antes de dezembro de 2024 (o Spotify nunca informou o dia exato): com uma conta mais nova, sua música aparece mas não toca. O **Soloist**, o motor oficial do Spotify, toca com todas as contas Premium: escolha-o ao adicionar o Spotify. Ele precisa da sua própria chave de API do Soloist (do [Spotify Developer Dashboard](https://developer.spotify.com/dashboard), Premium), o Music Assistant só baixa o Soloist do Spotify se você concordar e, uma única vez, você escolhe **Music Assistant Pairing** entre os dispositivos do app Spotify, com o telefone no Wi-Fi. O Soloist é um programa para Linux: no telefone ele roda dentro do proot, em um pequeno sistema Linux que vem com o download. No GrapheneOS, se você bloqueou a depuração de código nativo para apps novos, permita-a para o Xonos nas configurações do app.
+- O **Spotify** pede, pelo mesmo motivo, o Client ID do seu próprio app do Spotify: crie um de graça no [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) (é preciso Spotify Premium), com Web API e o Redirect URI `https://music-assistant.io/callback`; o Xonos mostra os passos. Depois você entra na sua conta no navegador (com o librespot, também aprova a reprodução lá). Um app pessoal recebe menos do Spotify que o do Music Assistant: só as músicas das suas playlists, não das que você segue nem das do próprio Spotify (como Daily Mix), então copie essas músicas para uma playlist sua no Spotify; também faltam as músicas mais tocadas dos artistas e os lançamentos.
+- Se algo não funcionar, **Compartilhar o registro do servidor deste telefone** (nas **Configurações**, no cartão do servidor do telefone) envia as últimas linhas para quem está ajudando você. Com outro Music Assistant (um computador, umbrel…), **Registro do Music Assistant** nas **Configurações** envia o registro do servidor ao qual o Xonos está conectado (só para administradores). Elas podem conter os nomes dos seus serviços e músicas.
 
 ### No carro
 
@@ -748,20 +776,6 @@ O Xonos entra no Music Assistant e registra o telefone como reprodutor privado p
 - **Um reprodutor, uma fila**: o que você começa no telefone toca no telefone, e o carro mostra do mesmo jeito.
 - **Tocar em**: no reprodutor, ou no ícone de transmitir no Início, envie a música para uma caixa de som que o Music Assistant conhece. A fila vai para lá e continua do mesmo ponto, e o telefone para; a partir daí a tela controla essa caixa, volume incluído, e o que você tocar vai para lá. Escolha “Este telefone” para trazer a música de volta. No carro nada muda: o carro sempre toca no telefone.
 - **Serviços do Music Assistant** (para quem administra, nas Configurações, ou no Início quando a biblioteca está vazia): veja os serviços, adicione um (Spotify, Tidal, YouTube Music, Deezer, Qobuz, Jellyfin, Plex, Subsonic, podcasts, rádio, pastas…), entre pelo navegador quando ele pedir, mude as opções, configure de novo ou remova. Os formulários são os do Music Assistant, no seu idioma quando o Music Assistant tem a tradução. Para adicionar e configurar serviços é preciso o Music Assistant 2.10 ou mais recente.
-
-### Music Assistant neste telefone
-
-Não tem um Music Assistant em casa? O Xonos pode rodar um no próprio telefone, só para ele mesmo e para o myCar.
-
-- Nas **Configurações**, ou na primeira vez que abrir o Xonos, toque em **Transformar o Xonos no seu servidor Music Assistant**. O Xonos diz o tamanho do download (cerca de 75 MB, 200 MB depois de instalado) e só baixa depois que você tocar em **Baixar**: o Music Assistant com Python, FFmpeg, librespot e um pequeno sistema Linux para o Soloist, da release da mesma versão do Xonos nesta página. Lojas de apps como o F-Droid não verificam esse download; o Xonos só o usa se estiver assinado com a mesma chave do Xonos.
-- O Android pede para deixar o Xonos ler as músicas do telefone: permita, e o serviço de disco local do Music Assistant começa pela pasta Music do telefone.
-- Depois o Xonos inicia o Music Assistant, cria a primeira conta e se conecta sozinho; a primeira inicialização leva cerca de um minuto. Adicione sua música em **Serviços do Music Assistant**: os arquivos do telefone, rádio, podcasts, Jellyfin, Plex, Subsonic, Spotify…
-- Ele só responde no telefone, não para o resto da sua rede, e roda enquanto o Xonos roda. O myCar chega a ele através do Xonos.
-- **Usar outro Music Assistant** volta para um servidor de casa; **Remover deste telefone** o apaga, com os serviços e a biblioteca.
-- É preciso um telefone de 64 bits. Não estão disponíveis no telefone: Apple Music, Deezer, YouTube Music, Tidal, Qobuz, BBC Sounds e pastas de rede (SMB, NFS). O Tidal e o Qobuz entram com as chaves do Music Assistant, que só as versões oficiais dele têm.
-- ⚠️ **Aqui o Spotify tem dois motores.** O librespot só toca com contas Premium criadas antes de dezembro de 2024 (o Spotify nunca informou o dia exato): com uma conta mais nova, sua música aparece mas não toca. O **Soloist**, o motor oficial do Spotify, toca com todas as contas Premium: escolha-o ao adicionar o Spotify. Ele precisa da sua própria chave de API do Soloist (do [Spotify Developer Dashboard](https://developer.spotify.com/dashboard), Premium), o Music Assistant só baixa o Soloist do Spotify se você concordar e, uma única vez, você escolhe **Music Assistant Pairing** entre os dispositivos do app Spotify, com o telefone no Wi-Fi. O Soloist é um programa para Linux: no telefone ele roda dentro do proot, em um pequeno sistema Linux que vem com o download. No GrapheneOS, se você bloqueou a depuração de código nativo para apps novos, permita-a para o Xonos nas configurações do app.
-- O **Spotify** pede, pelo mesmo motivo, o Client ID do seu próprio app do Spotify: crie um de graça no [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) (é preciso Spotify Premium), com Web API e o Redirect URI `https://music-assistant.io/callback`; o Xonos mostra os passos. Depois você entra na sua conta no navegador (com o librespot, também aprova a reprodução lá). Um app pessoal recebe menos do Spotify que o do Music Assistant: só as músicas das suas playlists, não das que você segue nem das do próprio Spotify (como Daily Mix), então copie essas músicas para uma playlist sua no Spotify; também faltam as músicas mais tocadas dos artistas e os lançamentos.
-- Se algo não funcionar, **Compartilhar o registro do servidor deste telefone** (nas **Configurações**, no cartão do servidor do telefone) envia as últimas linhas para quem está ajudando você. Com outro Music Assistant (um computador, umbrel…), **Registro do Music Assistant** nas **Configurações** envia o registro do servidor ao qual o Xonos está conectado (só para administradores). Elas podem conter os nomes dos seus serviços e músicas.
 
 ### Com o myCar
 

@@ -1,19 +1,31 @@
-Xonos turns your phone into a private Music Assistant player and brings your Music Assistant library to Gearslip's music player in the car, including the split screen next to the map. The music plays on the phone itself, so it reaches the car over Bluetooth (or Gearslip's USB audio), never your speakers at home.
+Spotify and all your music on a phone without Google, with no server to set up: the phone is the server. Xonos runs Music Assistant, a free music server that brings your streaming services and your own music together, right on the phone. Spotify (Premium), SoundCloud, Plex, Jellyfin, Emby, Subsonic/Navidrome, Audiobookshelf, TuneIn, podcasts, radio and the songs on the phone end up in one library, which you play on the phone and on the car's screen with Gearslip or myCar, also in the split screen next to the map. The music plays on the phone, so it reaches the car over Bluetooth, never your speakers at home.
 
-You need your own Music Assistant server, version 2.7.5 or later (adding services from the app needs 2.10). Whatever Music Assistant can play is in Xonos: your own files and servers (Jellyfin, Plex, Subsonic, Navidrome), podcasts, radio and the services you connect to Music Assistant.
+No Google account and no Google Play services: each service only asks for its own account.
+
+<b>Music Assistant on this phone</b>
+<ul>
+<li>Downloaded only if you ask (about 75 MB) and used only if it's signed with Xonos's own key; app stores such as F-Droid don't check this download</li>
+<li>Runs on the phone, just for you and for myCar, and answers only on the phone</li>
+<li>Spotify with every Premium account through Spotify's official engine (Soloist, downloaded from Spotify with your consent and your own API key), or librespot for older accounts</li>
+<li>Needs a 64-bit phone</li>
+</ul>
+
+<b>Or your own Music Assistant</b>
+<ul>
+<li>Finds Music Assistant on your network and signs in with your username and password (version 2.7.5 or later)</li>
+<li>Play on: send the music to the speakers Music Assistant knows (Chromecast, AirPlay, Sonos, DLNA…) and bring it back to the phone, from the same point</li>
+</ul>
 
 <b>On the phone</b>
 <ul>
 <li>Home with what you played recently and Music Assistant's recommendations</li>
 <li>Search across the library and every service, while you type</li>
 <li>The whole library: playlists, albums, artists, tracks, podcasts, audiobooks, radio, genres</li>
-<li>A player with synced lyrics and the queue</li>
-<li>Play on: send the music to the speakers Music Assistant knows (Chromecast, AirPlay, Sonos, DLNA…) and bring it back to the phone, from the same point</li>
-<li>Finds Music Assistant on your network and signs in with your username and password</li>
-<li>Music Assistant administrators can add, set up and remove services from the app</li>
+<li>A player with synced lyrics, a queue and playlists you can edit</li>
+<li>Administrators add, set up and remove services from the app</li>
 </ul>
 
-<b>In the car, through Gearslip</b>
+<b>In the car, with Gearslip or myCar</b>
 <ul>
 <li>The full menu and search, in the language you chose</li>
 <li>Calls and navigation prompts pause or lower the music</li>
@@ -22,4 +34,4 @@ You need your own Music Assistant server, version 2.7.5 or later (adding service
 
 Available in English, Italiano, Español, Deutsch, Français, Português, Ελληνικά, Русский and 简体中文.
 
-Xonos is an independent project, not affiliated with Music Assistant or Gearslip.
+Xonos is an independent project, not affiliated with Music Assistant, Spotify or Gearslip.

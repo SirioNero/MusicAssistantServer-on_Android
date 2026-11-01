@@ -285,15 +285,22 @@ private fun PhoneServerCard(page: SettingsPage, model: PhoneModel, host: Host) {
             when {
                 progress != null -> {
                     val (done, total) = progress
-                    if (total > 0) {
-                        LinearProgressIndicator(progress = { done.toFloat() / total }, modifier = Modifier.fillMaxWidth())
-                        Text(stringResource(R.string.phone_server_downloading, done / MEGABYTE, total / MEGABYTE), style = MaterialTheme.typography.bodySmall)
-                    } else {
+                    if (total > 0 && done >= total) {
+                        // Scaricato: si controlla la firma e si estrae (qualche secondo, prima la barra restava ferma al
+                        // 100%). Annulla qui butterebbe il download appena finito: non c'è.
                         LinearProgressIndicator(Modifier.fillMaxWidth())
-                        Text(stringResource(R.string.phone_server_downloading_unknown, done / MEGABYTE), style = MaterialTheme.typography.bodySmall)
-                    }
-                    TextButton(onClick = { model.cancelPhoneServerDownload(page) }, modifier = Modifier.testTag("cancel_phone_server")) {
-                        Text(stringResource(R.string.flow_cancel))
+                        Text(stringResource(R.string.phone_server_preparing), style = MaterialTheme.typography.bodySmall)
+                    } else {
+                        if (total > 0) {
+                            LinearProgressIndicator(progress = { done.toFloat() / total }, modifier = Modifier.fillMaxWidth())
+                            Text(stringResource(R.string.phone_server_downloading, done / MEGABYTE, total / MEGABYTE), style = MaterialTheme.typography.bodySmall)
+                        } else {
+                            LinearProgressIndicator(Modifier.fillMaxWidth())
+                            Text(stringResource(R.string.phone_server_downloading_unknown, done / MEGABYTE), style = MaterialTheme.typography.bodySmall)
+                        }
+                        TextButton(onClick = { model.cancelPhoneServerDownload(page) }, modifier = Modifier.testTag("cancel_phone_server")) {
+                            Text(stringResource(R.string.flow_cancel))
+                        }
                     }
                 }
                 // In uso ma senza il pacchetto di questa versione (Xonos aggiornato): il server non parte finché non

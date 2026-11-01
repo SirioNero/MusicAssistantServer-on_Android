@@ -31,6 +31,7 @@
     <string name="phone_server_help">Non hai un Music Assistant a casa? Xonos può farne girare uno su questo telefono, solo per sé e per myCar. Poi aggiungi la tua musica da Servizi di Music Assistant: i file del telefono, radio, podcast e servizi in streaming.</string>
     <string name="phone_server_use">Usa Music Assistant su questo telefono</string>
     <string name="phone_server_starting">Avvio… (la prima volta ci vuole un minuto)</string>
+    <string name="phone_server_preparing">Controllo e preparo Music Assistant…</string>
     <string name="phone_server_in_use">Xonos usa il Music Assistant di questo telefono. Aggiungi la tua musica da Servizi di Music Assistant.</string>
     <string name="phone_server_leave">Usa un altro Music Assistant</string>
     <string name="phone_server_failed">Music Assistant non è partito: %1$s</string>

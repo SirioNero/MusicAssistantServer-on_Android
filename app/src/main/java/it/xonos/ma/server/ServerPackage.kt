@@ -7,6 +7,8 @@ import android.os.StatFs
 import it.xonos.ma.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -50,6 +52,9 @@ class ServerPackage(private val context: Context, http: OkHttpClient) {
 
     private val zipName: String get() = "xonos-server-$abi.zip"
 
+    /** Un download alla volta: uno annullato può finire il pezzo che sta facendo mentre ne parte un altro. */
+    private val busy = Mutex()
+
     /** Quanto pesa lo zip da scaricare; null se non si sa. */
     suspend fun size(): Long? = withContext(Dispatchers.IO) {
         if (abi == null) return@withContext null
@@ -61,7 +66,9 @@ class ServerPackage(private val context: Context, http: OkHttpClient) {
     }
 
     /** Scarica, controlla e mette al suo posto il pacchetto; quello vecchio, se c'era, se ne va. */
-    suspend fun download(progress: (Long, Long) -> Unit) = withContext(Dispatchers.IO) {
+    suspend fun download(progress: (Long, Long) -> Unit) = busy.withLock { downloadNow(progress) }
+
+    private suspend fun downloadNow(progress: (Long, Long) -> Unit) = withContext(Dispatchers.IO) {
         if (abi == null) throw IOException("this phone isn't 64-bit")
         base.mkdirs()
         val part = File(base, "$zipName.part")
@@ -163,11 +170,12 @@ class ServerPackage(private val context: Context, http: OkHttpClient) {
         return signatures.map { factory.generateCertificate(it.toByteArray().inputStream()).publicKey }
     }
 
-    /** Estrae lo zip in [target]; i programmi di bin/ diventano eseguibili. */
-    private fun unzip(zip: File, target: File) {
+    /** Estrae lo zip in [target]; i programmi di bin/ diventano eseguibili. "Annulla" si ferma al file dopo. */
+    private suspend fun unzip(zip: File, target: File) {
         val root = target.canonicalFile
         ZipFile(zip).use { archive ->
             for (entry in archive.entries()) {
+                coroutineContext.ensureActive()
                 val file = File(root, entry.name).canonicalFile
                 if (!file.path.startsWith(root.path + File.separator)) throw IOException("bad entry ${entry.name}")
                 if (entry.isDirectory) {

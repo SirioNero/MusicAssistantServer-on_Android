@@ -406,7 +406,19 @@ class MaPlayer(
 
     // ---------- Comandi ----------
 
+    /** Scelte dall'auto (handleSetMediaItems) per cui Music Assistant sta ancora preparando la musica. */
+    private var choosing = 0
+
+    /** Pausa toccata mentre Music Assistant preparava una scelta: si mette appena la musica parte. */
+    private var pauseAfterChoice = false
+
     override fun handleSetPlayWhenReady(playWhenReady: Boolean): ListenableFuture<*> {
+        if (choosing > 0) {
+            // Dall'auto arrivano insieme la scelta e "play": il play_media della scelta fa già partire la musica, e
+            // un player_queues/play adesso (la coda non è in pausa) la farebbe ripartire da capo (Soloist: 7 s).
+            pauseAfterChoice = !playWhenReady
+            return Futures.immediateVoidFuture()
+        }
         val q = queue ?: return Futures.immediateVoidFuture()
         if (q.playing == playWhenReady) return Futures.immediateVoidFuture()
         return command(if (playWhenReady) "player_queues/play" else "player_queues/pause") { it?.playing == playWhenReady }
@@ -497,6 +509,8 @@ class MaPlayer(
         if (item == null || request == null) return Futures.immediateVoidFuture()
         val done = SettableFuture.create<Void?>()
         val before = queue
+        choosing++
+        pauseAfterChoice = false
         scope.launch {
             try {
                 awaitReady()
@@ -512,6 +526,11 @@ class MaPlayer(
             } catch (e: Exception) {
                 Log.w(TAG, "Non riesco a suonare ${item.mediaId}: ${e.message}")
             } finally {
+                choosing--
+                if (choosing == 0 && pauseAfterChoice) {
+                    pauseAfterChoice = false
+                    pauseFromSystem()
+                }
                 done.set(null)
             }
         }
@@ -575,6 +594,15 @@ class MaPlayer(
         expectations.forEach { it.future.set(null) }
         expectations.clear()
         return Futures.immediateVoidFuture()
+    }
+
+    /**
+     * Si è staccato il Bluetooth (o le cuffie) mentre la musica era ferma per un calo di rete: al ritorno della rete
+     * non si riprende da soli, perché uscirebbe dall'altoparlante del telefono.
+     */
+    fun forgetDrop() {
+        if (drop != null) Log.i(TAG, "Uscita audio staccata: dopo il calo di rete non riprendo da solo")
+        drop = null
     }
 
     /** Lo stesso play o pausa, ma deciso dal telefono (chiamata in arrivo, cuffie staccate). */

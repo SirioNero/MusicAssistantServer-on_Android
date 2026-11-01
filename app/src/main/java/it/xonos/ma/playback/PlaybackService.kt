@@ -5,6 +5,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.media.AudioDeviceCallback
+import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.media.MediaFormat
 import android.net.ConnectivityManager
@@ -140,6 +142,7 @@ class PlaybackService : MediaLibraryService() {
         }
         scope.launch { engine.outputting.collect(::onOutputting) }
         connectivity.registerDefaultNetworkCallback(networkCallback)
+        getSystemService(AudioManager::class.java).registerAudioDeviceCallback(outputs, main)
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession = session
@@ -147,6 +150,7 @@ class PlaybackService : MediaLibraryService() {
     override fun onDestroy() {
         app.playerReady.value = false
         runCatching { connectivity.unregisterNetworkCallback(networkCallback) }
+        runCatching { getSystemService(AudioManager::class.java).unregisterAudioDeviceCallback(outputs) }
         main.removeCallbacksAndMessages(null)
         setNoisyReceiver(false)
         releaseLocks()
@@ -163,7 +167,8 @@ class PlaybackService : MediaLibraryService() {
     /** Come ci presentiamo a Music Assistant, deciso a ogni connessione (la rete può essere cambiata). */
     private fun identity(): SendspinClient.Identity {
         val settings = app.settings
-        val metered = connectivity.isActiveNetworkMetered
+        // Con il Music Assistant sul telefono stesso la rete non c'entra: il margine è quello del Wi-Fi.
+        val metered = connectivity.isActiveNetworkMetered && !onPhoneServer
         val formats = buildList {
             // Opus pesa un decimo del PCM: in rete mobile fa la differenza. Il PCM resta come riserva.
             if (AndroidAudio.canDecode(MediaFormat.MIMETYPE_AUDIO_OPUS)) add(StreamFormat("opus", RATE, 2, 16))
@@ -255,6 +260,17 @@ class PlaybackService : MediaLibraryService() {
         }
     }
 
+    /**
+     * Il Bluetooth dell'auto (o le cuffie) si stacca anche quando la musica è già ferma, per esempio perché la rete
+     * è caduta in galleria: allora, al ritorno della rete, non si riprende da soli (uscirebbe dall'altoparlante).
+     * Mentre suona ci pensa [noisy].
+     */
+    private val outputs = object : AudioDeviceCallback() {
+        override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>) {
+            if (removedDevices.any { it.isSink && it.type !in BUILT_IN_OUTPUTS }) player.forgetDrop()
+        }
+    }
+
     /** Il Bluetooth dell'auto si stacca: la musica si ferma invece di passare all'altoparlante del telefono. */
     private val noisy = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -297,6 +313,10 @@ class PlaybackService : MediaLibraryService() {
         wifiLock?.takeIf { it.isHeld }?.release()
     }
 
+    /** Xonos usa il Music Assistant sul telefono stesso (127.0.0.1). */
+    private val onPhoneServer: Boolean
+        get() = app.phoneServer?.url?.let { it == app.settings.load().homeUrl } == true
+
     /** Uscendo di casa il Wi-Fi lascia il posto alla rete mobile: le connessioni vecchie sono morte, si riapre tutto. */
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
@@ -304,6 +324,12 @@ class PlaybackService : MediaLibraryService() {
                 val previous = lastNetwork
                 lastNetwork = network
                 if (previous != null && previous != network) {
+                    // Il Music Assistant sul telefono è a 127.0.0.1: il cambio di rete non tocca la connessione, e
+                    // ricollegarsi farebbe fermare la coda a Music Assistant (con Soloist il brano ripartirebbe).
+                    if (onPhoneServer) {
+                        Log.i(TAG, "Rete cambiata: Music Assistant è sul telefono, resto collegato")
+                        return@post
+                    }
                     Log.i(TAG, "Rete cambiata: mi ricollego")
                     networkChanged = true
                     app.repo.reconnect()
@@ -456,5 +482,13 @@ class PlaybackService : MediaLibraryService() {
         const val LOCK_TIMEOUT_MS = 6 * 60 * 60 * 1000L
         const val QUEUE_WAIT_MS = 10_000L
         const val QUEUE_POLL_MS = 200L
+
+        /** Le uscite del telefono stesso: staccarle non c'entra con il Bluetooth o le cuffie. */
+        val BUILT_IN_OUTPUTS = setOf(
+            AudioDeviceInfo.TYPE_BUILTIN_SPEAKER,
+            AudioDeviceInfo.TYPE_BUILTIN_EARPIECE,
+            AudioDeviceInfo.TYPE_TELEPHONY,
+            AudioDeviceInfo.TYPE_REMOTE_SUBMIX,
+        )
     }
 }

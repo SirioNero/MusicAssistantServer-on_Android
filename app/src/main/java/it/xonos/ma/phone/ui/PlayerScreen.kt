@@ -174,7 +174,8 @@ internal fun MiniPlayer(now: NowPlaying, player: PlayerLink, model: PhoneModel) 
 
 @Composable
 private fun PlayPauseButton(now: NowPlaying, player: PlayerLink, modifier: Modifier, iconSize: Dp, busy: Boolean = false) {
-    IconButton(onClick = player::playPause, modifier = modifier) {
+    // Mentre Music Assistant prepara un "suona" un play qui farebbe ripartire il brano da capo (resume).
+    IconButton(onClick = player::playPause, modifier = modifier, enabled = !busy) {
         if (busy || now.playing && now.buffering) {
             Waiting(Modifier.size(iconSize - 4.dp), 2.dp, MaterialTheme.colorScheme.onSurface)
         } else {
@@ -321,8 +322,15 @@ private fun Controls(now: NowPlaying, player: PlayerLink, busy: Boolean) {
         }
         FilledIconButton(
             onClick = player::playPause,
+            enabled = !busy,
             modifier = Modifier.size(76.dp),
-            colors = IconButtonDefaults.filledIconButtonColors(containerColor = normal, contentColor = MaterialTheme.colorScheme.background),
+            // Spento mentre la musica parte, ma con lo stesso aspetto: si vede la rotella, non un tasto grigio.
+            colors = IconButtonDefaults.filledIconButtonColors(
+                containerColor = normal,
+                contentColor = MaterialTheme.colorScheme.background,
+                disabledContainerColor = normal,
+                disabledContentColor = MaterialTheme.colorScheme.background,
+            ),
         ) {
             if (busy || now.playing && now.buffering) {
                 Waiting(Modifier.size(32.dp), 3.dp, MaterialTheme.colorScheme.background)

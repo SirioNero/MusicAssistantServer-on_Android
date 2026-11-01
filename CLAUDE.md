@@ -627,6 +627,24 @@ di Xonos suona dal server sul telefono; la release ridotta con R8, da capo come 
 - Ciò che sta fuori dallo `Scaffold` (lettore, benvenuto) ha bisogno della `Surface` della radice
   sopra, altrimenti `LocalContentColor` è nero.
 
+## Correzioni della notte (1–2 novembre 2026, ramo `claude/notte`)
+
+Da una caccia ai bug con più agenti (8 aree, un giudice avversario per area) e verificate nel codice:
+- `MaPlayer.forgetDrop` + `AudioDeviceCallback` in `PlaybackService`: un'uscita esterna (Bluetooth, cuffie) che si
+  stacca a musica già ferma (rete caduta) annulla la ripresa automatica, che durava 10 minuti e sarebbe uscita
+  dall'altoparlante.
+- Dall'auto una scelta arriva con un play subito dopo: `player_queues/play` su una coda non in pausa per Music
+  Assistant è un `resume` che rifà partire il brano (Soloist: altri 7 s). `MaPlayer.choosing`: durante la scelta il
+  play si ignora, una pausa si mette appena la musica parte. Sul telefono il tasto play è spento mentre parte.
+- Server sul telefono: al cambio di rete niente `repo.reconnect()` (127.0.0.1 non cambia; ricollegarsi fermava la
+  coda) e margine Sendspin del Wi-Fi anche in rete mobile (`PlaybackService.onPhoneServer`).
+- `SendspinClient.start`: se il ciclo sta solo aspettando il prossimo tentativo (fino a 30 s), riparte subito.
+- `MaPlayer.stateItems` si aggiorna subito a ogni "togli"/"sposta": la modifica dopo arriva con le posizioni del
+  segnaposto di Media3.
+- Wake lock anche mentre la coda deve suonare ma l'audio non esce ancora (al massimo 2 minuti, solo processore):
+  in auto a schermo spento la preparazione di Soloist si sarebbe fermata.
+- `AudioEngine.decode`: un decoder guasto si sostituisce (al massimo una volta al secondo).
+
 ## Lingue
 
 - `Language.kt`: en (predefinita), it, es, de, fr, pt, el, ru, zh-CN. La scelta vale per la schermata

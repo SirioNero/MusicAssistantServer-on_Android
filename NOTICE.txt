@@ -1,0 +1,156 @@
+Music Assistant for Xonos: package 2.10.8-3 for x86_64
+
+Xonos downloads this package only when you tap "Make Xonos your Music Assistant server". It is built
+from source by the workflows of https://github.com/SirioNero/Music-Assistant-on-Gearslip (folder server/,
+with the exact versions and the build scripts). Its parts, their licenses and their sources:
+
+Xonos's own files: bin/python3, app/xonos_server.py, app/av, app/modern_colorthief.py,
+app/music_assistant_frontend, and the orjson and aiodns stand-ins in site-packages (+xonos)
+    License: AGPL-3.0-or-later (licenses/Xonos-AGPL-3.0.txt)
+    Source: https://github.com/SirioNero/Music-Assistant-on-Gearslip
+
+Music Assistant 2.10.8 (app/music_assistant), changed for the phone by server/ma/prepare.py
+    License: Apache-2.0 (licenses/Apache-2.0.txt)
+    Source: https://github.com/music-assistant/server/tree/2.10.8
+
+Python 3.13 for Android (lib/libpython3*.so, lib/python313.zip, lib/python3.13/lib-dynload),
+as built by Chaquopy 17.2.0. Python's standard library includes other software (expat, libffi,
+libmpdec, HACL*, bzip2, xz, zlib...): https://docs.python.org/3.13/license.html
+    License: PSF-2.0 (licenses/Python.txt); Chaquopy: MIT (licenses/Chaquopy.txt)
+    Source: https://github.com/chaquo/chaquopy/tree/17.2.0, https://www.python.org/downloads/source/
+
+OpenSSL 3, for Python and the Python packages (lib/libssl_*.so, lib/libcrypto_*.so)
+    License: Apache-2.0 (licenses/Apache-2.0.txt)
+    Source: https://github.com/openssl/openssl, as built by Chaquopy
+
+SQLite, for Python (lib/libsqlite3_*.so)
+    License: public domain
+    Source: https://sqlite.org/src, as built by Chaquopy
+
+FFmpeg 7.1.5 (bin/ffmpeg, bin/ffprobe, lib/libav*.so, lib/libsw*.so), built by server/ffmpeg/build.sh
+with --enable-version3, without GPL parts
+    License: LGPL-3.0-or-later (licenses/LGPL-3.0.txt and licenses/GPL-3.0.txt)
+    Source: https://ffmpeg.org/releases/ffmpeg-7.1.5.tar.xz
+
+Mbed TLS 3.6.5, inside FFmpeg for https
+    License: Apache-2.0 or GPL-2.0-or-later (licenses/Mbed-TLS.txt)
+    Source: https://github.com/Mbed-TLS/mbedtls/releases/tag/mbedtls-3.6.5
+
+pkg_resources (site-packages/pkg_resources), from setuptools through Chaquopy's bootstrap
+    License: MIT (https://github.com/pypa/setuptools/blob/main/LICENSE)
+    Source: https://github.com/pypa/setuptools
+
+librespot, Music Assistant's fork (bin/librespot), built by server/librespot/build.sh
+    License: MIT (licenses/librespot.txt)
+    Source: https://github.com/music-assistant/librespot/tree/59a21d48d296a17544d0231e2ffeeced78fda186
+
+LLVM libc++ from the Android NDK (lib/libc++_shared.so), if present
+    License: Apache-2.0 WITH LLVM-exception (licenses/Apache-2.0.txt)
+    Source: https://github.com/llvm/llvm-project
+
+The Python packages in site-packages, each with its license in its .dist-info folder. Those built for
+Android by Chaquopy (numpy, pillow, cryptography, cffi, pycryptodome and the chaquopy-* libraries) have
+their recipes at https://github.com/chaquo/chaquopy/tree/17.2.0/server/pypi/packages.
+
+    aioaudiobookshelf 0.1.25: Apache-2.0. https://pypi.org/project/aioaudiobookshelf/0.1.25/
+    aiodns 4.0.4+xonos: AGPL-3.0-or-later, written for Xonos. https://github.com/SirioNero/Music-Assistant-on-Gearslip/tree/main/server/wheels
+    aiofiles 24.1.0: Apache-2.0. https://pypi.org/project/aiofiles/24.1.0/
+    aiohappyeyeballs 2.7.1: PSF-2.0. https://pypi.org/project/aiohappyeyeballs/2.7.1/
+    aiohttp 3.14.3: Apache-2.0 AND MIT. https://pypi.org/project/aiohttp/3.14.3/
+    aiohttp-fast-zlib 0.3.0: Apache-2.0. https://pypi.org/project/aiohttp-fast-zlib/0.3.0/
+    aiohttp_socks 0.11.0: Apache-2.0. https://pypi.org/project/aiohttp_socks/0.11.0/
+    aiojellyfin 0.14.1: Apache-2.0. https://pypi.org/project/aiojellyfin/0.14.1/
+    aiosendspin 10.2.1: Apache-2.0. https://pypi.org/project/aiosendspin/10.2.1/
+    aiosignal 1.4.0: Apache 2.0. https://pypi.org/project/aiosignal/1.4.0/
+    aiosqlite 0.22.1: MIT License. https://pypi.org/project/aiosqlite/0.22.1/
+    annotated-doc 0.0.5: MIT. https://pypi.org/project/annotated-doc/0.0.5/
+    anyascii 0.3.3: ISC License (ISCL). https://pypi.org/project/anyascii/0.3.3/
+    anyio 4.15.1: MIT. https://pypi.org/project/anyio/4.15.1/
+    attrs 26.1.0: MIT. https://pypi.org/project/attrs/26.1.0/
+    awesomeversion 25.8.0: MIT. https://pypi.org/project/awesomeversion/25.8.0/
+    backoff 2.2.1: MIT. https://pypi.org/project/backoff/2.2.1/
+    bandcamp-async-api 0.2.2: see its source. https://pypi.org/project/bandcamp-async-api/0.2.2/
+    beautifulsoup4 4.15.0: MIT License. https://pypi.org/project/beautifulsoup4/4.15.0/
+    bidict 0.24.1: MPL-2.0. https://pypi.org/project/bidict/0.24.1/
+    cachetools 7.2.6: MIT. https://pypi.org/project/cachetools/7.2.6/
+    certifi 2025.11.12: MPL-2.0. https://pypi.org/project/certifi/2025.11.12/
+    cffi 1.17.1: MIT. https://pypi.org/project/cffi/1.17.1/
+    chaquopy-freetype 2.9.1: see its source. https://pypi.org/project/chaquopy-freetype/2.9.1/
+    chaquopy-libcxx 180000: see LICENSE.TXT in its .dist-info folder. https://pypi.org/project/chaquopy-libcxx/180000/
+    chaquopy-libffi 3.3: see LICENSE, LICENSE-BUILDTOOLS in its .dist-info folder. https://pypi.org/project/chaquopy-libffi/3.3/
+    chaquopy-libgfortran 4.9: see LICENSE.txt in its .dist-info folder. https://pypi.org/project/chaquopy-libgfortran/4.9/
+    chaquopy-libjpeg 1.5.3: see LICENSE.md in its .dist-info folder. https://pypi.org/project/chaquopy-libjpeg/1.5.3/
+    chaquopy-openblas 0.2.20: see LICENSE in its .dist-info folder. https://pypi.org/project/chaquopy-openblas/0.2.20/
+    chardet 7.6.0: 0BSD. https://pypi.org/project/chardet/7.6.0/
+    charset-normalizer 3.5.2: MIT. https://pypi.org/project/charset-normalizer/3.5.2/
+    colorlog 6.12.0: MIT License. https://pypi.org/project/colorlog/6.12.0/
+    cpace 0.1.0: Apache-2.0. https://pypi.org/project/cpace/0.1.0/
+    cryptography 42.0.8: Apache-2.0 OR BSD-3-Clause. https://pypi.org/project/cryptography/42.0.8/
+    defusedxml 0.7.1: PSFL. https://pypi.org/project/defusedxml/0.7.1/
+    fake-useragent 2.2.0: Apache-2.0. https://pypi.org/project/fake-useragent/2.2.0/
+    frozenlist 1.8.0: Apache-2.0. https://pypi.org/project/frozenlist/1.8.0/
+    getmac 0.9.5: MIT. https://pypi.org/project/getmac/0.9.5/
+    gql 4.0.0: MIT. https://pypi.org/project/gql/4.0.0/
+    graphql-core 3.2.13: MIT license. https://pypi.org/project/graphql-core/3.2.13/
+    h11 0.16.0: MIT. https://pypi.org/project/h11/0.16.0/
+    hass_client 1.3.1: Apache-2.0. https://pypi.org/project/hass_client/1.3.1/
+    httpcore 1.0.9: BSD-3-Clause. https://pypi.org/project/httpcore/1.0.9/
+    httpx 0.28.1: BSD-3-Clause. https://pypi.org/project/httpx/0.28.1/
+    idna 3.20: BSD-3-Clause. https://pypi.org/project/idna/3.20/
+    ifaddr 0.2.0: MIT. https://pypi.org/project/ifaddr/0.2.0/
+    liblistenbrainz 0.7.0: GNU General Public License v3 (GPLv3). https://pypi.org/project/liblistenbrainz/0.7.0/
+    lyricsgenius 3.12.2: MIT. https://pypi.org/project/lyricsgenius/3.12.2/
+    make-it-sync 2.1.1: MIT. https://pypi.org/project/make-it-sync/2.1.1/
+    markdown-it-py 4.2.0: MIT License. https://pypi.org/project/markdown-it-py/4.2.0/
+    markdownify 1.2.3: MIT License. https://pypi.org/project/markdownify/1.2.3/
+    mashumaro 3.20: Apache-2.0. https://pypi.org/project/mashumaro/3.20/
+    mdurl 0.1.2: MIT License. https://pypi.org/project/mdurl/0.1.2/
+    multidict 6.9.1: Apache License 2.0. https://pypi.org/project/multidict/6.9.1/
+    music_assistant_models 1.1.205: Apache-2.0. https://pypi.org/project/music_assistant_models/1.1.205/
+    mutagen 1.48.1: GPL-2.0-or-later. https://pypi.org/project/mutagen/1.48.1/
+    noiseprotocol 0.3.1: MIT. https://pypi.org/project/noiseprotocol/0.3.1/
+    numpy 1.26.2: BSD License. https://pypi.org/project/numpy/1.26.2/
+    onedrive-personal-sdk 0.1.7: MIT. https://pypi.org/project/onedrive-personal-sdk/0.1.7/
+    orjson 3.11.6+xonos: AGPL-3.0-or-later, written for Xonos. https://github.com/SirioNero/Music-Assistant-on-Gearslip/tree/main/server/wheels
+    pillow 11.0.0: MIT-CMU. https://pypi.org/project/pillow/11.0.0/
+    pkce 1.0.3: MIT. https://pypi.org/project/pkce/1.0.3/
+    PlexAPI 4.18.2: BSD-3-Clause. https://pypi.org/project/PlexAPI/4.18.2/
+    podcastparser 0.6.11: ISC License. https://pypi.org/project/podcastparser/0.6.11/
+    propcache 0.5.4: Apache-2.0. https://pypi.org/project/propcache/0.5.4/
+    py-opensonic 10.4.1: GNU General Public License (GPL). https://pypi.org/project/py-opensonic/10.4.1/
+    pycountry 24.6.1: LGPL-2.1-only. https://pypi.org/project/pycountry/24.6.1/
+    pycparser 3.12: BSD-3-Clause. https://pypi.org/project/pycparser/3.12/
+    pycryptodome 3.21.0: BSD, Public Domain. https://pypi.org/project/pycryptodome/3.21.0/
+    pydantic 1.10.26: MIT. https://pypi.org/project/pydantic/1.10.26/
+    Pygments 2.21.0: BSD-2-Clause. https://pypi.org/project/Pygments/2.21.0/
+    PyJWT 2.15.1: MIT. https://pypi.org/project/PyJWT/2.15.1/
+    pylast 7.0.2: Apache-2.0. https://pypi.org/project/pylast/7.0.2/
+    python-dotenv 1.2.4: BSD-3-Clause. https://pypi.org/project/python-dotenv/1.2.4/
+    python-engineio 4.15.0: MIT. https://pypi.org/project/python-engineio/4.15.0/
+    python-google-drive-api 0.1.0: Apache-2.0. https://pypi.org/project/python-google-drive-api/0.1.0/
+    python-slugify 8.0.4: MIT. https://pypi.org/project/python-slugify/8.0.4/
+    python-socketio 5.17.0: MIT. https://pypi.org/project/python-socketio/5.17.0/
+    python-socks 2.8.2: Apache-2.0. https://pypi.org/project/python-socks/2.8.2/
+    radios 0.3.2: MIT. https://pypi.org/project/radios/0.3.2/
+    requests 2.34.2: Apache-2.0. https://pypi.org/project/requests/2.34.2/
+    rich 15.0.0: MIT. https://pypi.org/project/rich/15.0.0/
+    setuptools 68.2.2: MIT License. https://pypi.org/project/setuptools/68.2.2/
+    shellingham 1.5.4: ISC License. https://pypi.org/project/shellingham/1.5.4/
+    shortuuid 1.0.13: BSD-3-Clause. https://pypi.org/project/shortuuid/1.0.13/
+    simple-websocket 1.1.0: MIT License. https://pypi.org/project/simple-websocket/1.1.0/
+    six 1.17.0: MIT. https://pypi.org/project/six/1.17.0/
+    soundcloudpy 0.1.4: Apache-2.0. https://pypi.org/project/soundcloudpy/0.1.4/
+    soupsieve 3.0.4: MIT. https://pypi.org/project/soupsieve/3.0.4/
+    sxm 0.2.8: MIT license. https://pypi.org/project/sxm/0.2.8/
+    tenacity 9.2.1: Apache-2.0. https://pypi.org/project/tenacity/9.2.1/
+    text-unidecode 1.3: Artistic License. https://pypi.org/project/text-unidecode/1.3/
+    typer 0.27.3: MIT. https://pypi.org/project/typer/0.27.3/
+    typing_extensions 4.16.0: PSF-2.0. https://pypi.org/project/typing_extensions/4.16.0/
+    ua-parser 1.0.2: Apache-2.0. https://pypi.org/project/ua-parser/1.0.2/
+    ua-parser-builtins 202610: Apache 2.0. https://pypi.org/project/ua-parser-builtins/202610/
+    urllib3 2.8.0: MIT. https://pypi.org/project/urllib3/2.8.0/
+    wsproto 1.3.2: MIT. https://pypi.org/project/wsproto/1.3.2/
+    xmltodict 1.0.4: MIT. https://pypi.org/project/xmltodict/1.0.4/
+    yarl 1.25.1: Apache-2.0. https://pypi.org/project/yarl/1.25.1/
+    zeroconf 0.149.16: see COPYING in its .dist-info folder. https://pypi.org/project/zeroconf/0.149.16/
+    zvuk-music 0.6.1: MIT. https://pypi.org/project/zvuk-music/0.6.1/

@@ -66,7 +66,8 @@ class XonosApp : Application(), SingletonImageLoader.Factory {
             if (settings.load().homeUrl == server.url && server.installed &&
                 server.state != State.STARTING && server.state != State.RUNNING
             ) {
-                scope.launch { server.start() }
+                // Appena risponde ci si collega, senza aspettare il prossimo tentativo (che dopo qualche errore tarda).
+                scope.launch { if (server.start()) repo.reconnect() }
             }
         }
         startIfUsed()

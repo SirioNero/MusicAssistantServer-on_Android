@@ -1023,6 +1023,9 @@ class PhoneModel(
     /** Il pacchetto c'era ma per una versione precedente di Xonos: va riscaricato. */
     val phoneServerOutdated: Boolean get() = phoneServer?.outdated == true
 
+    /** Xonos usa il Music Assistant sul telefono e quello sta ancora partendo (all'apertura dell'app ci vuole un po'). */
+    val phoneServerStarting: Boolean get() = onPhoneServer && phoneServer?.state == PhoneServerControl.State.STARTING
+
     /** Il modulo indica il Music Assistant sul telefono. */
     fun usesPhoneServer(page: SettingsPage): Boolean = phoneServer != null && page.home == phoneServer.url
 
@@ -1130,6 +1133,9 @@ class PhoneModel(
         page.phoneServerDownloadError = null
         page.phoneServerError = null
         page.phoneServerProgress = 0L to (page.phoneServerSize ?: -1L)
+        // La prima volta ci si collega da soli; un aggiornamento sposta Xonos (e myCar) sul server del telefono solo
+        // se lo stava già usando: chi usa un altro Music Assistant resta lì.
+        val switchTo = usesPhoneServer(page) || !server.outdated
         downloading?.cancel()
         downloading = scope.launch {
             // Se lo si sta ancora togliendo, prima si finisce.
@@ -1145,7 +1151,7 @@ class PhoneModel(
                 }
                 page.phoneServerInstalled = server.installed
                 page.phoneServerProgress = null
-                usePhoneServer(page)
+                if (switchTo) usePhoneServer(page)
             } catch (e: CancellationException) {
                 page.phoneServerProgress = null
                 throw e
@@ -1246,8 +1252,11 @@ class PhoneModel(
 
     private fun finish(page: SettingsPage) {
         val config = Settings.Config(homeUrl = page.home, remoteUrl = page.remote, token = page.token)
-        // Un altro server: le schermate salvate sono dell'altro.
-        if (config.urls != settings.load().urls) scope.launch(Dispatchers.IO) { cache.clear() }
+        // Un altro server: le schermate salvate sono dell'altro, e anche quelle aperte.
+        if (config.urls != settings.load().urls) {
+            scope.launch(Dispatchers.IO) { cache.clear() }
+            forgetServer(page)
+        }
         settings.save(config)
         repo.reconnect()
         page.results = emptyList()
@@ -1267,6 +1276,28 @@ class PhoneModel(
             } finally {
                 page.checking = false
             }
+        }
+    }
+
+    /**
+     * Un altro Music Assistant: Home, Cerca e Libreria (con quello che c'era sopra) e la cassa di "Suona su" erano del
+     * server di prima. Ogni scheda torna alla sua prima schermata, che si carica dal nuovo; [settings] (da dove si è
+     * cambiato server) resta in cima.
+     */
+    private fun forgetServer(settings: SettingsPage) {
+        remote?.stop()
+        remote = null
+        for ((t, stack) in stacks) {
+            val keep = settings.takeIf { t == tab && it in stack }
+            stack.clear()
+            stack.add(
+                when (t) {
+                    Tab.HOME -> HomePage()
+                    Tab.SEARCH -> SearchPage()
+                    Tab.LIBRARY -> LibraryPage()
+                },
+            )
+            keep?.let { stack.add(it) }
         }
     }
 

@@ -101,9 +101,12 @@ internal fun ConnectionBanner(model: PhoneModel, host: Host) {
     val connection by model.connection.collectAsState()
     // Il server sul telefono parte solo con il pacchetto della versione di Xonos: finché non lo si scarica, niente.
     val serverOld = connection !is Connection.Connected && model.onPhoneServer && model.phoneServerOutdated
+    // Mentre il server sul telefono parte la connessione non riesce: non è un errore di rete, è l'avvio.
+    val starting = connection !is Connection.Connected && !serverOld && model.phoneServerStarting
     val text = when {
         serverOld -> stringResource(R.string.phone_server_outdated)
         connection is Connection.Connected -> return
+        starting -> stringResource(R.string.phone_server_starting)
         connection is Connection.Connecting -> stringResource(R.string.connecting)
         else -> host.describe(connection) ?: return
     }
@@ -114,7 +117,7 @@ internal fun ConnectionBanner(model: PhoneModel, host: Host) {
     ) {
         Column(Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                if (connection is Connection.Connecting && !serverOld) {
+                if ((connection is Connection.Connecting || starting) && !serverOld) {
                     CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
                 } else {
                     Icon(XIcons.Offline, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.error)

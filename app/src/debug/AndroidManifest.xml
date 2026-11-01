@@ -6,5 +6,9 @@
         <activity
             android:name=".ServerCheckActivity"
             android:exported="true" />
+        <!-- Solo nella build di prova: esegue un comando dentro Xonos (prova di Soloist con proot). -->
+        <activity
+            android:name=".ExecCheckActivity"
+            android:exported="true" />
     </application>
 </manifest>

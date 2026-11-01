@@ -103,6 +103,14 @@ baselineProfile {
     mergeIntoMain = true
 }
 
+// Nella build di prova le librerie si estraggono su disco: la prova di Soloist mette proot in jniLibs, e da
+// Android 10 un'app può avviare un programma solo dalla cartella delle sue librerie. La release non cambia.
+androidComponents {
+    onVariants(selector().withBuildType("debug")) { variant ->
+        variant.packaging.jniLibs.useLegacyPackaging.set(true)
+    }
+}
+
 dependencies {
     baselineProfile(project(":baselineprofile"))
     // Installa il Baseline Profile anche quando l'APK non arriva dal Play Store (Obtainium).

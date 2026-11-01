@@ -35,7 +35,7 @@ jobs:
 
       - name: Soloist, il sistema Linux di prova e proot
         run: |
-          sudo apt-get install -y -q patchelf > /dev/null
+          sudo apt-get install -y -q patchelf busybox-static > /dev/null
           bash tools/soloist/prepare.sh
 
       - name: Compila la build di prova
@@ -68,4 +68,6 @@ jobs:
           for f in "$OUT"/runner.txt "$OUT"/emulator.txt; do
             [ -f "$f" ] || continue
             { echo "### $(basename "$f")"; echo '```'; cat "$f"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            # Anche nel log del passo: si legge con le API, il riassunto della pagina no.
+            echo "===== $(basename "$f")"; cat "$f"
           done

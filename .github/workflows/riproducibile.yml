@@ -26,8 +26,9 @@ jobs:
       - name: Prepara come il buildserver di F-Droid
         run: |
           apt-get update -q
-          # make per proot (app/native/proot.sh): nella ricetta va nel campo sudo (apt-get install -y make).
-          apt-get install -qy --no-install-recommends openjdk-21-jdk-headless git curl unzip python3 make
+          # make e gawk per proot (app/native/proot.sh; uno script awk del suo GNUmakefile usa strtonum, che mawk
+          # di Debian non ha): nella ricetta vanno nel campo sudo (apt-get install -y make gawk).
+          apt-get install -qy --no-install-recommends openjdk-21-jdk-headless git curl unzip python3 make gawk
           update-alternatives --set java /usr/lib/jvm/java-21-openjdk-amd64/bin/java
           java -version
 

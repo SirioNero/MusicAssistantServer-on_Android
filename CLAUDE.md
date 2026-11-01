@@ -486,10 +486,16 @@ di Xonos suona dal server sul telefono; la release ridotta con R8, da capo come 
     la cartella dei dati), alla fine `_end_guests` dà SIGKILL ai gruppi rimasti; tutti e due lo scrivono nel
     registro. Provato in locale con un finto proot in C che ignora gli stessi segnali: com'era SIGINT al solo proot
     lascia acceso il programma; con la correzione SIGINT, terminate e SIGKILL fermano tutto il gruppo, la pulizia
-    toglie i rimasti.
+    toglie i rimasti. In CI (Server MA, emulatore x86_64, proot e Soloist veri): `proot-ignora-sigint` (SIGINT al
+    solo proot, Soloist resta acceso: il guasto del telefono), `soloist-ferma` (AsyncProcess.close() con il lettore
+    di iter_stdout, come in un brano: fermo in 0,0 s, codice 0, nessun processo rimasto), `pulseaudio-ferma`
+    (nessuno rimasto dopo release()); `cpu-audio`, 10 s di rumore con pacat letti dal tubo a 1,1 volte il tempo
+    reale: PulseAudio 1%, proot 1%, pacat 0% (3,87 MB letti su 3,53 MB del tempo reale).
   - **Il processore nel registro**: ogni minuto (`CPU_EVERY_S`), finché gira un programma Linux, una riga
     "Processore dei programmi Linux negli ultimi 60 s: soloist N%, proot N%, pulseaudio N%" (100% = un core, i nomi
     dall'argv[0] di /proc; gli zombie non contano), così dal registro di una persona si vede quanto pesa proot.
+    In CI la riga non compare (le prove con i programmi Linux durano 21 s, prima del primo minuto): provata in
+    locale; `_processes` e `SC_CLK_TCK` sull'emulatore li usa anche `cpu-audio`.
   - **prepare.py** (`_soloist`): `_resolve_architecture` accetta Android quando c'è XONOS_PROOT; il flusso di Spotify
     mostra la scelta del motore solo allora (sennò librespot); `PAVolumeController` comanda PulseAudio con `pactl`
     (stessa interfaccia: load/unload-module, set-sink-volume) perché la libpulse del sistema Linux è di glibc e il
@@ -501,9 +507,9 @@ di Xonos suona dal server sul telefono; la release ridotta con R8, da capo come 
     build di prova: comandi dentro il processo di Xonos) con proot dal sorgente: glibc, `soloist --version`, PulseAudio
     in 0,1 s, pipe sink, audio nel tubo, Soloist acceso con una chiave finta fino a "waiting for login — connect to
     … from your Spotify app", nessun SIGSYS; la rete da dentro proot (DNS, http verso Spotify). "Server MA" con
-    `xonos_selftest.py` (parte se c'è `<dati>/xonos-selftest`, aspetta `xonos-selftest-go`; 7 prove, tutte
-    passate; dal 2.10.8-5 anche `proot-ignora-sigint`, `soloist-ferma` con AsyncProcess come in un brano,
-    `cpu-audio` con 10 s di audio a tempo reale e `pulseaudio-ferma`): Music Assistant scarica Soloist e lo prova, PulseAudio e pipe sink col suo codice, audio nel tubo,
+    `xonos_selftest.py` (parte se c'è `<dati>/xonos-selftest`, aspetta `xonos-selftest-go`; dal 2.10.8-5 11 prove,
+    tutte passate: anche `proot-ignora-sigint`, `soloist-ferma` con AsyncProcess come in un brano, `cpu-audio` con
+    10 s di audio a tempo reale e `pulseaudio-ferma`): Music Assistant scarica Soloist e lo prova, PulseAudio e pipe sink col suo codice, audio nel tubo,
     Soloist acceso, e lo si cerca come l'app Spotify: risponde all'mDNS (`_spotify-connect._tcp.local`: PTR, SRV con
     la porta, TXT `CPath=/zc`, A con gli indirizzi del telefono, in multicast al gruppo, non con risposte dirette) e
     la sua pagina getInfo risponde su 127.0.0.1 e sull'indirizzo di rete. `tools/soloist/ifaddrs-test.c`: dentro

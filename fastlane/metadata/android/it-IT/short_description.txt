@@ -1,1 +1,1 @@
-Music Assistant in auto con Gearslip, e un lettore musicale sul telefono
+Un server Music Assistant sul telefono, per l'auto con Gearslip e myCar

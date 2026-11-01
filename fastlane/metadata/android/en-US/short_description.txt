@@ -1,1 +1,1 @@
-Music Assistant in your car through Gearslip, and a music player on your phone
+A Music Assistant server on your phone, for the car with Gearslip and myCar

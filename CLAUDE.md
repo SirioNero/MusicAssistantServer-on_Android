@@ -1,9 +1,14 @@
 # Xonos: appunti per chi ci lavora
 
-Xonos è un'app Android che fa del telefono un lettore privato di Music Assistant (MA) e porta la
-libreria nel lettore di Gearslip (alternativa ad Android Auto), anche in vista doppia con le mappe.
-La musica esce dal telefono, quindi dall'auto via Bluetooth: mai dalle casse di casa. Serve anche ad
-aggirare Spotify, che a Gearslip non mostra la libreria: Spotify si aggiunge come servizio in MA.
+Xonos è un'app Android che fa girare un server Music Assistant (MA) sul telefono, un aggregatore di
+servizi (Spotify, SoundCloud, Plex, Jellyfin, podcast, radio, i file del telefono), e porta la musica nel
+lettore di Gearslip (alternativa ad Android Auto) e di myCar, anche in vista doppia con le mappe; si collega
+anche a un MA di casa, come lettore privato. Non chiede un account Google né i servizi Google Play: va sui
+telefoni senza Google (l'utente usa GrapheneOS). La musica esce dal telefono, quindi dall'auto via Bluetooth:
+mai dalle casse di casa. Serve anche ad aggirare Spotify, che a Gearslip non mostra la libreria: Spotify si
+aggiunge come servizio in MA. Dal 1° novembre 2026 la presentazione (README, About di GitHub, testi per
+F-Droid) mette al centro il server sul telefono, i servizi in un'unica libreria e l'assenza di Google: scelta
+dell'utente, che ha rinominato il repository di conseguenza.
 
 L'utente (SirioNero) parla italiano e prova l'app sul telefono con Obtainium. Leggi tutto questo file
 prima di cominciare: le cose scritte qui sono già state verificate, non vanno riscoperte.

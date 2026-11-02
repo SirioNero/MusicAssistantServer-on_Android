@@ -449,9 +449,8 @@ class MaPlayer(
         if (choosing > 0) {
             // Dall'auto arrivano insieme la scelta e "play": il play_media della scelta fa già partire la musica, e
             // un player_queues/play adesso (la coda non è in pausa) la farebbe ripartire da capo (Soloist: 7 s).
+            // (La stessa voce toccata di nuovo dopo una pausa qui aspetta la scelta di prima: il suo play toglie la pausa.)
             pauseAfterChoice = !playWhenReady
-            // Dopo una pausa voluta la stessa voce toccata di nuovo deve suonare: non si aspetta la scelta di prima.
-            if (!playWhenReady) lastChoice = null
             return Futures.immediateVoidFuture()
         }
         if (!playWhenReady) {

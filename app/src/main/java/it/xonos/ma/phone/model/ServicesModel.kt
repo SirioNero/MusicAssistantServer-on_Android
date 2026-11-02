@@ -109,7 +109,11 @@ class ServicesModel internal constructor(
     private fun show(page: FlowPage, step: FlowStep) {
         val previous = page.step.value
         previous?.flowId?.takeIf { it != step.flowId }?.let(flows::remove)
-        if (previous != null && (previous.stepId != step.stepId || previous.type != step.type)) page.advanced = true
+        // Un passo cambiato conta come fatto dalla persona, tranne l'uscita da un'attesa (progress): quella la fa il
+        // server da solo, per esempio la ricerca dei server di Plex prima del primo modulo.
+        if (previous != null && previous.type != "progress" && (previous.stepId != step.stepId || previous.type != step.type)) {
+            page.advanced = true
+        }
         // Finito mentre si chiedeva se lasciarlo: non c'è più niente da perdere, la domanda si chiude.
         if (step.done) page.confirmLeave = false
         if (step.done) flows.remove(step.flowId) else flows[step.flowId] = page

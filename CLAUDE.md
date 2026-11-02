@@ -722,7 +722,8 @@ Da una caccia ai bug con più agenti (8 aree, un giudice avversario per area) e 
     I testi di Soloist che Music Assistant non traduce in italiano (35) sono in `server/ma/ma-strings.json`: `_texts`
     li unisce solo per voci che Music Assistant ha in inglese (sennò si ferma).
     Indietro o "Annulla" in un flusso andato oltre il primo passo prima chiede conferma (`FlowPage.confirmLeave`,
-    `ServicesModel.asksBeforeLeaving`; un secondo indietro lo lascia): con Spotify buttava Client ID e accessi. Se
+    `ServicesModel.asksBeforeLeaving`; mentre si chiede indietro chiude solo la domanda, si esce con Interrompi; l'uscita
+    da un passo progress non conta, la fa il server): con Spotify buttava Client ID e accessi. Se
     il flusso finisce mentre si chiede, la domanda si chiude e "Interrompi" esce come dalla fine (`close`).
     `ServicesCheckKt`, scena `flow-leave` di `tools/screens`.
   - Correzioni alle correzioni: tornando al server salvato in `choose` tornano token e accesso; avvisi sopra il
@@ -734,7 +735,8 @@ Da una caccia ai bug con più agenti (8 aree, un giudice avversario per area) e 
   (`Menu.PART`) un elenco diventa cartelle `part|<k>|<cartella>` ("1–150"...), con voci dagli stessi id dell'elenco
   intero (`LongListCheckKt`: 2880 brani, 20 cartelle). La ricerca chiede sempre di nuovo (`fresh`). La stessa voce
   toccata di nuovo mentre parte non manda un secondo play_media (`lastChoice`: aspetta il primo; per le ricerche a
-  voce conta la frase, perché l'id è vuoto; uno stop o una pausa voluti lo azzerano). Nel lettore:
+  voce conta la frase, perché l'id è vuoto; uno stop lo azzera, una pausa no: il play del nuovo tocco la toglie).
+  Nel lettore:
   indietro con un salto in corso passa da `skip`; pausa durante un salto → stop dopo il salto (`pauseAfterSkip`);
   `pauseFromSystem`/`resumeFromSystem` come pausa e play della persona; pausa o stop voluti tolgono la ripresa
   automatica; pausa non arrivata per la rete → `onPauseLost` → `engine.silence()` (torna su solo con un play

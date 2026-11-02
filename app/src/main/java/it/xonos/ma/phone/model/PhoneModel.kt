@@ -154,8 +154,9 @@ class PhoneModel(
         val top = stack.last()
         when {
             playerOpen -> playerOpen = false
-            // Un flusso a metà: prima si chiede (un secondo indietro lo lascia)
-            stack.size > 1 && top is FlowPage && !top.confirmLeave && services.asksBeforeLeaving(top) -> top.confirmLeave = true
+            // Un flusso a metà: prima si chiede. Mentre si chiede, indietro chiude la domanda (lo fa la finestra del
+            // dialogo, come Continua): si esce solo con Interrompi.
+            stack.size > 1 && top is FlowPage && services.asksBeforeLeaving(top) -> top.confirmLeave = true
             stack.size > 1 -> removed(stack.removeAt(stack.lastIndex))
             tab != Tab.HOME -> tab = Tab.HOME
             else -> return false

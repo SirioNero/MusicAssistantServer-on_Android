@@ -571,17 +571,25 @@ di Xonos suona dal server sul telefono; la release ridotta con R8, da capo come 
     è avanti di quanto letto a 1,1x, e la sua posizione vecchia confermava subito un seek non fatto, così usciva un
     pezzo dal punto sbagliato; se in pausa non dice la posizione, dopo 0,3 s riprende e rifà il seek come prima. Un
     cambio annullato a metà spegne Soloist (prima restava acceso senza timer, o occupato); dopo due cambi falliti
-    di fila si riprova passati 15 minuti (`_XONOS_RETRY_S`; prima mai più); attesa del brano 8 s invece di 5
-    (`_XONOS_SWITCH_S`: ripartire da capo costa di più); `_VERIFY_CACHE_SECONDS` di runtime.py da 60 s a 6 ore (il
-    `soloist --version` in proot a ogni fine brano). `_phone_chain`: il buffer di Music Assistant tiene già PCM 16 bit
-    48 kHz stereo (la sessione Sendspin di Xonos e myCar, che annunciano solo 48 kHz), così `AudioBuffer.get_stream`
-    non avvia un secondo ffmpeg a ogni brano (con un filtro sì, come prima). Nel registro: «Xonos tempi: play_index
-    N ricevuto», «brano pronto in N s», «primo audio al lettore N s dopo l'inizio del flusso, da suonare fra N ms»,
-    «il lettore suona N s dopo play_index»; di Soloist «parte da capo (controllo del programma N s)», «in pausa e
-    acceso in N s», «salto sulla sessione accesa in N s (pausa di prima, tubo, comando, il brano suona, posizione,
-    sink)», «dal sink ripartito, primo audio in N s e primo secondo intero in N s (silenzio tolto)», «la sessione accesa
-    non si riusa (perché)», «brano finito, N s di audio in N s (rapporto)» (se è sotto 1,1x Soloist non tiene il
-    passo). Scartate dopo la verifica: soglia del buffer sotto 1 s (il pezzo da 1 s è il minimo di Music Assistant),
+    di fila si riprova passati 15 minuti, e l'attesa raddoppia a ogni nuovo tentativo fallito fino a 16 ore
+    (`_XONOS_RETRY_S`, `_xonos_retry_after`; prima mai più); tutto il cambio ha 5 s (`_JUMP_TIMEOUT_S`, così se non va
+    resta il tempo di ripartire da capo nei 15 s che Music Assistant dà al buffer), 8 s (`_XONOS_SWITCH_S`) solo se
+    Soloist ha già detto il brano chiesto, cioè lo sta caricando; il drain non si ferma se i dati del tubo e il timeout
+    arrivano nello stesso giro del loop (restavano 64 KB del brano di prima); `_VERIFY_CACHE_SECONDS` di runtime.py da
+    60 s a 6 ore (il `soloist --version` in proot a ogni fine brano), con la scadenza della build guardata lo stesso
+    (`_installed_expired`). `_phone_chain`: senza filtri dopo il buffer (normalizzazione spenta o del servizio, come
+    Spotify, niente dissolvenza) il buffer di Music Assistant tiene già PCM 16 bit 48 kHz stereo (la sessione Sendspin
+    di Xonos e myCar, che annunciano solo 48 kHz), così `AudioBuffer.get_stream` non avvia un secondo ffmpeg a ogni
+    brano; con un filtro il buffer resta come prima (un guadagno su audio già a 16 bit lo riquantizzerebbe senza
+    dither). Nel registro: «Xonos tempi: play_index N ricevuto», «next (previous) ricevuto, play_index N fra 1 s», «X
+    ha aspettato N s un'altra azione sul lettore», «brano pronto in N s», «comando al lettore dato N s dopo play_index
+    (non è ancora audio)», «primo audio al lettore N s dopo l'inizio del flusso, da suonare fra N ms»; di Soloist
+    «parte da capo (controllo del programma N s)», «in pausa e acceso in N s», «salto sulla sessione accesa in N s
+    (pausa di prima, tubo, comando, il brano suona, posizione, sink)», «dal sink ripartito, primo audio in N s e primo
+    secondo intero in N s (silenzio tolto)», «la sessione accesa non si riusa (perché)», «brano finito, N s di audio in
+    N s dal sink ripartito (rapporto)» (sotto 1,1x Soloist non tiene il passo). Una revisione avversaria (4 angoli, un
+    verificatore per problema) ha trovato i guasti corretti qui sopra; nel finto Soloist il resto della pausa ora entra
+    davvero nel tubo (lascia posto, `FIONREAD`) e arriva 0,2 s prima della conferma. Scartate dopo la verifica: soglia del buffer sotto 1 s (il pezzo da 1 s è il minimo di Music Assistant),
     `PULSE_LATENCY_MSEC` (taglia la fine dei brani), margine Sendspin più corto (il server butta i pacchetti in
     ritardo), Soloist tenuto acceso a fine brano o la coda di Spotify Connect (con `--single-track` esce comunque).
     Da decidere col registro: mandare subito il primo tocco (−0,4 s, ma un doppio tocco costa un cambio in più),

@@ -428,6 +428,7 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
     a, b, c, d, e, f, g, h, i = (f"spotify:track:xonos{x}" for x in "abcdefghi")
     first_a = first_b = first_r = first_g = first_h = first_i = -1.0
     real_switch = solo._XONOS_SWITCH_S
+    real_jump = solo._JUMP_TIMEOUT_S
     real_retry = solo._XONOS_RETRY_S
     try:
         os.environ["XONOS_FAKE_LEAK"] = "1"
@@ -440,6 +441,9 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
         check("salto sullo stesso processo", backend._run is run and alive(run))
         check("solo audio del brano saltato", values == {mark(b)}, values)
         check("salto dall'inizio del brano", early == {0}, early)
+        # il resto della pausa è entrato nel tubo (sennò le prove "solo audio del brano..." non dicono niente)
+        rests = [r for r in records if "finto soloist: resto " in r]
+        check("resto della pausa nel tubo", any(not r.endswith(" 0") for r in rests), rests)
         # Soloist in pausa è oltre i 3 s (letti, più il tubo e il resto della pausa): la ripresa a 1 s deve partire
         # da lì, non dal punto in cui Soloist si era fermato
         solo._XONOS_PARK_S = 1.0
@@ -473,6 +477,7 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
         # un Soloist che non accetta salti: dopo l'attesa si riparte da capo, e il fallimento si conta
         os.environ["XONOS_FAKE_NO_JUMP"] = "1"
         solo._XONOS_SWITCH_S = 2.0
+        solo._JUMP_TIMEOUT_S = 2.0
         await take(f, "f", seconds=1.0)
         run_f = backend._run
         first_g, values, _ = await take(g, "g", seconds=1.0)
@@ -493,8 +498,11 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
         first_i, values, _ = await take(i, "i", seconds=1.0)
         check(
             "salto riprovato dopo un po'",
-            values == {mark(i)} and first_i >= 2.0 and backend._xonos_failures["salto"] == 2,
-            (first_i, backend._xonos_failures),
+            values == {mark(i)}
+            and first_i >= 2.0
+            and backend._xonos_failures["salto"] == 2
+            and backend._xonos_retries["salto"] == 1,
+            (first_i, backend._xonos_failures, backend._xonos_retries),
         )
     except Exception as err:  # noqa: BLE001 - nel risultato, con le ultime righe del motore
         failed.append(repr(err))
@@ -505,6 +513,7 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
         solo.SoloistBinaryManager = real_manager
         solo._XONOS_PARK_S = real_park
         solo._XONOS_SWITCH_S = real_switch
+        solo._JUMP_TIMEOUT_S = real_jump
         solo._XONOS_RETRY_S = real_retry
         backend._xonos_cancel_park()
         async with backend._run_lock:

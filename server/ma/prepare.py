@@ -539,8 +539,12 @@ def _spotify(root: Path) -> None:
         '                    await session.form([], step_id="xonos_finish_retry", errors=xonos_errors, last_step=True)\n'
         "                    if xonos_reauth:\n"
         "                        # Il tentativo di prima ha già rinnovato (e invalidato) il token: un accesso nuovo nel\n"
-        "                        # browser, l'abbinamento resta\n"
-        '                        token_result = await _pkce_authenticate(session, client_id, step_id="authenticate")\n'
+        "                        # browser, l'abbinamento resta. Se non riesce (tempo scaduto, rete) si torna al riprova\n"
+        "                        try:\n"
+        '                            token_result = await _pkce_authenticate(session, client_id, step_id="authenticate")\n'
+        "                        except (SetupFlowError, StepExpiredError, OSError, TimeoutError) as err:\n"
+        '                            xonos_errors = {"base": getattr(err, "translation_key", None) or str(err) or "timed_out"}\n'
+        "                            continue\n"
         '                        setup_data[CONF_REFRESH_TOKEN_GLOBAL] = str(token_result["refresh_token"])\n'
         "                # Mentre Music Assistant avvia Spotify (Soloist, PulseAudio, l'accesso) lo schermo lo dice\n"
         '                session.progress("xonos_finishing", text="xonos_finishing")\n'

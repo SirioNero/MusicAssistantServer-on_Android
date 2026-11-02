@@ -138,6 +138,7 @@ def main() -> None:
 
 # I testi dei passi che Xonos aggiunge ai servizi, nelle lingue di Xonos (vedi _texts).
 STRINGS = Path(__file__).with_name("strings.json")
+MA_STRINGS = Path(__file__).with_name("ma-strings.json")
 
 
 def _fingerprint(version: str) -> str:
@@ -869,6 +870,18 @@ def _texts(root: Path) -> None:
         path = root / "translations" / f"{locale}.json"
         if not path.is_file():
             sys.exit(f"{path}: Music Assistant non ha questa lingua")
+        translations = json.loads(path.read_text(encoding="utf-8"))
+        translations.update(strings)
+        path.write_text(json.dumps(translations, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    # I testi di Music Assistant stesso che lui non traduce in una lingua di Xonos (ma-strings.json: per ora i passi di
+    # Soloist in italiano). Solo voci che Music Assistant ha in inglese: un nome sbagliato ferma tutto.
+    english = json.loads((root / "translations" / "en.json").read_text(encoding="utf-8"))
+    extra = json.loads(MA_STRINGS.read_text(encoding="utf-8"))
+    for locale, strings in extra.items():
+        unknown = sorted(key for key in strings if key not in english)
+        if unknown:
+            sys.exit(f"{MA_STRINGS}: {locale}: voci che Music Assistant non ha: {', '.join(unknown[:3])}")
+        path = root / "translations" / f"{locale}.json"
         translations = json.loads(path.read_text(encoding="utf-8"))
         translations.update(strings)
         path.write_text(json.dumps(translations, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

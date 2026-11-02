@@ -104,7 +104,7 @@ internal fun ConnectionBanner(model: PhoneModel, host: Host) {
     // Il server sul telefono parte solo con il pacchetto della versione di Xonos: finché non lo si scarica, niente.
     val serverOld = connection !is Connection.Connected && model.onPhoneServer && model.phoneServerOutdated
     // Mentre il server sul telefono parte la connessione non riesce: non è un errore di rete, è l'avvio.
-    val starting = connection !is Connection.Connected && !serverOld && model.phoneServerStarting
+    val starting = connection !is Connection.Connected && !serverOld && (model.phoneServerStarting || model.phoneServerRetrying)
     // Non è partito, o si è fermato: il perché (non solo "non raggiungibile"), con il tasto per riprovare.
     val failure = if (connection !is Connection.Connected && !serverOld && !starting) model.phoneServerFailure else null
     val text = when {

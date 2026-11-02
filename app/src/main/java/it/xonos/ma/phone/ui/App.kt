@@ -142,7 +142,7 @@ fun XonosScreen(model: PhoneModel, player: PlayerLink, host: Host) {
             }
             // Con il lettore a schermo intero aperto gli avvisi (anche "perché non suona") gli vanno sopra: quelli dello
             // Scaffold resterebbero sotto, nascosti.
-            if (model.playerOpen) {
+            if (model.playerOpen && nowPlaying != null) {
                 Box(Modifier.fillMaxSize().navigationBarsPadding(), contentAlignment = Alignment.BottomCenter) {
                     SnackbarHost(snackbar)
                 }

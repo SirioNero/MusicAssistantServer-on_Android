@@ -358,6 +358,8 @@ fun main(): Unit = runBlocking {
     val same = model.settingsPage()
     model.choose(same, FoundServer("stesso", "Stesso", "2.10.8", "$savedUrl/", null))
     check("Server trovato: lo stesso tiene il token", same.token == settings.load().token && same.token.isNotEmpty())
+    model.choose(chooser, FoundServer("stesso", "Stesso", "2.10.8", savedUrl, null))
+    check("Server trovato: tornando a quello salvato il token torna", chooser.token == settings.load().token && chooser.home == savedUrl)
 
     // ---------- Accesso con nome utente e password ----------
     val login = model.settingsPage()

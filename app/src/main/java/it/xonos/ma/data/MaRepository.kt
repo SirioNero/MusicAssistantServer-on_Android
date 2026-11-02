@@ -78,6 +78,9 @@ class MaRepository(private val settings: Settings) {
             loop = null
             client?.close()
             client = null
+            // Non più "collegato": chi segue la connessione (la cassa di "Suona su") deve vedere il prossimo
+            // collegamento come nuovo. Con lo stesso Connected di prima lo StateFlow non direbbe niente.
+            _connection.value = Connection.Connecting("")
         }
     }
 

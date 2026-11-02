@@ -196,7 +196,12 @@ class PhoneModel(
             page.useToken = false
             page.remote = server.remoteUrl.orEmpty()
         } else {
-            server.remoteUrl?.let { page.remote = it }
+            // Il server salvato (anche dopo averne toccato un altro): tornano il suo token e il suo accesso.
+            val config = settings.load()
+            page.token = config.token
+            page.signedIn = settings.username
+            page.useToken = config.token.isNotBlank() && settings.username == null
+            page.remote = server.remoteUrl ?: config.remoteUrl
         }
         page.home = server.url
         page.setupNeeded = false
@@ -1056,10 +1061,22 @@ class PhoneModel(
         get() = phoneServer?.takeIf { onPhoneServer && it.state == PhoneServerControl.State.FAILED }
             ?.let { it.error.ifBlank { it.state.name } }
 
+    /** Mentre "Riprova" fa ripartire il server sul telefono: la Home mostra subito la rotella, e un altro tocco non conta. */
+    var phoneServerRetrying by mutableStateOf(false)
+        private set
+
     /** "Riprova" quando il server sul telefono non è partito (dopo qualche tentativo Xonos smette da solo). */
     fun retryPhoneServer() {
         val server = phoneServer ?: return
-        scope.launch { if (server.start()) repo.reconnect() }
+        if (phoneServerRetrying) return
+        phoneServerRetrying = true
+        scope.launch {
+            try {
+                if (server.start() && repo.connection.value !is Connection.Connected) repo.reconnect()
+            } finally {
+                phoneServerRetrying = false
+            }
+        }
     }
 
     /** Il modulo indica il Music Assistant sul telefono. */
@@ -1297,8 +1314,9 @@ class PhoneModel(
 
     private fun finish(page: SettingsPage) {
         val config = Settings.Config(homeUrl = page.home, remoteUrl = page.remote, token = page.token)
-        // Un altro server: le schermate salvate sono dell'altro, e anche quelle aperte.
-        if (config.urls != settings.load().urls) {
+        // Un altro server: le schermate salvate sono dell'altro, e anche quelle aperte. Non se cambia solo l'indirizzo
+        // da fuori casa dello stesso server (si perdevano le schede aperte e "Suona su").
+        if (Settings.normalizeUrl(config.homeUrl) != Settings.normalizeUrl(settings.load().homeUrl)) {
             scope.launch(Dispatchers.IO) { cache.clear() }
             forgetServer(page)
             // Lasciato il Music Assistant sul telefono, non serve più che giri (processore e batteria): lo si
@@ -1341,7 +1359,7 @@ class PhoneModel(
         picker = null
         playlistPicker = null
         for ((t, stack) in stacks) {
-            val keep = settings.takeIf { t == tab && it in stack }
+            val keep = settings.takeIf { it in stack }
             stack.clear()
             stack.add(
                 when (t) {

@@ -15,7 +15,9 @@
     "provider.spotify.errors.xonos_playlist_not_yours": "Spotify gives your own app only the songs of your playlists, not of the ones you follow or of Spotify's own (such as Daily Mix). In Spotify, copy the songs into a playlist of yours and play that one.",
     "common.errors.xonos_service_down": "There is nothing to play here: {0} isn't working right now. Music Assistant services say why.",
     "provider.spotify.setup_flow.xonos_finish_retry.title": "Spotify didn't start",
-    "provider.spotify.setup_flow.xonos_finish_retry.description": "Music Assistant couldn't start Spotify with these settings, for example because the network dropped for a moment. Your sign-in and pairing are kept: press Finish to try again."
+    "provider.spotify.setup_flow.xonos_finish_retry.description": "Music Assistant couldn't start Spotify with these settings, for example because the network dropped for a moment. Your sign-in and pairing are kept: press Finish to try again.",
+    "provider.spotify.setup_flow.xonos_soloist_blocked.title": "Soloist can't run on this phone",
+    "provider.spotify.setup_flow.xonos_soloist_blocked.description": "Soloist, Spotify's official engine, works with every Premium account, but Android doesn't let Xonos run it. On GrapheneOS: in Xonos's app info allow native code debugging, then Force stop Xonos and open it again.\n\nFor now Spotify uses librespot, which mostly works only with accounts created before December 2024."
   },
   "it": {
     "provider.spotify.setup_flow.xonos_client_id.title": "Il Client ID della tua app Spotify",
@@ -33,7 +35,9 @@
     "provider.spotify.errors.xonos_playlist_not_yours": "Spotify dà alla tua app solo i brani delle tue playlist, non quelli delle playlist che segui né di quelle di Spotify (come Daily Mix). In Spotify copia i brani in una tua playlist e suona quella.",
     "common.errors.xonos_service_down": "Qui non c'è niente da suonare: {0} in questo momento non funziona. Nei Servizi di Music Assistant c'è il perché.",
     "provider.spotify.setup_flow.xonos_finish_retry.title": "Spotify non è partito",
-    "provider.spotify.setup_flow.xonos_finish_retry.description": "Music Assistant non è riuscito ad avviare Spotify con queste impostazioni, per esempio perché la rete è mancata un attimo. Accesso e abbinamento restano: tocca Fine per riprovare."
+    "provider.spotify.setup_flow.xonos_finish_retry.description": "Music Assistant non è riuscito ad avviare Spotify con queste impostazioni, per esempio perché la rete è mancata un attimo. Accesso e abbinamento restano: tocca Fine per riprovare.",
+    "provider.spotify.setup_flow.xonos_soloist_blocked.title": "Soloist non può girare su questo telefono",
+    "provider.spotify.setup_flow.xonos_soloist_blocked.description": "Soloist, il motore ufficiale di Spotify, va con tutti gli account Premium, ma Android non lascia a Xonos farlo girare. Su GrapheneOS: nelle informazioni dell'app Xonos permetti il debug del codice nativo, poi tocca Forza interruzione e riapri Xonos.\n\nPer ora Spotify usa librespot, che di solito va solo con gli account creati prima di dicembre 2024."
   },
   "es": {
     "provider.spotify.setup_flow.xonos_client_id.title": "El Client ID de tu app de Spotify",
@@ -51,7 +55,9 @@
     "provider.spotify.errors.xonos_playlist_not_yours": "Spotify solo le da a tu app las canciones de tus playlists, no las de las que sigues ni las del propio Spotify (como Daily Mix). En Spotify, copia las canciones a una playlist tuya y reproduce esa.",
     "common.errors.xonos_service_down": "Aquí no hay nada que reproducir: {0} no funciona ahora mismo. En Servicios de Music Assistant se ve por qué.",
     "provider.spotify.setup_flow.xonos_finish_retry.title": "Spotify no se ha iniciado",
-    "provider.spotify.setup_flow.xonos_finish_retry.description": "Music Assistant no ha podido iniciar Spotify con estos ajustes, por ejemplo porque la red se cortó un momento. El acceso y la vinculación se conservan: pulsa Terminar para volver a intentarlo."
+    "provider.spotify.setup_flow.xonos_finish_retry.description": "Music Assistant no ha podido iniciar Spotify con estos ajustes, por ejemplo porque la red se cortó un momento. El acceso y la vinculación se conservan: pulsa Terminar para volver a intentarlo.",
+    "provider.spotify.setup_flow.xonos_soloist_blocked.title": "Soloist no puede funcionar en este teléfono",
+    "provider.spotify.setup_flow.xonos_soloist_blocked.description": "Soloist, el motor oficial de Spotify, funciona con todas las cuentas Premium, pero Android no deja que Xonos lo ejecute. En GrapheneOS: en la información de la app Xonos permite la depuración de código nativo, luego pulsa Forzar detención y vuelve a abrir Xonos.\n\nPor ahora Spotify usa librespot, que normalmente solo funciona con cuentas creadas antes de diciembre de 2024."
   },
   "de": {
     "provider.spotify.setup_flow.xonos_client_id.title": "Die Client ID deiner Spotify-App",
@@ -69,7 +75,9 @@
     "provider.spotify.errors.xonos_playlist_not_yours": "Spotify gibt deiner eigenen App nur die Titel deiner Playlists, nicht die der Playlists, denen du folgst, oder die von Spotify selbst (wie Daily Mix). Kopiere die Titel in Spotify in eine eigene Playlist und spiele diese ab.",
     "common.errors.xonos_service_down": "Hier gibt es nichts abzuspielen: {0} funktioniert gerade nicht. Unter Music-Assistant-Dienste steht, warum.",
     "provider.spotify.setup_flow.xonos_finish_retry.title": "Spotify ist nicht gestartet",
-    "provider.spotify.setup_flow.xonos_finish_retry.description": "Music Assistant konnte Spotify mit diesen Einstellungen nicht starten, zum Beispiel weil das Netzwerk kurz weg war. Anmeldung und Kopplung bleiben erhalten: Tippe auf Fertigstellen, um es erneut zu versuchen."
+    "provider.spotify.setup_flow.xonos_finish_retry.description": "Music Assistant konnte Spotify mit diesen Einstellungen nicht starten, zum Beispiel weil das Netzwerk kurz weg war. Anmeldung und Kopplung bleiben erhalten: Tippe auf Fertigstellen, um es erneut zu versuchen.",
+    "provider.spotify.setup_flow.xonos_soloist_blocked.title": "Soloist kann auf diesem Telefon nicht laufen",
+    "provider.spotify.setup_flow.xonos_soloist_blocked.description": "Soloist, die offizielle Engine von Spotify, funktioniert mit allen Premium-Konten, aber Android lässt Xonos sie nicht ausführen. Unter GrapheneOS: In den App-Infos von Xonos das Debugging von nativem Code erlauben, dann Beenden erzwingen und Xonos wieder öffnen.\n\nBis dahin nutzt Spotify librespot, das meist nur mit Konten funktioniert, die vor Dezember 2024 erstellt wurden."
   },
   "fr": {
     "provider.spotify.setup_flow.xonos_client_id.title": "Le Client ID de votre app Spotify",
@@ -87,7 +95,9 @@
     "provider.spotify.errors.xonos_playlist_not_yours": "Spotify ne donne à votre propre app que les titres de vos playlists, pas ceux des playlists que vous suivez ni de celles de Spotify lui-même (comme Daily Mix). Dans Spotify, copiez les titres dans une playlist à vous et lisez celle-ci.",
     "common.errors.xonos_service_down": "Il n'y a rien à lire ici : {0} ne fonctionne pas pour le moment. Les Services de Music Assistant indiquent pourquoi.",
     "provider.spotify.setup_flow.xonos_finish_retry.title": "Spotify n'a pas démarré",
-    "provider.spotify.setup_flow.xonos_finish_retry.description": "Music Assistant n'a pas pu démarrer Spotify avec ces réglages, par exemple parce que le réseau a été coupé un instant. La connexion et l'association sont conservées : appuie sur Terminer pour réessayer."
+    "provider.spotify.setup_flow.xonos_finish_retry.description": "Music Assistant n'a pas pu démarrer Spotify avec ces réglages, par exemple parce que le réseau a été coupé un instant. La connexion et l'association sont conservées : appuie sur Terminer pour réessayer.",
+    "provider.spotify.setup_flow.xonos_soloist_blocked.title": "Soloist ne peut pas fonctionner sur ce téléphone",
+    "provider.spotify.setup_flow.xonos_soloist_blocked.description": "Soloist, le moteur officiel de Spotify, fonctionne avec tous les comptes Premium, mais Android ne laisse pas Xonos l'exécuter. Sur GrapheneOS : dans les infos de l'appli Xonos, autorise le débogage du code natif, puis Forcer l'arrêt et rouvre Xonos.\n\nEn attendant, Spotify utilise librespot, qui ne fonctionne généralement qu'avec les comptes créés avant décembre 2024."
   },
   "pt_PT": {
     "provider.spotify.setup_flow.xonos_client_id.title": "O Client ID do seu app do Spotify",
@@ -105,7 +115,9 @@
     "provider.spotify.errors.xonos_playlist_not_yours": "O Spotify só dá ao seu app as músicas das suas playlists, não das que você segue nem das do próprio Spotify (como Daily Mix). No Spotify, copie as músicas para uma playlist sua e toque essa.",
     "common.errors.xonos_service_down": "Não há nada para tocar aqui: {0} não está funcionando agora. Em Serviços do Music Assistant aparece o motivo.",
     "provider.spotify.setup_flow.xonos_finish_retry.title": "O Spotify não arrancou",
-    "provider.spotify.setup_flow.xonos_finish_retry.description": "O Music Assistant não conseguiu iniciar o Spotify com estas definições, por exemplo porque a rede falhou por um momento. O acesso e o emparelhamento mantêm-se: toca em Concluir para tentar de novo."
+    "provider.spotify.setup_flow.xonos_finish_retry.description": "O Music Assistant não conseguiu iniciar o Spotify com estas definições, por exemplo porque a rede falhou por um momento. O acesso e o emparelhamento mantêm-se: toca em Concluir para tentar de novo.",
+    "provider.spotify.setup_flow.xonos_soloist_blocked.title": "O Soloist não pode funcionar neste telemóvel",
+    "provider.spotify.setup_flow.xonos_soloist_blocked.description": "O Soloist, o motor oficial do Spotify, funciona com todas as contas Premium, mas o Android não deixa o Xonos executá-lo. No GrapheneOS: nas informações da app Xonos permite a depuração de código nativo, depois toca em Forçar paragem e volta a abrir o Xonos.\n\nPor agora o Spotify usa o librespot, que normalmente só funciona com contas criadas antes de dezembro de 2024."
   },
   "el_GR": {
     "provider.spotify.setup_flow.xonos_client_id.title": "Το Client ID της εφαρμογής σας Spotify",
@@ -123,7 +135,9 @@
     "provider.spotify.errors.xonos_playlist_not_yours": "Το Spotify δίνει στη δική σας εφαρμογή μόνο τα τραγούδια των δικών σας playlist, όχι αυτών που ακολουθείτε ούτε του ίδιου του Spotify (όπως το Daily Mix). Στο Spotify αντιγράψτε τα τραγούδια σε μια δική σας playlist και παίξτε αυτήν.",
     "common.errors.xonos_service_down": "Δεν υπάρχει τίποτα για αναπαραγωγή εδώ: το {0} δεν λειτουργεί αυτή τη στιγμή. Στις Υπηρεσίες του Music Assistant φαίνεται το γιατί.",
     "provider.spotify.setup_flow.xonos_finish_retry.title": "Το Spotify δεν ξεκίνησε",
-    "provider.spotify.setup_flow.xonos_finish_retry.description": "Το Music Assistant δεν μπόρεσε να ξεκινήσει το Spotify με αυτές τις ρυθμίσεις, για παράδειγμα επειδή το δίκτυο χάθηκε για λίγο. Η σύνδεση και η αντιστοίχιση διατηρούνται: πάτησε Ολοκλήρωση για να δοκιμάσεις ξανά."
+    "provider.spotify.setup_flow.xonos_finish_retry.description": "Το Music Assistant δεν μπόρεσε να ξεκινήσει το Spotify με αυτές τις ρυθμίσεις, για παράδειγμα επειδή το δίκτυο χάθηκε για λίγο. Η σύνδεση και η αντιστοίχιση διατηρούνται: πάτησε Ολοκλήρωση για να δοκιμάσεις ξανά.",
+    "provider.spotify.setup_flow.xonos_soloist_blocked.title": "Το Soloist δεν μπορεί να τρέξει σε αυτό το τηλέφωνο",
+    "provider.spotify.setup_flow.xonos_soloist_blocked.description": "Το Soloist, η επίσημη μηχανή του Spotify, λειτουργεί με όλους τους λογαριασμούς Premium, αλλά το Android δεν αφήνει το Xonos να το εκτελέσει. Στο GrapheneOS: στις πληροφορίες της εφαρμογής Xonos επίτρεψε την αποσφαλμάτωση εγγενούς κώδικα, μετά πάτησε Αναγκαστική διακοπή και άνοιξε ξανά το Xonos.\n\nΠρος το παρόν το Spotify χρησιμοποιεί το librespot, που συνήθως λειτουργεί μόνο με λογαριασμούς που δημιουργήθηκαν πριν από τον Δεκέμβριο του 2024."
   },
   "ru_RU": {
     "provider.spotify.setup_flow.xonos_client_id.title": "Client ID вашего приложения Spotify",
@@ -141,7 +155,9 @@
     "provider.spotify.errors.xonos_playlist_not_yours": "Spotify даёт вашему приложению только треки ваших плейлистов, а не тех, на которые вы подписаны, и не плейлистов самого Spotify (например, Daily Mix). В Spotify скопируйте треки в свой плейлист и включите его.",
     "common.errors.xonos_service_down": "Здесь нечего воспроизводить: {0} сейчас не работает. Причина указана в разделе «Сервисы Music Assistant».",
     "provider.spotify.setup_flow.xonos_finish_retry.title": "Spotify не запустился",
-    "provider.spotify.setup_flow.xonos_finish_retry.description": "Music Assistant не смог запустить Spotify с этими настройками, например потому что сеть ненадолго пропала. Вход и сопряжение сохранены: нажмите «Завершить», чтобы попробовать снова."
+    "provider.spotify.setup_flow.xonos_finish_retry.description": "Music Assistant не смог запустить Spotify с этими настройками, например потому что сеть ненадолго пропала. Вход и сопряжение сохранены: нажмите «Завершить», чтобы попробовать снова.",
+    "provider.spotify.setup_flow.xonos_soloist_blocked.title": "Soloist не может работать на этом телефоне",
+    "provider.spotify.setup_flow.xonos_soloist_blocked.description": "Soloist, официальный движок Spotify, работает со всеми аккаунтами Premium, но Android не даёт Xonos его запускать. В GrapheneOS: в сведениях о приложении Xonos разрешите отладку нативного кода, затем нажмите «Остановить» и снова откройте Xonos.\n\nПока Spotify использует librespot, который обычно работает только с аккаунтами, созданными до декабря 2024 года."
   },
   "zh_CN": {
     "provider.spotify.setup_flow.xonos_client_id.title": "你的 Spotify 应用的 Client ID",
@@ -159,6 +175,8 @@
     "provider.spotify.errors.xonos_playlist_not_yours": "Spotify 只向你自己的应用提供你自己的播放列表中的歌曲，不包括你关注的播放列表和 Spotify 自己的播放列表（例如 Daily Mix）。请在 Spotify 中把这些歌曲复制到你自己的播放列表，然后播放那个播放列表。",
     "common.errors.xonos_service_down": "这里没有可播放的内容：{0} 目前无法使用。原因可在“Music Assistant 服务”中查看。",
     "provider.spotify.setup_flow.xonos_finish_retry.title": "Spotify 未能启动",
-    "provider.spotify.setup_flow.xonos_finish_retry.description": "Music Assistant 无法用这些设置启动 Spotify，例如网络短暂中断。登录和配对都会保留：点击“完成”重试。"
+    "provider.spotify.setup_flow.xonos_finish_retry.description": "Music Assistant 无法用这些设置启动 Spotify，例如网络短暂中断。登录和配对都会保留：点击“完成”重试。",
+    "provider.spotify.setup_flow.xonos_soloist_blocked.title": "Soloist 无法在此手机上运行",
+    "provider.spotify.setup_flow.xonos_soloist_blocked.description": "Soloist 是 Spotify 的官方引擎，适用于所有 Premium 账户，但 Android 不允许 Xonos 运行它。在 GrapheneOS 上：在 Xonos 的应用信息中允许原生代码调试，然后点击“强行停止”并重新打开 Xonos。\n\n目前 Spotify 使用 librespot，它通常只适用于 2024 年 12 月之前创建的账户。"
   }
 }

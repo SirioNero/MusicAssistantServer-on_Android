@@ -191,6 +191,30 @@ _guest_groups: set[int] = set()
 _leftovers = 0
 
 
+# Perché i programmi Linux non possono girare (ptrace negato), se è così: lo si scrive nel registro all'avvio.
+_ptrace_blocked = ""
+
+
+def _ptrace_refused(base: list[str], loader: str, tmp: Path) -> str:
+    """
+    Una prova sola all'avvio (qualche decimo di secondo): proot fa girare un programma del sistema Linux. Se Android
+    non gli lascia seguire i programmi (ptrace negato: su GrapheneOS l'opzione che blocca il debug del codice nativo
+    per le app), il messaggio di proot; se va, o se non va per un altro motivo, "".
+    """
+    env = {"PATH": "/usr/bin:/bin", "PROOT_LOADER": loader, "PROOT_TMP_DIR": str(tmp)}
+    try:
+        done = subprocess.run(
+            [*base, "-w", "/", "/usr/bin/pactl", "--version"],
+            env=env, capture_output=True, timeout=30, start_new_session=True, check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    if done.returncode == 0:
+        return ""
+    text = " ".join((done.stderr + done.stdout).decode(errors="replace").split())
+    return text[:300] if "ptrace" in text.lower() else ""
+
+
 def _linux_programs(data_dir: str, cache_dir: str) -> None:
     """
     Soloist (il motore ufficiale di Spotify) e PulseAudio, a cui dà l'audio, sono programmi per Linux con glibc:
@@ -254,6 +278,16 @@ def _linux_programs(data_dir: str, cache_dir: str) -> None:
 
     # Un server fermato con SIGKILL lascia accesi i suoi programmi Linux (in un gruppo loro): via prima di partire.
     _end_leftovers(proot, tuple(dict.fromkeys([os.path.abspath(data_dir) + os.sep, data + os.sep])))
+
+    # Se Android non lascia a Xonos seguire i suoi programmi (ptrace), proot non fa girare niente: Music Assistant
+    # offrirebbe Soloist, lo scaricherebbe (34 MB) e lo butterebbe a ogni tentativo. Allora resta librespot, e il
+    # flusso di Spotify dice cosa permettere (XONOS_PROOT_ERROR).
+    global _ptrace_blocked
+    _ptrace_blocked = _ptrace_refused(base, loader, tmp)
+    if _ptrace_blocked:
+        os.environ.pop("XONOS_PROOT", None)
+        os.environ["XONOS_PROOT_ERROR"] = "ptrace"
+        return
 
     previous = subprocess.Popen
 
@@ -509,6 +543,13 @@ def _run(data_dir: str, cache_dir: str, log_level: str) -> None:
                 if _leftovers:
                     logging.getLogger("xonos").warning(
                         "Tolti %d processi Linux rimasti accesi da prima (proot, Soloist, PulseAudio)", _leftovers
+                    )
+                if _ptrace_blocked:
+                    logging.getLogger("xonos").warning(
+                        "Soloist non può girare: Android non lascia a Xonos seguire i suoi programmi (ptrace: %s). "
+                        "Spotify resta con librespot. Su GrapheneOS: nelle informazioni dell'app Xonos permetti il "
+                        "debug del codice nativo (Native code debugging), poi Forza interruzione e riapri Xonos.",
+                        _ptrace_blocked,
                     )
                 selftest = None
                 if (Path(data_dir) / SELFTEST_FILE).is_file():

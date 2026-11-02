@@ -508,6 +508,9 @@ def _spotify(root: Path) -> None:
         "        if os.environ.get(\"XONOS_PROOT\"):\n"
         "            selected = await _choose_playback_backend(session, preselect, errors)\n"
         "        else:\n"
+        "            if os.environ.get(\"XONOS_PROOT_ERROR\") == \"ptrace\":\n"
+        "                # Xonos: Soloist ci sarebbe, ma Android non lascia a Xonos seguire i suoi programmi\n"
+        "                await session.form([], step_id=\"xonos_soloist_blocked\")\n"
         "            selected = BACKEND_LIBRESPOT\n",
     )
     _replace(flow, "import asyncio\nimport logging\n", "import asyncio\nimport logging\nimport os\n")

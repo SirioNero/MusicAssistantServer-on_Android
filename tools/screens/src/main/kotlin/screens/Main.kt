@@ -520,6 +520,11 @@ private val SCENES = listOf(
         val step = FlowStep.from(JSONObject(FLOW_EXTERNAL))!!
         push(FlowPage("Spotify", "spotify") { step }.apply { this.step = ready(step); started = true })
     },
+    "flow-leave" to Scene(server = ServerInUse()) {
+        (page as HomePage).started = true
+        val step = FlowStep.from(JSONObject(FLOW_EXTERNAL))!!
+        push(FlowPage("Spotify", "spotify") { step }.apply { this.step = ready(step); started = true; confirmLeave = true })
+    },
     "service" to Scene {
         (page as HomePage).started = true
         val service = ServiceConfig.from(JSONObject(SERVICE))!!

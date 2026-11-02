@@ -247,6 +247,10 @@
     <string name="show_advanced">Mostrar opções avançadas</string>
     <string name="hide_advanced">Ocultar opções avançadas</string>
     <string name="flow_cancel">Cancelar</string>
+    <string name="flow_leave_title">Parar a configuração de %1$s?</string>
+    <string name="flow_leave_text">Os passos feitos até agora serão perdidos e será preciso recomeçar.</string>
+    <string name="flow_leave">Parar</string>
+    <string name="flow_stay">Continuar</string>
     <string name="flow_finish">Concluir</string>
     <string name="flow_next">Avançar</string>
     <string name="flow_open_browser">Abrir no navegador</string>

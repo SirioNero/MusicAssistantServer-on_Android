@@ -237,6 +237,10 @@
     <string name="show_advanced">显示高级选项</string>
     <string name="hide_advanced">隐藏高级选项</string>
     <string name="flow_cancel">取消</string>
+    <string name="flow_leave_title">要停止设置 %1$s 吗？</string>
+    <string name="flow_leave_text">目前完成的步骤将会丢失，需要从头开始。</string>
+    <string name="flow_leave">停止</string>
+    <string name="flow_stay">继续</string>
     <string name="flow_finish">完成</string>
     <string name="flow_next">下一步</string>
     <string name="flow_open_browser">在浏览器中打开</string>

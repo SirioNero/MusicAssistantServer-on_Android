@@ -717,6 +717,9 @@ Da una caccia ai bug con più agenti (8 aree, un giudice avversario per area) e 
     (`_xonos_verify_account`). Non provato con Spotify vero (il testo del 403 è quello che riportano gli sviluppatori).
     I testi di Soloist che Music Assistant non traduce in italiano (35) sono in `server/ma/ma-strings.json`: `_texts`
     li unisce solo per voci che Music Assistant ha in inglese (sennò si ferma).
+    Indietro o "Annulla" in un flusso andato oltre il primo passo prima chiede conferma (`FlowPage.confirmLeave`,
+    `ServicesModel.asksBeforeLeaving`; un secondo indietro lo lascia): con Spotify buttava Client ID e accessi.
+    `ServicesCheckKt`, scena `flow-leave` di `tools/screens`.
   - Correzioni alle correzioni: tornando al server salvato in `choose` tornano token e accesso; avvisi sopra il
     lettore solo se si vede; "Riprova" con `phoneServerRetrying`; `forgetServer` solo se cambia l'indirizzo di casa,
     e tiene la pagina delle Impostazioni in qualsiasi scheda; `MaRepository.release()` mette Connecting (il prossimo

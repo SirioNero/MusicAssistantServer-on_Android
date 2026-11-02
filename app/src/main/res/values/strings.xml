@@ -250,6 +250,10 @@
     <string name="show_advanced">Show advanced options</string>
     <string name="hide_advanced">Hide advanced options</string>
     <string name="flow_cancel">Cancel</string>
+    <string name="flow_leave_title">Stop setting up %1$s?</string>
+    <string name="flow_leave_text">The steps done so far will be lost and you\'ll have to start again.</string>
+    <string name="flow_leave">Stop</string>
+    <string name="flow_stay">Continue</string>
     <string name="flow_finish">Finish</string>
     <string name="flow_next">Next</string>
     <string name="flow_open_browser">Open in the browser</string>

@@ -151,13 +151,23 @@ class PhoneModel(
     /** Indietro: chiude il lettore, poi toglie una schermata, poi torna alla Home. Falso se non c'è altro. */
     fun back(): Boolean {
         val stack = stacks.getValue(tab)
+        val top = stack.last()
         when {
             playerOpen -> playerOpen = false
+            // Un flusso a metà: prima si chiede (un secondo indietro lo lascia)
+            stack.size > 1 && top is FlowPage && !top.confirmLeave && services.asksBeforeLeaving(top) -> top.confirmLeave = true
             stack.size > 1 -> removed(stack.removeAt(stack.lastIndex))
             tab != Tab.HOME -> tab = Tab.HOME
             else -> return false
         }
         return true
+    }
+
+    /** Confermato: si lascia il flusso a metà, come con indietro (Music Assistant lo chiude). */
+    fun leaveFlow(page: FlowPage) {
+        page.confirmLeave = false
+        val stack = stacks.getValue(tab)
+        if (stack.size > 1 && stack.last() === page) removed(stack.removeAt(stack.lastIndex))
     }
 
     fun openSettings() = push(settingsPage())

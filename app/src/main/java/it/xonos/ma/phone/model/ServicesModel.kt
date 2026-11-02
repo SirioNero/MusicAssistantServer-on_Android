@@ -109,6 +109,7 @@ class ServicesModel internal constructor(
     private fun show(page: FlowPage, step: FlowStep) {
         val previous = page.step.value
         previous?.flowId?.takeIf { it != step.flowId }?.let(flows::remove)
+        if (previous != null && (previous.stepId != step.stepId || previous.type != step.type)) page.advanced = true
         if (step.done) flows.remove(step.flowId) else flows[step.flowId] = page
         if (step.type == "finish") step.instanceId?.let(services::changed)
         // Un modulo nuovo parte dai suoi valori; lo stesso modulo con gli errori tiene ciò che si è scritto.
@@ -163,6 +164,15 @@ class ServicesModel internal constructor(
                 show(page, step.copy(type = if (added != null) "finish" else "abort", instanceId = added, reason = if (added != null) null else reason))
             }
         }
+    }
+
+    /**
+     * Se lasciare il flusso va prima confermato: è andato oltre il primo passo e non è finito. Per esempio con Spotify,
+     * dopo il Client ID e l'accesso nel browser, un indietro di troppo buttava tutto.
+     */
+    fun asksBeforeLeaving(page: FlowPage): Boolean {
+        val step = page.step.value ?: return false
+        return page.advanced && !step.done
     }
 
     /** Si lascia un flusso (indietro, "Annulla"): Music Assistant lo chiude subito invece di aspettare che scada. */

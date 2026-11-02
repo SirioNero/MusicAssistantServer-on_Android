@@ -267,6 +267,10 @@
     <string name="show_advanced">Показать дополнительные настройки</string>
     <string name="hide_advanced">Скрыть дополнительные настройки</string>
     <string name="flow_cancel">Отмена</string>
+    <string name="flow_leave_title">Прервать настройку %1$s?</string>
+    <string name="flow_leave_text">Пройденные шаги пропадут, и придётся начать заново.</string>
+    <string name="flow_leave">Прервать</string>
+    <string name="flow_stay">Продолжить</string>
     <string name="flow_finish">Завершить</string>
     <string name="flow_next">Далее</string>
     <string name="flow_open_browser">Открыть в браузере</string>

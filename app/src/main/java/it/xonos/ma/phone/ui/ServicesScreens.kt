@@ -190,6 +190,21 @@ internal fun FlowScreen(page: FlowPage, model: PhoneModel, host: Host) {
             }
         }
     }
+    // Indietro o "Annulla" a metà flusso: prima di buttare ciò che si è fatto si chiede.
+    if (page.confirmLeave) {
+        AlertDialog(
+            onDismissRequest = { page.confirmLeave = false },
+            title = { Text(stringResource(R.string.flow_leave_title, page.title)) },
+            text = { Text(stringResource(R.string.flow_leave_text)) },
+            confirmButton = {
+                TextButton(
+                    onClick = { model.leaveFlow(page) },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                ) { Text(stringResource(R.string.flow_leave)) }
+            },
+            dismissButton = { TextButton(onClick = { page.confirmLeave = false }) { Text(stringResource(R.string.flow_stay)) } },
+        )
+    }
 }
 
 @Composable

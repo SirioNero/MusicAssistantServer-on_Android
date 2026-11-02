@@ -247,6 +247,10 @@
     <string name="show_advanced">Εμφάνιση προηγμένων επιλογών</string>
     <string name="hide_advanced">Απόκρυψη προηγμένων επιλογών</string>
     <string name="flow_cancel">Ακύρωση</string>
+    <string name="flow_leave_title">Διακοπή της ρύθμισης του %1$s;</string>
+    <string name="flow_leave_text">Τα βήματα που έγιναν ως τώρα θα χαθούν και θα πρέπει να ξεκινήσετε από την αρχή.</string>
+    <string name="flow_leave">Διακοπή</string>
+    <string name="flow_stay">Συνέχεια</string>
     <string name="flow_finish">Ολοκλήρωση</string>
     <string name="flow_next">Επόμενο</string>
     <string name="flow_open_browser">Άνοιγμα στο πρόγραμμα περιήγησης</string>

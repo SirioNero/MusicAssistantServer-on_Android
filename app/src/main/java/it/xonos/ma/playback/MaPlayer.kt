@@ -436,6 +436,9 @@ class MaPlayer(
     /** Pausa toccata mentre Music Assistant preparava una scelta: si mette appena la musica parte. */
     private var pauseAfterChoice = false
 
+    /** L'ultima scelta dall'auto (id della voce e la sua attesa): la stessa voce toccata di nuovo mentre parte non riparte. */
+    private var lastChoice: Pair<String, ListenableFuture<*>>? = null
+
     /** Il play mandato a Music Assistant finché la musica non parte (con Soloist circa 7 s). */
     private var pendingPlay: ListenableFuture<*>? = null
 
@@ -589,7 +592,11 @@ class MaPlayer(
         val item = mediaItems.getOrNull(if (startIndex == C.INDEX_UNSET) 0 else startIndex)
         val request = onPlayRequest
         if (item == null || request == null) return Futures.immediateVoidFuture()
+        // La stessa voce toccata di nuovo mentre Music Assistant la prepara (con Soloist circa 7 s, senza niente che
+        // si muova sullo schermo dell'auto): un secondo play_media rifarebbe tutto da capo. Si aspetta il primo.
+        lastChoice?.let { (id, waiting) -> if (id == item.mediaId && !waiting.isDone) return waiting }
         val done = SettableFuture.create<Void?>()
+        lastChoice = item.mediaId to done
         val before = queue
         choosing++
         pauseAfterChoice = false

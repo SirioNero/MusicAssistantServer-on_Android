@@ -165,6 +165,10 @@ class AudioEngine(
 
     // Quanto si suona dopo il momento del server, dall'ultimo avvio: si recupera piano.
     @Volatile private var lateUs = 0L
+
+    // L'uscita ha già detto quando suona davvero, da quando è aperta (prima i tempi sono stime), e quando la si è aperta.
+    private var timed = false
+    private var openedAt = 0L
     private var silence = ShortArray(0)
     private var statSince = 0L
     private var statBlocks = 0
@@ -328,6 +332,7 @@ class AudioEngine(
         framesWritten = 0
         smoothedErrorUs = 0.0
         lateUs = 0
+        timed = false
     }
 
     private fun checkStarved() {
@@ -369,6 +374,8 @@ class AudioEngine(
         framesWritten = 0
         smoothedErrorUs = 0.0
         lateUs = 0
+        timed = false
+        openedAt = clock()
         created.play()
         return created
     }
@@ -383,24 +390,37 @@ class AudioEngine(
         // Il ritardo dell'avvio si recupera piano, meno della correzione dolce più sotto.
         if (!fresh && lateUs > 0) lateUs = max(0L, lateUs - (frames * 1_000_000L / out.sampleRate * CATCH_UP).toLong())
         var target = filter.toClient(timestampUs) + lateUs
+        // Il primo tempo vero dell'uscita da quando è aperta: fin lì quando si sente era una stima. Un Bluetooth
+        // sospeso (l'autoradio dopo una pausa) può restare fermo più di quanto [prime] aspetta, e il ritardo che si
+        // scopre adesso è ancora quello dell'avvio, non un buco della rete: non si salta.
+        val firstStamp = !timed && out.presentationTimeUs(framesWritten) != null
+        if (firstStamp) timed = true
         var error = heardAt(out) - target // positivo: siamo in ritardo
         report(error, fresh)
         var start = 0
         var count = frames
-        if (fresh || abs(error) > HARD_US) {
+        // Prima del primo tempo vero (per [UNTIMED_GRACE_US] al massimo) "in ritardo" è solo una stima: un'uscita
+        // ferma che riparte sembra in ritardo. Non si salta né si accelera: il primo tempo vero dirà quanto.
+        val guessed = !fresh && !timed && error > 0 && clock() - openedAt < UNTIMED_GRACE_US
+        if (guessed) {
+            if (writeFrames(out, pcm, 0, frames, gen)) markAudio()
+            return
+        }
+        if (fresh || abs(error) > HARD_US || (firstStamp && error > 0)) {
             // All'avvio, o dopo un buco della rete: ci si allinea in un colpo solo.
             smoothedErrorUs = 0.0
-            if (fresh && error > 0) {
+            if ((fresh || firstStamp) && error > 0) {
                 // L'uscita ci ha messo più del margine chiesto al server: l'inizio del brano non si
                 // salta, lo si suona un po' dopo (fino a [MAX_LATE_US]) e si recupera piano.
-                val late = min(error, MAX_LATE_US)
-                Log.d(TAG, "Inizio ${late / 1000} ms dopo il momento giusto: non si salta, si recupera piano")
-                lateUs = late
+                val late = min(error, max(0L, MAX_LATE_US - lateUs))
+                Log.d(TAG, "Inizio ${(lateUs + late) / 1000} ms dopo il momento giusto: non si salta, si recupera piano")
+                lateUs += late
                 target += late
                 error -= late
             }
             if (error > 0) {
                 // Audio già passato: lo si salta.
+                Log.d(TAG, "Audio in ritardo di ${error / 1000} ms: lo si salta")
                 val drop = framesFor(error, out.sampleRate).coerceAtMost(count.toLong()).toInt()
                 start = drop
                 count -= drop
@@ -556,6 +576,9 @@ class AudioEngine(
 
         /** Il ritardo più grande che si tiene all'avvio invece di saltare l'audio. */
         const val MAX_LATE_US = 2_000_000L
+
+        /** Quanto si aspetta il primo tempo vero dell'uscita prima di fidarsi delle stime (vedi [render]). */
+        const val UNTIMED_GRACE_US = 5_000_000L
 
         /** Quanto in fretta si recupera il ritardo dell'avvio: 0,4% (la correzione dolce arriva allo 0,5%). */
         const val CATCH_UP = 0.004

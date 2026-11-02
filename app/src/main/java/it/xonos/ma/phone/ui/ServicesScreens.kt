@@ -24,6 +24,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -168,7 +169,8 @@ internal fun FlowScreen(page: FlowPage, model: PhoneModel, host: Host) {
             ) {
                 if (spotifyOnPhone) Note(XIcons.Warning, stringResource(R.string.spotify_old_accounts))
                 step.title?.let { Text(it, style = MaterialTheme.typography.headlineSmall) }
-                step.description?.let { Markdown(it) }
+                // Selezionabile: per esempio il Redirect URI da scrivere nell'app Spotify si copia, invece di riscriverlo.
+                step.description?.let { SelectionContainer { Markdown(it) } }
                 when (step.type) {
                     "form" -> FlowForm(page, step, model)
                     "external" -> FlowExternal(step)
@@ -176,13 +178,32 @@ internal fun FlowScreen(page: FlowPage, model: PhoneModel, host: Host) {
                     "finish" -> FlowEnd(XIcons.Check, stringResource(R.string.flow_finished), stringResource(R.string.flow_done)) { model.services.close(page) }
                     "abort" -> FlowEnd(
                         XIcons.Warning,
-                        step.reason?.let { stringResource(R.string.flow_aborted, it) } ?: stringResource(R.string.flow_aborted_plain),
+                        when (val reason = step.reason) {
+                            null -> stringResource(R.string.flow_aborted_plain)
+                            ServicesModel.ENDED_AWAY -> stringResource(R.string.flow_ended_away)
+                            else -> stringResource(R.string.flow_aborted, reason)
+                        },
                         stringResource(R.string.flow_close),
                     ) { model.services.close(page) }
                     else -> FlowProgress(step)
                 }
             }
         }
+    }
+    // Indietro o "Annulla" a metà flusso: prima di buttare ciò che si è fatto si chiede.
+    if (page.confirmLeave) {
+        AlertDialog(
+            onDismissRequest = { page.confirmLeave = false },
+            title = { Text(stringResource(R.string.flow_leave_title, page.title)) },
+            text = { Text(stringResource(R.string.flow_leave_text)) },
+            confirmButton = {
+                TextButton(
+                    onClick = { model.leaveFlow(page) },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                ) { Text(stringResource(R.string.flow_leave)) }
+            },
+            dismissButton = { TextButton(onClick = { page.confirmLeave = false }) { Text(stringResource(R.string.flow_stay)) } },
+        )
     }
 }
 
@@ -222,7 +243,8 @@ private fun FlowExternal(step: FlowStep) {
 
 @Composable
 private fun FlowProgress(step: FlowStep) {
-    Text(step.progressText ?: stringResource(R.string.flow_working), style = MaterialTheme.typography.bodyLarge)
+    // In Markdown come le descrizioni: le istruzioni dell'abbinamento di Soloist hanno parole in grassetto.
+    SelectionContainer { Markdown(step.progressText ?: stringResource(R.string.flow_working), style = MaterialTheme.typography.bodyLarge) }
     val progress = step.progress
     if (progress != null) {
         LinearProgressIndicator(progress = { progress.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
@@ -588,6 +610,8 @@ private fun FieldHelp(description: String?, error: String?) {
 private fun errorText(error: String): String = when (error) {
     "required" -> stringResource(R.string.field_required)
     "invalid_value" -> stringResource(R.string.field_invalid)
+    // Il servizio dei file sul disco, con una cartella che non c'è (o che Xonos non può leggere).
+    "music_directory_not_found" -> stringResource(R.string.folder_not_found)
     else -> error
 }
 

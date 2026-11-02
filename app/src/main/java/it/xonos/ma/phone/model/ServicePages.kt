@@ -35,6 +35,12 @@ class FlowPage(val title: String, val domain: String, internal val start: suspen
 
     /** Il servizio esistente prima del flusso, per capire se è finito bene quando l'evento della fine si è perso. */
     internal var before: Set<String> = emptySet()
+
+    /** Vero quando il flusso è andato oltre il primo passo: lasciarlo butterebbe ciò che si è già fatto. */
+    internal var advanced = false
+
+    /** Vero mentre si chiede conferma prima di lasciare il flusso a metà (indietro, "Annulla"). */
+    var confirmLeave by mutableStateOf(false)
 }
 
 /** Un servizio configurato: le sue opzioni, abilitarlo o no, riconfigurarlo, toglierlo. */

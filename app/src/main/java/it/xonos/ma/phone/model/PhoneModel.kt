@@ -151,13 +151,26 @@ class PhoneModel(
     /** Indietro: chiude il lettore, poi toglie una schermata, poi torna alla Home. Falso se non c'è altro. */
     fun back(): Boolean {
         val stack = stacks.getValue(tab)
+        val top = stack.last()
         when {
             playerOpen -> playerOpen = false
+            // Un flusso a metà: prima si chiede. Mentre si chiede, indietro chiude la domanda (lo fa la finestra del
+            // dialogo, come Continua): si esce solo con Interrompi.
+            stack.size > 1 && top is FlowPage && services.asksBeforeLeaving(top) -> top.confirmLeave = true
             stack.size > 1 -> removed(stack.removeAt(stack.lastIndex))
             tab != Tab.HOME -> tab = Tab.HOME
             else -> return false
         }
         return true
+    }
+
+    /** Confermato: si lascia il flusso a metà, come con indietro (Music Assistant lo chiude). */
+    fun leaveFlow(page: FlowPage) {
+        page.confirmLeave = false
+        // Finito proprio adesso (il servizio c'è già): si esce come dalla sua fine, con l'elenco ricaricato.
+        if (page.step.value?.done == true) return services.close(page)
+        val stack = stacks.getValue(tab)
+        if (stack.size > 1 && stack.last() === page) removed(stack.removeAt(stack.lastIndex))
     }
 
     fun openSettings() = push(settingsPage())
@@ -167,13 +180,43 @@ class PhoneModel(
         val config = settings.load()
         return SettingsPage(config.homeUrl, config.remoteUrl, config.token, settings.playerName, settings.username).also {
             it.phoneServerInstalled = phoneServer?.installed == true
+            it.phoneServerError = phoneServerFailure
         }
+    }
+
+    private var welcome: SettingsPage? = null
+
+    /**
+     * La pagina del benvenuto. Vive qui, come il resto del modello: download del server, accesso e prova della
+     * connessione restano sullo schermo anche se il telefono ruota o cambia lingua.
+     */
+    fun welcomePage(): SettingsPage = welcome ?: settingsPage().also { welcome = it }
+
+    /** Finito il benvenuto: se un giorno ricompare (tolto il server, per esempio) riparte da capo. */
+    fun welcomeDone() {
+        welcome = null
     }
 
     /** Un server trovato nella rete: i suoi indirizzi vanno nel modulo. */
     fun choose(page: SettingsPage, server: FoundServer) {
+        val saved = settings.load().urls.map { Settings.normalizeUrl(it) }
+        if (Settings.normalizeUrl(server.url) !in saved) {
+            // Un altro server: il token (e l'accesso) di quello salvato non gli vanno mandati. Qualsiasi apparecchio
+            // della rete può annunciarsi come Music Assistant, e il token (spesso di un amministratore) viaggerebbe
+            // in chiaro. Anche l'indirizzo remoto era di quell'altro.
+            page.token = ""
+            page.signedIn = null
+            page.useToken = false
+            page.remote = server.remoteUrl.orEmpty()
+        } else {
+            // Il server salvato (anche dopo averne toccato un altro): tornano il suo token e il suo accesso.
+            val config = settings.load()
+            page.token = config.token
+            page.signedIn = settings.username
+            page.useToken = config.token.isNotBlank() && settings.username == null
+            page.remote = server.remoteUrl ?: config.remoteUrl
+        }
         page.home = server.url
-        server.remoteUrl?.let { page.remote = it }
         page.setupNeeded = false
     }
 
@@ -676,9 +719,29 @@ class PhoneModel(
 
     fun addToQueue(item: MaItem) = play(listOf(item.uri), option = "add")
 
+    /** Un "suona" (non "dopo" né "in coda") mandato a Music Assistant, che non ha ancora risposto. */
+    private data class PlayRequest(val target: String?, val media: List<String>, val start: String?, val shuffle: Boolean)
+
+    private var pendingPlay: PlayRequest? = null
+
+    /**
+     * Music Assistant sta preparando un "suona": risponde solo quando la musica parte, e con Spotify (Soloist) ci
+     * vogliono diversi secondi. Intanto il mini-lettore mostra la rotella, anche se prima non suonava niente.
+     */
+    var starting by mutableStateOf(false)
+        private set
+
     private fun play(media: List<String>, start: String? = null, option: String = "replace", shuffle: Boolean = false) {
         // Suona dove si è scelto con "Suona su": il telefono, o un lettore di Music Assistant.
         val target = remote?.device?.id
+        val request = if (option == "replace") PlayRequest(target, media, start, shuffle) else null
+        // Lo stesso "suona" toccato di nuovo mentre Music Assistant prepara il primo: con Spotify (Soloist) farebbe
+        // ripartire tutto da capo. Un "suona" diverso invece passa (Music Assistant li fa uno dopo l'altro).
+        if (request != null && request == pendingPlay) return
+        if (request != null) {
+            pendingPlay = request
+            starting = true
+        }
         scope.launch {
             try {
                 if (target == null) awaitReady()
@@ -691,6 +754,11 @@ class PhoneModel(
                 throw e
             } catch (e: Exception) {
                 notice = Notice.Failed(e)
+            } finally {
+                if (request != null && pendingPlay === request) {
+                    pendingPlay = null
+                    starting = false
+                }
             }
         }
     }
@@ -998,11 +1066,43 @@ class PhoneModel(
     /** Il pacchetto c'era ma per una versione precedente di Xonos: va riscaricato. */
     val phoneServerOutdated: Boolean get() = phoneServer?.outdated == true
 
+    /** Xonos usa il Music Assistant sul telefono e quello sta ancora partendo (all'apertura dell'app ci vuole un po'). */
+    val phoneServerStarting: Boolean get() = onPhoneServer && phoneServer?.state == PhoneServerControl.State.STARTING
+
+    /** Xonos usa il Music Assistant sul telefono e quello non è partito o si è fermato: il perché. */
+    val phoneServerFailure: String?
+        get() = phoneServer?.takeIf { onPhoneServer && it.state == PhoneServerControl.State.FAILED }
+            ?.let { it.error.ifBlank { it.state.name } }
+
+    /** Mentre "Riprova" fa ripartire il server sul telefono: la Home mostra subito la rotella, e un altro tocco non conta. */
+    var phoneServerRetrying by mutableStateOf(false)
+        private set
+
+    /** "Riprova" quando il server sul telefono non è partito (dopo qualche tentativo Xonos smette da solo). */
+    fun retryPhoneServer() {
+        val server = phoneServer ?: return
+        if (phoneServerRetrying) return
+        phoneServerRetrying = true
+        scope.launch {
+            try {
+                if (server.start() && repo.connection.value !is Connection.Connected) repo.reconnect()
+            } finally {
+                phoneServerRetrying = false
+            }
+        }
+    }
+
     /** Il modulo indica il Music Assistant sul telefono. */
     fun usesPhoneServer(page: SettingsPage): Boolean = phoneServer != null && page.home == phoneServer.url
 
     /** Xonos è collegato al Music Assistant sul telefono (quello salvato, non il modulo). */
     val onPhoneServer: Boolean get() = phoneServer != null && settings.load().homeUrl == phoneServer.url
+
+    /**
+     * Ha senso "Suona su": il Music Assistant sul telefono non vede casse né TV (niente servizi di casse, risponde
+     * solo al telefono), e l'elenco sarebbe sempre vuoto con l'invito ad aggiungere Chromecast e AirPlay.
+     */
+    val canPlayElsewhere: Boolean get() = remote != null || !onPhoneServer
 
     /** Passa a [share] (la condivisione di Android) il registro di Music Assistant sul telefono, per chi aiuta. */
     fun sharePhoneServerLog(share: (String) -> Unit) {
@@ -1105,6 +1205,9 @@ class PhoneModel(
         page.phoneServerDownloadError = null
         page.phoneServerError = null
         page.phoneServerProgress = 0L to (page.phoneServerSize ?: -1L)
+        // La prima volta ci si collega da soli; un aggiornamento sposta Xonos (e myCar) sul server del telefono solo
+        // se lo stava già usando: chi usa un altro Music Assistant resta lì.
+        val switchTo = usesPhoneServer(page) || !server.outdated
         downloading?.cancel()
         downloading = scope.launch {
             // Se lo si sta ancora togliendo, prima si finisce.
@@ -1120,7 +1223,7 @@ class PhoneModel(
                 }
                 page.phoneServerInstalled = server.installed
                 page.phoneServerProgress = null
-                usePhoneServer(page)
+                if (switchTo) usePhoneServer(page)
             } catch (e: CancellationException) {
                 page.phoneServerProgress = null
                 throw e
@@ -1144,8 +1247,11 @@ class PhoneModel(
      */
     fun removePhoneServer(page: SettingsPage) {
         val server = phoneServer ?: return
-        if (usesPhoneServer(page)) {
-            leavePhoneServer(page)
+        if (usesPhoneServer(page)) leavePhoneServer(page)
+        // Anche se il modulo mostra già un altro Music Assistant ("Usa un altro Music Assistant" senza salvare):
+        // finché le impostazioni salvate sono quelle del server sul telefono, Xonos e myCar restano lì, e Xonos lo
+        // farebbe ripartire mentre lo si cancella.
+        if (onPhoneServer) {
             settings.save(Settings.Config("", "", ""))
             repo.reconnect()
         }
@@ -1221,8 +1327,16 @@ class PhoneModel(
 
     private fun finish(page: SettingsPage) {
         val config = Settings.Config(homeUrl = page.home, remoteUrl = page.remote, token = page.token)
-        // Un altro server: le schermate salvate sono dell'altro.
-        if (config.urls != settings.load().urls) scope.launch(Dispatchers.IO) { cache.clear() }
+        // Un altro server: le schermate salvate sono dell'altro, e anche quelle aperte. Non se cambia solo l'indirizzo
+        // da fuori casa dello stesso server (si perdevano le schede aperte e "Suona su").
+        if (Settings.normalizeUrl(config.homeUrl) != Settings.normalizeUrl(settings.load().homeUrl)) {
+            scope.launch(Dispatchers.IO) { cache.clear() }
+            forgetServer(page)
+            // Lasciato il Music Assistant sul telefono, non serve più che giri (processore e batteria): lo si
+            // riaccende con "Usa Music Assistant su questo telefono".
+            val server = phoneServer
+            if (server != null && onPhoneServer && config.homeUrl != server.url) scope.launch(Dispatchers.IO) { server.stop() }
+        }
         settings.save(config)
         repo.reconnect()
         page.results = emptyList()
@@ -1245,12 +1359,59 @@ class PhoneModel(
         }
     }
 
+    /**
+     * Un altro Music Assistant: Home, Cerca e Libreria (con quello che c'era sopra) e la cassa di "Suona su" erano del
+     * server di prima. Ogni scheda torna alla sua prima schermata, che si carica dal nuovo; [settings] (da dove si è
+     * cambiato server) resta in cima.
+     */
+    private fun forgetServer(settings: SettingsPage) {
+        remote?.stop()
+        remote = null
+        // Anche i testi (per uri, che tra due server può essere lo stesso) e gli elenchi aperti di casse e playlist.
+        lyrics.clear()
+        picker = null
+        playlistPicker = null
+        for ((t, stack) in stacks) {
+            val keep = settings.takeIf { it in stack }
+            stack.clear()
+            stack.add(
+                when (t) {
+                    Tab.HOME -> HomePage()
+                    Tab.SEARCH -> SearchPage()
+                    Tab.LIBRARY -> LibraryPage()
+                },
+            )
+            keep?.let { stack.add(it) }
+        }
+    }
+
     init {
         // Tornata la connessione, le schermate che non si erano caricate ci riprovano da sole.
         scope.launch {
             repo.connection.collect { connection ->
                 if (connection !is Connection.Connected) return@collect
                 stacks.values.flatten().filter { it.started && failed(it) }.forEach(::reload)
+            }
+        }
+        // Arriva sul thread di OkHttp: si passa a quello dello schermo.
+        repo.addEventListener { event, _, _ -> if (event == SYNC_COMPLETED) scope.launch { libraryChanged() } }
+    }
+
+    /**
+     * Music Assistant ha finito di leggere la libreria (un servizio appena aggiunto, la cartella Music del telefono):
+     * Home e Libreria già aperte mostrano la musica nuova da sole. Prima la Home vuota continuava a dire "Aggiungi un
+     * servizio" finché non la si trascinava in giù.
+     */
+    private fun libraryChanged() {
+        for (page in stacks.values.flatten()) {
+            if (!page.started) continue
+            when (page) {
+                is HomePage -> if (page.job?.isActive != true) loadHome(page, refresh = true)
+                is LibraryPage -> {
+                    loadShelves(page)
+                    page.lists.values.forEach { refresh(it, quiet = true) }
+                }
+                else -> Unit
             }
         }
     }
@@ -1308,6 +1469,9 @@ class PhoneModel(
 
         /** La password più corta che Music Assistant accetta per un account nuovo. */
         const val MIN_PASSWORD = 8
+
+        /** L'evento di Music Assistant quando ha finito di leggere la libreria dai servizi. */
+        const val SYNC_COMPLETED = "music_sync_completed"
 
         /** Il nome dell'account che Xonos si crea nel Music Assistant sul telefono. */
         const val PHONE_SERVER_USER = "xonos"

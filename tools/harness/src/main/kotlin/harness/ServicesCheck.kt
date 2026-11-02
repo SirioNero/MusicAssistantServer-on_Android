@@ -205,6 +205,45 @@ private fun checks(): Unit = runBlocking {
     val gone = runCatching { services.current(againId!!) }.isFailure
     check("Modello: indietro chiude il flusso anche in Music Assistant", model.page === page && gone)
 
+    // Un flusso andato oltre il primo passo: indietro prima chiede; "Continua" resta, "Interrompi" lo chiude.
+    model.services.add(kind)
+    val half = model.page as FlowPage
+    model.start(half)
+    until { half.step.value?.type == "form" }
+    half.values["account"] = "prova"
+    half.values["secret"] = "x"
+    model.services.submit(half)
+    until { half.step.value?.type == "external" }
+    model.back()
+    check("Modello: indietro a metà flusso chiede prima", model.page === half && half.confirmLeave, "${model.page}")
+    half.confirmLeave = false
+    delay(500)
+    val halfId = half.step.value!!.flowId
+    check("Modello: «Continua» resta nel flusso, aperto anche in Music Assistant", model.page === half && runCatching { services.current(halfId) }.isSuccess)
+    model.back()
+    model.leaveFlow(half)
+    delay(1_000)
+    check("Modello: «Interrompi» chiude il flusso anche in Music Assistant", model.page === page && runCatching { services.current(halfId) }.isFailure, "${model.page}")
+
+    // Finito mentre si chiede se lasciarlo: la domanda si chiude, e "Interrompi" toccato proprio allora esce come dalla fine.
+    model.services.add(kind)
+    val racing = model.page as FlowPage
+    model.start(racing)
+    until { racing.step.value?.type == "form" }
+    racing.values["account"] = "prova"
+    racing.values["secret"] = "x"
+    model.services.submit(racing)
+    until { racing.step.value?.type == "external" }
+    model.back()
+    check("Modello: un altro flusso a metà, chiede", racing.confirmLeave)
+    browser.newCall(Request.Builder().url(racing.step.value!!.url!!).build()).execute().close()
+    until { racing.step.value?.type == "finish" }
+    check("Modello: finito mentre si chiedeva, la domanda si chiude", !racing.confirmLeave && racing.step.value?.type == "finish", "${racing.step.value?.type}")
+    val raced = racing.step.value?.instanceId
+    model.leaveFlow(racing)
+    check("Modello: «Interrompi» su un flusso appena finito esce come dalla fine", model.page === page, "${model.page}")
+    if (raced != null) services.remove(raced)
+
     // Tornati dal browser con l'evento perso (la connessione era chiusa): il flusso è già finito.
     model.services.add(kind)
     val lost = model.page as FlowPage

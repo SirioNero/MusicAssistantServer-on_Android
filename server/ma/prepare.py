@@ -138,10 +138,11 @@ def main() -> None:
 
 # I testi dei passi che Xonos aggiunge ai servizi, nelle lingue di Xonos (vedi _texts).
 STRINGS = Path(__file__).with_name("strings.json")
+MA_STRINGS = Path(__file__).with_name("ma-strings.json")
 
 
 def _fingerprint(version: str) -> str:
-    changed = f"{Path(__file__).stat().st_mtime_ns} {STRINGS.stat().st_mtime_ns}"
+    changed = f"{Path(__file__).stat().st_mtime_ns} {STRINGS.stat().st_mtime_ns} {MA_STRINGS.stat().st_mtime_ns}"
     return f"{version} {' '.join(PROVIDERS + LIBRARIES)} {changed}"
 
 
@@ -365,11 +366,14 @@ def _patch(root: Path) -> None:
     )
     _replace(spotify, "import re\nimport tempfile\n", "import re\nimport shutil\nimport tempfile\n")
     # La cartella che propone il servizio dei file sul disco: sul telefono è quella della musica, che
-    # Xonos chiede il permesso di leggere.
+    # Xonos chiede il permesso di leggere. Xonos dice quale (XONOS_MUSIC_DIR): in un profilo secondario o nello
+    # Spazio privato di Android non è /storage/emulated/0/Music ma /storage/emulated/<profilo>/Music.
+    constants = root / "providers" / "filesystem_local" / "constants.py"
+    _replace(constants, "from dataclasses import replace\n", "import os\nfrom dataclasses import replace\n")
     _replace(
-        root / "providers" / "filesystem_local" / "constants.py",
+        constants,
         '    default_value="/media",\n',
-        '    default_value="/storage/emulated/0/Music",  # Xonos: la musica del telefono\n',
+        '    default_value=os.environ.get("XONOS_MUSIC_DIR", "/storage/emulated/0/Music"),  # Xonos: la musica\n',
     )
     # Il testo sulle copertine generate delle playlist: sul telefono nessuno dei caratteri cercati c'è, e si usa
     # quello di Pillow, che passa da FreeType. La libreria di FreeType di Chaquopy non è allineata a 16 KB: sui
@@ -384,6 +388,7 @@ def _patch(root: Path) -> None:
     # a mano, con la chiave di Last.fm della persona.
     _replace(root / "constants.py", '    ("lastfm_recommendations", False),\n', "")
     _reasons(root)
+    _flows(root)
     _spotify(root)
     _soloist(root)
     _texts(root)
@@ -444,6 +449,45 @@ def _reasons(root: Path) -> None:
     )
 
 
+def _flows(root: Path) -> None:
+    """
+    I flussi di configurazione dei servizi (Spotify e gli altri) sul telefono. Si fanno passando da un'app all'altra
+    (il browser, l'app Spotify, il Developer Dashboard), e intanto Xonos può perdere la connessione o restare indietro:
+    - un flusso fermo da 15 minuti si chiudeva, e creare l'app Spotify o la chiave di Soloist sul telefono ci mette
+      di più: sul server di una persona sola si aspettano 3 ore;
+    - un flusso finito (o interrotto) mentre la persona era altrove spariva subito, e al ritorno Xonos chiedeva il
+      passo e riceveva "Unknown (or finished) setup flow" al posto dell'esito: ora config/flows/get dà ancora
+      l'ultimo passo degli ultimi flussi finiti.
+    """
+    flows = root / "controllers" / "config" / "flows.py"
+    _replace(
+        flows,
+        "IDLE_FLOW_TTL = 15 * 60\n",
+        "IDLE_FLOW_TTL = 3 * 60 * 60  # Xonos: sul telefono, tra un'app e l'altra, ci vuole di più\n"
+        "# Xonos: gli ultimi flussi finiti, per chi torna a chiedere il passo dopo la fine\n"
+        "_XONOS_FINISHED: dict = {}\n",
+    )
+    _replace(
+        flows,
+        "        self._setup_flows.pop(flow.session.flow_id, None)\n",
+        "        self._setup_flows.pop(flow.session.flow_id, None)\n"
+        "        _XONOS_FINISHED[flow.session.flow_id] = flow\n"
+        "        while len(_XONOS_FINISHED) > 16:\n"
+        "            _XONOS_FINISHED.pop(next(iter(_XONOS_FINISHED)))\n",
+    )
+    _replace(
+        flows,
+        "        flow = self._get_flow(flow_id)\n"
+        "        self._check_flow_permission(flow)\n"
+        "        flow.session.last_activity = time.monotonic()\n"
+        "        if (step := flow.session.current_step) is None:\n",
+        "        flow = self._setup_flows.get(flow_id) or _XONOS_FINISHED.get(flow_id) or self._get_flow(flow_id)\n"
+        "        self._check_flow_permission(flow)\n"
+        "        flow.session.last_activity = time.monotonic()\n"
+        "        if (step := flow.session.current_step) is None:\n",
+    )
+
+
 def _spotify(root: Path) -> None:
     """
     Spotify sul telefono.
@@ -486,8 +530,31 @@ def _spotify(root: Path) -> None:
         "            # Xonos: la chiave è già quella della persona, il passo per aggiungerne una sua non serve\n"
         "            setup_data[CONF_CLIENT_ID] = None\n"
         "            setup_data[CONF_REFRESH_TOKEN_DEV] = None\n"
-        "            await session.finish(setup_data)\n"
-        "            return\n"
+        "            # Se il servizio non parte con questi valori (la rete un attimo assente, PulseAudio lento) il\n"
+        "            # passo si ripete con l'errore, come fa Music Assistant: chiudere il flusso butterebbe anche\n"
+        "            # l'abbinamento di Soloist appena fatto\n"
+        "            xonos_errors = None\n"
+        "            xonos_reauth = False\n"
+        "            while True:\n"
+        "                if xonos_errors is not None:\n"
+        '                    await session.form([], step_id="xonos_finish_retry", errors=xonos_errors, last_step=True)\n'
+        "                    if xonos_reauth:\n"
+        "                        # Il tentativo di prima ha già rinnovato (e invalidato) il token: un accesso nuovo nel\n"
+        "                        # browser, l'abbinamento resta. Se non riesce (tempo scaduto, rete) si torna al riprova\n"
+        "                        try:\n"
+        '                            token_result = await _pkce_authenticate(session, client_id, step_id="authenticate")\n'
+        "                        except (SetupFlowError, StepExpiredError, OSError, TimeoutError) as err:\n"
+        '                            xonos_errors = {"base": getattr(err, "translation_key", None) or str(err) or "timed_out"}\n'
+        "                            continue\n"
+        '                        setup_data[CONF_REFRESH_TOKEN_GLOBAL] = str(token_result["refresh_token"])\n'
+        "                # Mentre Music Assistant avvia Spotify (Soloist, PulseAudio, l'accesso) lo schermo lo dice\n"
+        '                session.progress("xonos_finishing", text="xonos_finishing")\n'
+        "                try:\n"
+        "                    await session.finish(setup_data)\n"
+        "                    return\n"
+        "                except SetupFlowError as err:\n"
+        '                    xonos_errors = {"base": err.translation_key or str(err)}\n'
+        '                    xonos_reauth = any(word in f"{err.translation_key} {err}" for word in ("refresh_token_invalid", "invalid_grant", "revoked"))\n'
         '        client_id_default = str(session.context.setup_data.get(CONF_CLIENT_ID) or "")\n',
     )
     _replace(
@@ -498,6 +565,9 @@ def _spotify(root: Path) -> None:
         "        if os.environ.get(\"XONOS_PROOT\"):\n"
         "            selected = await _choose_playback_backend(session, preselect, errors)\n"
         "        else:\n"
+        "            if os.environ.get(\"XONOS_PROOT_ERROR\") == \"ptrace\":\n"
+        "                # Xonos: Soloist ci sarebbe, ma Android non lascia a Xonos seguire i suoi programmi\n"
+        "                await session.form([], step_id=\"xonos_soloist_blocked\")\n"
         "            selected = BACKEND_LIBRESPOT\n",
     )
     _replace(flow, "import asyncio\nimport logging\n", "import asyncio\nimport logging\nimport os\n")
@@ -547,6 +617,52 @@ def _spotify(root: Path) -> None:
         '        errors = {CONF_XONOS_CLIENT_ID: "xonos_client_id_invalid"}\n'
         "\n\n"
         "async def _authorize_developer_key(\n",
+    )
+    # Un'app Spotify in Development Mode fa entrare solo gli account scritti nella sua User Management (il
+    # proprietario e al massimo altri 4): con un altro account l'accesso riesce, ma poi Spotify risponde 403 "the
+    # user may not be registered" a ogni richiesta. Music Assistant saltava il controllo e il servizio non andava,
+    # senza dire perché: ora un passo spiega cosa fare e, dopo, controlla di nuovo con lo stesso accesso.
+    _replace(
+        flow,
+        "            if response.status != 200:\n"
+        '                LOGGER.warning("Account check skipped: Spotify replied HTTP %s", response.status)\n'
+        "                return None\n",
+        '            if response.status == 403 and "registered" in (await response.text()).lower():\n'
+        "                # Xonos: l'account non è tra gli utenti dell'app Spotify della persona\n"
+        "                raise _XonosNotRegistered\n"
+        "            if response.status != 200:\n"
+        '                LOGGER.warning("Account check skipped: Spotify replied HTTP %s", response.status)\n'
+        "                return None\n",
+    )
+    _replace(
+        flow,
+        '        if account_id := await _verify_account(session, str(token_result["access_token"])):\n',
+        '        if account_id := await _xonos_verify_account(session, str(token_result["access_token"])):\n',
+    )
+    _replace(
+        flow,
+        "async def _verify_account(session: SetupSession, access_token: str) -> str | None:\n",
+        "class _XonosNotRegistered(Exception):\n"
+        '    """Xonos: Spotify non fa entrare questo account nell\'app della persona (User Management)."""\n'
+        "\n\n"
+        "async def _xonos_verify_account(session: SetupSession, access_token: str) -> str | None:\n"
+        '    """\n'
+        "    Xonos: come _verify_account, ma se l'account non è tra gli utenti dell'app Spotify della persona\n"
+        "    spiega come aggiungerlo e poi controlla di nuovo.\n"
+        "\n"
+        "    :param session: The setup session driving the flow.\n"
+        "    :param access_token: The access token from the just-completed sign-in.\n"
+        '    """\n'
+        "    errors: dict[str, str] | None = None\n"
+        "    while True:\n"
+        "        try:\n"
+        "            return await _verify_account(session, access_token)\n"
+        "        except _XonosNotRegistered:\n"
+        '            LOGGER.warning("Spotify: this account is not in the User Management of the Spotify app")\n'
+        '            await session.form([], step_id="xonos_user_not_registered", errors=errors)\n'
+        '            errors = {"base": "xonos_user_still_not_registered"}\n'
+        "\n\n"
+        "async def _verify_account(session: SetupSession, access_token: str) -> str | None:\n",
     )
     # Con l'app della persona Spotify può dire "non suonabile" (is_playable) anche dei brani che si suonano, e allora
     # non si suonava niente ("There is nothing to play here."). A suonare è librespot, che decide da sé: si prova
@@ -800,6 +916,18 @@ def _texts(root: Path) -> None:
         path = root / "translations" / f"{locale}.json"
         if not path.is_file():
             sys.exit(f"{path}: Music Assistant non ha questa lingua")
+        translations = json.loads(path.read_text(encoding="utf-8"))
+        translations.update(strings)
+        path.write_text(json.dumps(translations, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    # I testi di Music Assistant stesso che lui non traduce in una lingua di Xonos (ma-strings.json: per ora i passi di
+    # Soloist in italiano). Solo voci che Music Assistant ha in inglese: un nome sbagliato ferma tutto.
+    english = json.loads((root / "translations" / "en.json").read_text(encoding="utf-8"))
+    extra = json.loads(MA_STRINGS.read_text(encoding="utf-8"))
+    for locale, strings in extra.items():
+        unknown = sorted(key for key in strings if key not in english)
+        if unknown:
+            sys.exit(f"{MA_STRINGS}: {locale}: voci che Music Assistant non ha: {', '.join(unknown[:3])}")
+        path = root / "translations" / f"{locale}.json"
         translations = json.loads(path.read_text(encoding="utf-8"))
         translations.update(strings)
         path.write_text(json.dumps(translations, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

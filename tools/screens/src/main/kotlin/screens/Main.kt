@@ -140,6 +140,8 @@ private class Scene(
     val now: NowPlaying? = PLAYING,
     val configured: Boolean = true,
     val server: PhoneServerControl? = ScreenServer(),
+    /** Indirizzi e token salvati, se non quelli del server finto. */
+    val config: Settings.Config? = null,
     val setUp: PhoneModel.() -> Unit,
 )
 
@@ -147,9 +149,13 @@ private fun shoot(file: File, lang: String, scene: Scene) {
     Texts.language = lang
     val settings = Settings()
     if (!scene.configured) settings.save(Settings.Config("", "", ""))
+    scene.config?.let { settings.save(it) }
     val repo = MaRepository(settings)
     repo.acquire()
-    if (scene.configured) runBlocking { withTimeout(10_000) { repo.connection.first { it is Connection.Connected } } }
+    // Una scena con un indirizzo suo (un server che non risponde) non aspetta il collegamento.
+    if (scene.configured && scene.config == null) {
+        runBlocking { withTimeout(10_000) { repo.connection.first { it is Connection.Connected } } }
+    }
     val model = PhoneModel(
         repo,
         Library(repo),
@@ -184,6 +190,18 @@ private const val SETTLE_NS = 2_500_000_000L
 /** Music Assistant sul telefono, ed è quello a cui Xonos è collegato (il finto server delle schermate). */
 private class ServerInUse : PhoneServerControl by ScreenServer() {
     override val url: String get() = Settings().load().homeUrl
+}
+
+/** Music Assistant sul telefono, in uso ma non partito. */
+private class ServerFailed : PhoneServerControl by ScreenServer() {
+    override val url = URL
+    override val state = PhoneServerControl.State.FAILED
+    override val error = "it stopped (exit 1): ModuleNotFoundError: No module named 'music_assistant'"
+    override val installed = true
+
+    companion object {
+        const val URL = "http://127.0.0.1:9"
+    }
 }
 
 /** Music Assistant sul telefono, non ancora scaricato: le schermate mostrano solo la scheda e la domanda. */
@@ -455,6 +473,15 @@ private val SCENES = listOf(
         (page as HomePage).started = true
         push(settingsPage().apply { phoneServerProgress = PACKAGE_SIZE * 2 / 5 to PACKAGE_SIZE })
     },
+    // Scaricato: si controlla la firma e si estrae (senza Annulla).
+    "phone-server-preparing" to Scene {
+        (page as HomePage).started = true
+        push(settingsPage().apply { phoneServerProgress = PACKAGE_SIZE to PACKAGE_SIZE })
+    },
+    // Il server sul telefono non è partito: il perché nella Home, con Riprova.
+    "phone-server-failed" to Scene(server = ServerFailed(), config = Settings.Config(ServerFailed.URL, "", "screens")) {
+        (page as HomePage).started = true
+    },
     "play-on" to Scene {
         (page as HomePage).started = true
         playerOpen = true
@@ -492,6 +519,11 @@ private val SCENES = listOf(
         (page as HomePage).started = true
         val step = FlowStep.from(JSONObject(FLOW_EXTERNAL))!!
         push(FlowPage("Spotify", "spotify") { step }.apply { this.step = ready(step); started = true })
+    },
+    "flow-leave" to Scene(server = ServerInUse()) {
+        (page as HomePage).started = true
+        val step = FlowStep.from(JSONObject(FLOW_EXTERNAL))!!
+        push(FlowPage("Spotify", "spotify") { step }.apply { this.step = ready(step); started = true; confirmLeave = true })
     },
     "service" to Scene {
         (page as HomePage).started = true

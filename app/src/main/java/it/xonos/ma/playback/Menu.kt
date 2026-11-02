@@ -8,6 +8,9 @@ import it.xonos.ma.data.MaItem
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import java.text.Normalizer
+import it.xonos.ma.data.MaException
+import it.xonos.ma.data.Problem
+import kotlinx.coroutines.CancellationException
 
 /** Una voce del menu dell'auto, prima che [BrowseTree] la trasformi in un MediaItem. */
 data class MenuNode(
@@ -52,7 +55,8 @@ interface MenuLabels {
  * - `top|<artista>` e `tracks|<artista o genere>` sono i suoi brani: si aprono, o si suonano tutti;
  * - `play|<uri>` si suona da solo;
  * - `in|<album o playlist>|<brano>` suona l'album o la playlist a partire da quel brano;
- * - `list|<cartella>|<n>` suona i brani di una cartella a partire dall'n-esimo.
+ * - `list|<cartella>|<n>` suona i brani di una cartella a partire dall'n-esimo;
+ * - `part|<k>|<cartella>` è il k-esimo pezzo (da [PART] voci) di un elenco troppo lungo per l'auto.
  */
 class Menu(
     private val library: Library,
@@ -110,6 +114,7 @@ class Menu(
         parentId.startsWith("find|") -> entries(parentId, found(parentId))
         parentId.startsWith("open|") -> open(parentId)
         parentId.startsWith("top|") || parentId.startsWith("tracks|") -> entries(parentId, tracksOf(parentId))
+        parentId.startsWith("part|") -> part(parentId)
         else -> emptyList()
     }
 
@@ -122,7 +127,9 @@ class Menu(
      */
     suspend fun search(query: String): List<MenuNode> {
         val (wanted, text) = typeHint(query)
-        val found = lookup(text)
+        // Sempre di nuovo: un servizio lento (oltre 8 s) poteva mancare la prima volta, e la stessa ricerca ridava per
+        // tutto il viaggio quei risultati. Le cartelle dei risultati invece usano quelli appena mostrati.
+        val found = fresh(text)
         val best = bestMatches(text, found, wanted)
         val shown = best.map { it.second.uri }.toSet()
         val nodes = best.map { (type, item) -> entry(item, "find|$type|$text", -1) }
@@ -135,8 +142,10 @@ class Menu(
         return (nodes + folders).onEach { known.put(it.id, it) }
     }
 
-    private suspend fun lookup(text: String): Map<String, List<MaItem>> =
-        searches.get(text) ?: library.search(text).also { found ->
+    private suspend fun lookup(text: String): Map<String, List<MaItem>> = searches.get(text) ?: fresh(text)
+
+    private suspend fun fresh(text: String): Map<String, List<MaItem>> =
+        library.search(text).also { found ->
             searches.put(text, found)
             found.values.flatten().forEach { items.put(it.uri, it) }
         }
@@ -182,7 +191,7 @@ class Menu(
     /** "Metti ..." detto all'auto: si suona il risultato migliore. */
     private suspend fun playSearch(queue: String, query: String) {
         val (wanted, text) = typeHint(query)
-        val best = bestMatches(text, lookup(text), wanted).map { it.second }.firstOrNull { it.playable } ?: return
+        val best = bestMatches(text, fresh(text), wanted).map { it.second }.firstOrNull { it.playable } ?: return
         library.playMedia(queue, listOf(best.uri))
     }
 
@@ -200,8 +209,17 @@ class Menu(
     }
 
     private suspend fun count(category: Category, kind: String): Int = when (category) {
-        // Music Assistant conta anche i generi senza musica, e prima della 2.10 non li ha.
-        Category.GENRES -> runCatching { if (library.hasGenres()) 1 else 0 }.getOrDefault(0)
+        // Music Assistant conta anche i generi senza musica, e prima della 2.10 non li ha (rifiuta il comando). Senza
+        // collegamento non si sa: la cartella resta, come le altre, invece di sparire dalla radice che l'auto tiene.
+        Category.GENRES -> try {
+            if (library.hasGenres()) 1 else 0
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: MaException) {
+            if (e.problem == Problem.REFUSED) 0 else -1
+        } catch (e: Exception) {
+            -1
+        }
         else -> runCatching { library.count(kind, category.favoriteOnly) }.getOrDefault(-1)
     }
 
@@ -309,7 +327,38 @@ class Menu(
     private fun entries(parentId: String, list: List<MaItem>, contextUri: String? = null): List<MenuNode> {
         lists.put(parentId, list)
         list.forEach { items.put(it.uri, it) }
-        return list.mapIndexedNotNull { index, item ->
+        // Media3 taglia l'elenco che manda all'auto a 256 KB (truncateListBySize, per i browser come Gearslip): oltre
+        // qualche centinaio di voci il resto spariva senza dirlo. Un elenco lungo diventa cartelle da [PART] voci.
+        if (list.size > PART) {
+            return list.indices.step(PART).mapIndexed { k, start ->
+                val end = minOf(start + PART, list.size)
+                folder("part|$k|$parentId", "${start + 1}–$end", list[start].name, "browse")
+            }.onEach { known.put(it.id, it) }
+        }
+        return entryNodes(parentId, list, 0, contextUri)
+    }
+
+    /** Il pezzo di un elenco lungo: le voci hanno gli stessi identificativi che avrebbero nell'elenco intero. */
+    private suspend fun part(id: String): List<MenuNode> {
+        val rest = id.removePrefix("part|")
+        val k = rest.substringBefore('|').toIntOrNull() ?: return emptyList()
+        val parent = rest.substringAfter('|')
+        val list = lists.get(parent) ?: run {
+            children(parent)
+            lists.get(parent)
+        } ?: return emptyList()
+        val start = k * PART
+        if (start >= list.size) return emptyList()
+        // Dentro un album o una playlist un brano suona tutto da lì, come nell'elenco intero.
+        val context = parent.removePrefix("open|").takeIf { parent.startsWith("open|") }?.takeIf { uri ->
+            items.get(uri)?.mediaType.let { it == "album" || it == "playlist" }
+        }
+        return entryNodes(parent, list.subList(start, minOf(start + PART, list.size)), start, context)
+    }
+
+    private fun entryNodes(parentId: String, list: List<MaItem>, first: Int, contextUri: String?): List<MenuNode> {
+        return list.mapIndexedNotNull { offset, item ->
+            val index = first + offset
             when {
                 item.mediaType == "folder" -> {
                     val path = item.path ?: return@mapIndexedNotNull null
@@ -346,6 +395,12 @@ class Menu(
 
         /** Oltre questi elementi una voce della libreria si divide per iniziale. */
         private const val INITIALS_FROM = 150
+
+        /**
+         * Le voci di un pezzo di elenco ([entries]): con copertina, titolo e sottotitolo una voce pesa meno di 1 KB, e
+         * 150 stanno sotto i 256 KB che Media3 lascia passare verso l'auto.
+         */
+        const val PART = 150
 
         /** Tra quanti primi risultati di un tipo si sceglie il migliore. */
         private const val PICK_FROM = 5

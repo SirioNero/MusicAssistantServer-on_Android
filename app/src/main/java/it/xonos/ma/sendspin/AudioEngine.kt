@@ -149,6 +149,9 @@ class AudioEngine(
     @Volatile private var released = false
     @Volatile private var gain = 1f
     @Volatile private var duck = 1f
+
+    // Zitto dopo lo stacco dell'uscita in uso (vedi [silence]), fino al prossimo play o al prossimo stream.
+    @Volatile private var silenced = false
     private var thread: Thread? = null
 
     // Lo stato del protocollo, visto dal thread della rete.
@@ -165,6 +168,10 @@ class AudioEngine(
 
     // Quanto si suona dopo il momento del server, dall'ultimo avvio: si recupera piano.
     @Volatile private var lateUs = 0L
+
+    // L'uscita ha già detto quando suona davvero, da quando è aperta (prima i tempi sono stime), e quando la si è aperta.
+    private var timed = false
+    private var openedAt = 0L
     private var silence = ShortArray(0)
     private var statSince = 0L
     private var statBlocks = 0
@@ -185,7 +192,10 @@ class AudioEngine(
     /** Inizia uno stream, o ne cambia il formato senza interromperlo. */
     fun startStream(format: StreamFormat) {
         val fresh = !streamOpen || freshNeeded
-        if (fresh) interrupt()
+        if (fresh) {
+            interrupt()
+            unsilence()
+        }
         streamOpen = true
         freshNeeded = false
         post(Start(format, fresh))
@@ -231,6 +241,22 @@ class AudioEngine(
         applyGain()
     }
 
+    /**
+     * Si è staccata l'uscita in uso (Bluetooth, cuffie): l'audio già ricevuto non deve uscire dall'altoparlante.
+     * Di solito la pausa arriva subito a Music Assistant, ma senza rete (l'auto spenta in garage) il buffer ne ha fino
+     * a 30 s. Torna su con il prossimo play ([unsilence]) o con lo stream di un brano nuovo.
+     */
+    fun silence() {
+        silenced = true
+        applyGain()
+    }
+
+    fun unsilence() {
+        if (!silenced) return
+        silenced = false
+        applyGain()
+    }
+
     fun release() {
         released = true
         interrupt()
@@ -241,8 +267,10 @@ class AudioEngine(
     }
 
     private fun applyGain() {
-        synchronized(outputLock) { output?.setGain(gain * duck) }
+        synchronized(outputLock) { output?.setGain(currentGain()) }
     }
+
+    private fun currentGain(): Float = if (silenced) 0f else gain * duck
 
     private fun interrupt() {
         generation++
@@ -294,6 +322,7 @@ class AudioEngine(
         if (start.fresh || previous == null || previous.codec != start.format.codec || previous.header != start.format.header) {
             decoder?.release()
             decoder = decoders(start.format)
+            decoderBroken = false
             if (decoder == null) Log.w(TAG, "Formato non supportato: ${start.format}")
         }
         if (previous != null && (previous.sampleRate != start.format.sampleRate || previous.channels != start.format.channels)) {
@@ -308,6 +337,7 @@ class AudioEngine(
         format?.let {
             decoder?.release()
             decoder = decoders(it)
+            decoderBroken = false
         }
         _outputting.value = false
     }
@@ -316,6 +346,7 @@ class AudioEngine(
         releaseOutput()
         decoder?.release()
         decoder = null
+        decoderBroken = false
         format = null
         _outputting.value = false
     }
@@ -328,16 +359,46 @@ class AudioEngine(
         framesWritten = 0
         smoothedErrorUs = 0.0
         lateUs = 0
+        timed = false
     }
 
     private fun checkStarved() {
         if (_outputting.value && clock() - lastAudioAt > STARVED_US) _outputting.value = false
     }
 
+    /** Quando si è preso l'ultimo decoder nuovo dopo un guasto (System.nanoTime). */
+    private var decoderResetNs = 0L
+
+    // Il decoder si è guastato e non ce n'è un altro (due guasti in un secondo, o non si crea): si riprova al pacchetto
+    // dopo, passato un secondo. Con Sendspin il flusso è continuo: un brano nuovo non porta uno stream nuovo.
+    private var decoderBroken = false
+
     private fun decode(chunk: Chunk) {
+        if (decoder == null && decoderBroken && System.nanoTime() - decoderResetNs > DECODER_RESET_NS) {
+            decoderResetNs = System.nanoTime()
+            decoder = runCatching { format?.let(decoders) }.getOrNull()
+            decoderBroken = decoder == null
+            Log.w(TAG, if (decoderBroken) "Decoder ancora non disponibile: riprovo tra un secondo" else "Decoder di nuovo pronto dopo un guasto")
+        }
         val decoder = decoder ?: return
-        decoder.decode(chunk.data, chunk.offset, chunk.length, chunk.timestampUs) { pcm, frames, timestampUs ->
-            render(pcm, frames, timestampUs, chunk.generation)
+        var rendering = false
+        try {
+            decoder.decode(chunk.data, chunk.offset, chunk.length, chunk.timestampUs) { pcm, frames, timestampUs ->
+                rendering = true
+                render(pcm, frames, timestampUs, chunk.generation)
+                rendering = false
+            }
+        } catch (e: Exception) {
+            if (rendering) throw e
+            // Un decoder guasto (MediaCodec in errore) non torna da solo: senza questo, silenzio fino al brano dopo e un
+            // errore per ogni pacchetto. Se ne prende uno nuovo, al massimo una volta al secondo; si perde solo il pezzo.
+            runCatching { decoder.release() }
+            val now = System.nanoTime()
+            val again = now - decoderResetNs > DECODER_RESET_NS
+            this.decoder = if (again) runCatching { format?.let(decoders) }.getOrNull() else null
+            decoderBroken = this.decoder == null
+            decoderResetNs = now
+            Log.w(TAG, if (again) "Decoder guasto, ne prendo uno nuovo: ${e.message}" else "Decoder guasto di nuovo: riprovo tra un secondo")
         }
     }
 
@@ -346,11 +407,13 @@ class AudioEngine(
         val created = outputs(format.sampleRate, format.channels) ?: return null
         synchronized(outputLock) {
             output = created
-            created.setGain(gain * duck)
+            created.setGain(currentGain())
         }
         framesWritten = 0
         smoothedErrorUs = 0.0
         lateUs = 0
+        timed = false
+        openedAt = clock()
         created.play()
         return created
     }
@@ -365,24 +428,37 @@ class AudioEngine(
         // Il ritardo dell'avvio si recupera piano, meno della correzione dolce più sotto.
         if (!fresh && lateUs > 0) lateUs = max(0L, lateUs - (frames * 1_000_000L / out.sampleRate * CATCH_UP).toLong())
         var target = filter.toClient(timestampUs) + lateUs
+        // Il primo tempo vero dell'uscita da quando è aperta: fin lì quando si sente era una stima. Un Bluetooth
+        // sospeso (l'autoradio dopo una pausa) può restare fermo più di quanto [prime] aspetta, e il ritardo che si
+        // scopre adesso è ancora quello dell'avvio, non un buco della rete: non si salta.
+        val firstStamp = !timed && out.presentationTimeUs(framesWritten) != null
+        if (firstStamp) timed = true
         var error = heardAt(out) - target // positivo: siamo in ritardo
         report(error, fresh)
         var start = 0
         var count = frames
-        if (fresh || abs(error) > HARD_US) {
+        // Prima del primo tempo vero (per [UNTIMED_GRACE_US] al massimo) "in ritardo" è solo una stima: un'uscita
+        // ferma che riparte sembra in ritardo. Non si salta né si accelera: il primo tempo vero dirà quanto.
+        val guessed = !fresh && !timed && error > 0 && clock() - openedAt < UNTIMED_GRACE_US
+        if (guessed) {
+            if (writeFrames(out, pcm, 0, frames, gen)) markAudio()
+            return
+        }
+        if (fresh || abs(error) > HARD_US || (firstStamp && error > 0)) {
             // All'avvio, o dopo un buco della rete: ci si allinea in un colpo solo.
             smoothedErrorUs = 0.0
-            if (fresh && error > 0) {
+            if ((fresh || firstStamp) && error > 0) {
                 // L'uscita ci ha messo più del margine chiesto al server: l'inizio del brano non si
                 // salta, lo si suona un po' dopo (fino a [MAX_LATE_US]) e si recupera piano.
-                val late = min(error, MAX_LATE_US)
-                Log.d(TAG, "Inizio ${late / 1000} ms dopo il momento giusto: non si salta, si recupera piano")
-                lateUs = late
+                val late = min(error, max(0L, MAX_LATE_US - lateUs))
+                Log.d(TAG, "Inizio ${(lateUs + late) / 1000} ms dopo il momento giusto: non si salta, si recupera piano")
+                lateUs += late
                 target += late
                 error -= late
             }
             if (error > 0) {
                 // Audio già passato: lo si salta.
+                Log.d(TAG, "Audio in ritardo di ${error / 1000} ms: lo si salta")
                 val drop = framesFor(error, out.sampleRate).coerceAtMost(count.toLong()).toInt()
                 start = drop
                 count -= drop
@@ -539,6 +615,9 @@ class AudioEngine(
         /** Il ritardo più grande che si tiene all'avvio invece di saltare l'audio. */
         const val MAX_LATE_US = 2_000_000L
 
+        /** Quanto si aspetta il primo tempo vero dell'uscita prima di fidarsi delle stime (vedi [render]). */
+        const val UNTIMED_GRACE_US = 5_000_000L
+
         /** Quanto in fretta si recupera il ritardo dell'avvio: 0,4% (la correzione dolce arriva allo 0,5%). */
         const val CATCH_UP = 0.004
         const val MAX_SILENCE_US = 3_000_000L
@@ -546,5 +625,6 @@ class AudioEngine(
         const val SLEEP_STEP_MS = 50L
         const val IDLE_WAIT_MS = 250L
         const val MAX_QUEUED = 4_000
+        const val DECODER_RESET_NS = 1_000_000_000L
     }
 }

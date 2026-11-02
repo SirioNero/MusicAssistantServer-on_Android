@@ -21,6 +21,7 @@ val prepareMusicAssistant by tasks.registering(Exec::class) {
     description = "Prepara il sorgente di Music Assistant per il telefono."
     inputs.file("ma/prepare.py")
     inputs.file("ma/strings.json")
+    inputs.file("ma/ma-strings.json")
     inputs.property("version", musicAssistantVersion)
     outputs.dir(preparedSources)
     commandLine(

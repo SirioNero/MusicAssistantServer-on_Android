@@ -69,8 +69,13 @@ import kotlinx.coroutines.delay
 /** Il primo avvio: le impostazioni da sole, finché Xonos non sa a quale Music Assistant collegarsi. */
 @Composable
 internal fun Onboarding(model: PhoneModel, host: Host, onDone: () -> Unit) {
-    val page = remember { model.settingsPage() }
-    SettingsScreen(page, model, host, onboarding = true, onDone)
+    // La pagina sta nel modello: se il telefono ruota o cambia lingua l'Activity si ricrea, e una pagina ricordata
+    // solo qui ripartirebbe vuota mentre il download del server e l'accesso continuano su quella di prima.
+    val page = model.welcomePage()
+    SettingsScreen(page, model, host, onboarding = true) {
+        model.welcomeDone()
+        onDone()
+    }
 }
 
 /**
@@ -238,6 +243,25 @@ private fun PhoneServerCard(page: SettingsPage, model: PhoneModel, host: Host) {
             Text(stringResource(R.string.phone_server_share_log))
         }
     }
+    // Scarica il pacchetto (la prima volta, o la versione nuova dopo un aggiornamento di Xonos): prima la domanda.
+    val download = @Composable {
+        Button(
+            onClick = {
+                focus.clearFocus()
+                model.askPhoneServerDownload(page)
+            },
+            enabled = !page.checking,
+            modifier = Modifier.testTag("make_phone_server"),
+        ) {
+            if (page.checking) {
+                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                Spacer(Modifier.width(12.dp))
+                Text(stringResource(R.string.phone_server_starting))
+            } else {
+                Text(stringResource(if (model.phoneServerOutdated) R.string.phone_server_update else R.string.phone_server_make))
+            }
+        }
+    }
     Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -248,14 +272,17 @@ private fun PhoneServerCard(page: SettingsPage, model: PhoneModel, host: Host) {
             Text(
                 stringResource(
                     when {
-                        inUse -> R.string.phone_server_in_use
+                        // Anche se Xonos lo sta usando: dopo un aggiornamento di Xonos il server parte solo con la sua versione.
                         !page.phoneServerInstalled && model.phoneServerOutdated -> R.string.phone_server_outdated
+                        inUse -> R.string.phone_server_in_use
                         else -> R.string.phone_server_help
                     },
                 ),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            // Mentre scarica, prepara e avvia la prima volta (qualche minuto in tutto): schermo acceso.
+            KeepScreenOn(progress != null || page.checking)
             page.phoneServerError?.let { error ->
                 Text(stringResource(R.string.phone_server_failed, error), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
             }
@@ -265,16 +292,32 @@ private fun PhoneServerCard(page: SettingsPage, model: PhoneModel, host: Host) {
             when {
                 progress != null -> {
                     val (done, total) = progress
-                    if (total > 0) {
-                        LinearProgressIndicator(progress = { done.toFloat() / total }, modifier = Modifier.fillMaxWidth())
-                        Text(stringResource(R.string.phone_server_downloading, done / MEGABYTE, total / MEGABYTE), style = MaterialTheme.typography.bodySmall)
-                    } else {
+                    if (total > 0 && done >= total) {
+                        // Scaricato: si controlla la firma e si estrae (qualche secondo, prima la barra restava ferma al
+                        // 100%). Annulla qui butterebbe il download appena finito: non c'è.
                         LinearProgressIndicator(Modifier.fillMaxWidth())
-                        Text(stringResource(R.string.phone_server_downloading_unknown, done / MEGABYTE), style = MaterialTheme.typography.bodySmall)
+                        Text(stringResource(R.string.phone_server_preparing), style = MaterialTheme.typography.bodySmall)
+                    } else {
+                        if (total > 0) {
+                            LinearProgressIndicator(progress = { done.toFloat() / total }, modifier = Modifier.fillMaxWidth())
+                            Text(stringResource(R.string.phone_server_downloading, done / MEGABYTE, total / MEGABYTE), style = MaterialTheme.typography.bodySmall)
+                        } else {
+                            LinearProgressIndicator(Modifier.fillMaxWidth())
+                            Text(stringResource(R.string.phone_server_downloading_unknown, done / MEGABYTE), style = MaterialTheme.typography.bodySmall)
+                        }
+                        TextButton(onClick = { model.cancelPhoneServerDownload(page) }, modifier = Modifier.testTag("cancel_phone_server")) {
+                            Text(stringResource(R.string.flow_cancel))
+                        }
                     }
-                    TextButton(onClick = { model.cancelPhoneServerDownload(page) }, modifier = Modifier.testTag("cancel_phone_server")) {
-                        Text(stringResource(R.string.flow_cancel))
+                }
+                // In uso ma senza il pacchetto di questa versione (Xonos aggiornato): il server non parte finché non
+                // si scarica, e i dati (account, servizi, libreria) restano. Prima il tasto era nascosto qui.
+                inUse && !page.phoneServerInstalled -> {
+                    download()
+                    TextButton(onClick = { model.leavePhoneServer(page) }, enabled = !page.checking, modifier = Modifier.testTag("leave_phone_server")) {
+                        Text(stringResource(R.string.phone_server_leave))
                     }
+                    shareLog()
                 }
                 inUse -> {
                     FilledTonalButton(onClick = { model.leavePhoneServer(page) }, enabled = !page.checking, modifier = Modifier.testTag("leave_phone_server")) {
@@ -304,24 +347,7 @@ private fun PhoneServerCard(page: SettingsPage, model: PhoneModel, host: Host) {
                     }
                     shareLog()
                 }
-                else -> {
-                    Button(
-                        onClick = {
-                            focus.clearFocus()
-                            model.askPhoneServerDownload(page)
-                        },
-                        enabled = !page.checking,
-                        modifier = Modifier.testTag("make_phone_server"),
-                    ) {
-                        if (page.checking) {
-                            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
-                            Spacer(Modifier.width(12.dp))
-                            Text(stringResource(R.string.phone_server_starting))
-                        } else {
-                            Text(stringResource(if (model.phoneServerOutdated) R.string.phone_server_update else R.string.phone_server_make))
-                        }
-                    }
-                }
+                else -> download()
             }
         }
     }

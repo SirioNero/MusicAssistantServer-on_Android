@@ -57,7 +57,9 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge(SystemBarStyle.dark(Color.TRANSPARENT), SystemBarStyle.dark(Color.TRANSPARENT))
         super.onCreate(savedInstanceState)
         app = application as XonosApp
-        openPlayerIfAsked(intent)
+        // Solo alla prima apertura: dopo una rotazione o un cambio di lingua l'Intent è lo stesso, e il lettore si
+        // riaprirebbe ogni volta anche se lo si era chiuso.
+        if (savedInstanceState == null) openPlayerIfAsked(intent)
         val host = object : Host {
             override fun describe(connection: Connection) = tell(this@MainActivity, connection)
 

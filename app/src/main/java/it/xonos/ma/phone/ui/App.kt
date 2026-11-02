@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -17,6 +18,7 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -30,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import it.xonos.ma.Language
@@ -93,6 +96,8 @@ fun XonosScreen(model: PhoneModel, player: PlayerLink, host: Host) {
         LaunchedEffect(phonePlaying) { model.phonePlaying(phonePlaying) }
         // Finché non c'è un indirizzo e il token, si comincia dalle impostazioni.
         var configured by remember { mutableStateOf(model.configured) }
+        // Configurato senza passare da "Vai alla tua musica" (il telefono ha ruotato a metà): il benvenuto è finito.
+        LaunchedEffect(configured) { if (configured) model.welcomeDone() }
         // Anche il lettore e il benvenuto, che stanno fuori dallo Scaffold, scrivono con i colori del tema.
         Surface(Modifier.fillMaxSize().automationIds(), color = MaterialTheme.colorScheme.background, contentColor = MaterialTheme.colorScheme.onBackground) {
             if (!configured) {
@@ -110,6 +115,7 @@ fun XonosScreen(model: PhoneModel, player: PlayerLink, host: Host) {
                         val remote = model.remote
                         when {
                             now != null -> MiniPlayer(now, link, model)
+                            model.starting -> StartingBar()
                             remote != null -> RemoteBar(remote.device, model)
                         }
                         TabBar(model)
@@ -133,6 +139,13 @@ fun XonosScreen(model: PhoneModel, player: PlayerLink, host: Host) {
                 exit = slideOutVertically(tween(260)) { it } + fadeOut(),
             ) {
                 shown?.let { PlayerScreen(it, link, model, host) }
+            }
+            // Con il lettore a schermo intero aperto gli avvisi (anche "perché non suona") gli vanno sopra: quelli dello
+            // Scaffold resterebbero sotto, nascosti.
+            if (model.playerOpen && nowPlaying != null) {
+                Box(Modifier.fillMaxSize().navigationBarsPadding(), contentAlignment = Alignment.BottomCenter) {
+                    SnackbarHost(snackbar)
+                }
             }
             model.picker?.let { DevicesSheet(it, model, host) }
             model.playlistPicker?.let { PlaylistSheet(it, model, host) }
@@ -203,6 +216,14 @@ private fun Notices(model: PhoneModel, host: Host, snackbar: SnackbarHostState) 
         if (text == null) return@LaunchedEffect
         model.notice = null
         snackbar.currentSnackbarData?.dismiss()
-        scope.launch { snackbar.showSnackbar(text) }
+        // Un errore (perché non suona, perché non si collega) resta di più, con la × per toglierlo: 4 s non bastano a leggerlo.
+        val failed = notice is Notice.Failed
+        scope.launch {
+            snackbar.showSnackbar(
+                text,
+                withDismissAction = failed,
+                duration = if (failed) SnackbarDuration.Long else SnackbarDuration.Short,
+            )
+        }
     }
 }

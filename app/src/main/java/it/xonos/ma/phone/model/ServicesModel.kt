@@ -109,6 +109,13 @@ class ServicesModel internal constructor(
     private fun show(page: FlowPage, step: FlowStep) {
         val previous = page.step.value
         previous?.flowId?.takeIf { it != step.flowId }?.let(flows::remove)
+        // Un passo cambiato conta come fatto dalla persona, tranne l'uscita da un'attesa (progress): quella la fa il
+        // server da solo, per esempio la ricerca dei server di Plex prima del primo modulo.
+        if (previous != null && previous.type != "progress" && (previous.stepId != step.stepId || previous.type != step.type)) {
+            page.advanced = true
+        }
+        // Finito mentre si chiedeva se lasciarlo: non c'è più niente da perdere, la domanda si chiude.
+        if (step.done) page.confirmLeave = false
         if (step.done) flows.remove(step.flowId) else flows[step.flowId] = page
         if (step.type == "finish") step.instanceId?.let(services::changed)
         // Un modulo nuovo parte dai suoi valori; lo stesso modulo con gli errori tiene ciò che si è scritto.
@@ -157,9 +164,21 @@ class ServicesModel internal constructor(
                 if (e.problem == Problem.NOT_CONNECTED || e.problem == Problem.NETWORK) return@launch
                 val now = runCatching { services.configured() }.getOrNull() ?: return@launch
                 val added = now.filter { it.domain == page.domain }.map { it.instanceId }.firstOrNull { it !in page.before }
-                show(page, step.copy(type = if (added != null) "finish" else "abort", instanceId = added, reason = if (added != null) null else e.message))
+                // Il flusso non c'è più e non è comparso un servizio nuovo: si è chiuso mentre si era fuori (per esempio
+                // nel browser). Music Assistant risponde "'Unknown (or finished) setup flow: …'": lo si dice a parole.
+                val reason = if (e.message.orEmpty().contains("setup flow")) ENDED_AWAY else e.message
+                show(page, step.copy(type = if (added != null) "finish" else "abort", instanceId = added, reason = if (added != null) null else reason))
             }
         }
+    }
+
+    /**
+     * Se lasciare il flusso va prima confermato: è andato oltre il primo passo e non è finito. Per esempio con Spotify,
+     * dopo il Client ID e l'accesso nel browser, un indietro di troppo buttava tutto.
+     */
+    fun asksBeforeLeaving(page: FlowPage): Boolean {
+        val step = page.step.value ?: return false
+        return page.advanced && !step.done
     }
 
     /** Si lascia un flusso (indietro, "Annulla"): Music Assistant lo chiude subito invece di aspettare che scada. */
@@ -259,6 +278,9 @@ class ServicesModel internal constructor(
     }
 
     companion object {
+        /** Il motivo di un flusso chiuso mentre si era fuori dall'app: lo schermo lo dice a parole. */
+        const val ENDED_AWAY = "xonos:ended-away"
+
         /** L'ordine dei gruppi: prima la musica, poi le casse, il resto in fondo. */
         val TYPES = listOf("music", "player", "plugin", "metadata", "audio_analysis")
 

@@ -5,6 +5,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.media.AudioDeviceCallback
+import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.media.MediaFormat
 import android.net.ConnectivityManager
@@ -21,6 +23,7 @@ import androidx.core.content.ContextCompat
 import androidx.media3.common.C
 import androidx.media3.common.HeartRating
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.common.Rating
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.DefaultMediaNotificationProvider
@@ -40,8 +43,10 @@ import it.xonos.ma.wrap
 import it.xonos.ma.BuildConfig
 import it.xonos.ma.R
 import it.xonos.ma.data.Connection
+import it.xonos.ma.data.Problem
 import it.xonos.ma.data.MaException
 import it.xonos.ma.phone.MainActivity
+import it.xonos.ma.phone.model.PhoneServerControl
 import it.xonos.ma.sendspin.AndroidAudio
 import it.xonos.ma.sendspin.AudioEngine
 import it.xonos.ma.sendspin.SendspinClient
@@ -52,6 +57,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.guava.future
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -106,10 +112,23 @@ class PlaybackService : MediaLibraryService() {
             settings.muted = muted
         }
         player = MaPlayer(mainLooper, app.repo, settings.playerId, app.playerReady, engine.outputting, artwork::uriFor, { engine.lateMs }) { connection ->
-            describe(settings.language.wrap(this), connection)
+            val context = settings.language.wrap(this)
+            phoneServerProblem(context, connection) ?: describe(context, connection)
         }
         tree = BrowseTree(Menu(app.library, ResourceLabels(this) { settings.language }) { settings.playerId }, artwork)
         player.onPlayRequest = { item -> tree.play(item) }
+        // Il perché di un play o di un comando non riuscito arriva anche all'auto (lo stato della sessione).
+        player.onFailure = { e ->
+            if (::session.isInitialized) {
+                val context = settings.language.wrap(this)
+                // Col server sul telefono che non risponde, il perché (parte, va aggiornato, non è partito) invece di
+                // "Non collegato a Music Assistant".
+                val text = phoneServerProblem(context, app.repo.connection.value) ?: describe(context, e)
+                session.sendError(SessionError(SessionError.ERROR_UNKNOWN, text))
+            }
+        }
+        // Pausa non arrivata a Music Assistant (niente rete): l'audio già ricevuto si zittisce.
+        player.onPauseLost = { engine.silence() }
 
         // Toccando la notifica si apre il lettore sul telefono.
         val openPlayer = PendingIntent.getActivity(
@@ -139,7 +158,16 @@ class PlaybackService : MediaLibraryService() {
             }
         }
         scope.launch { engine.outputting.collect(::onOutputting) }
+        player.addListener(object : Player.Listener {
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                // Un play chiesto (dalla persona, dall'auto, a fine telefonata): il silenzio dopo lo stacco dell'uscita o
+                // una pausa non arrivata finisce. Non quando lo stato torna "in riproduzione" da solo (una pausa fallita).
+                if (playWhenReady && reason == Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST) engine.unsilence()
+                updateLocks()
+            }
+        })
         connectivity.registerDefaultNetworkCallback(networkCallback)
+        getSystemService(AudioManager::class.java).registerAudioDeviceCallback(outputs, main)
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession = session
@@ -147,6 +175,7 @@ class PlaybackService : MediaLibraryService() {
     override fun onDestroy() {
         app.playerReady.value = false
         runCatching { connectivity.unregisterNetworkCallback(networkCallback) }
+        runCatching { getSystemService(AudioManager::class.java).unregisterAudioDeviceCallback(outputs) }
         main.removeCallbacksAndMessages(null)
         setNoisyReceiver(false)
         releaseLocks()
@@ -163,7 +192,8 @@ class PlaybackService : MediaLibraryService() {
     /** Come ci presentiamo a Music Assistant, deciso a ogni connessione (la rete può essere cambiata). */
     private fun identity(): SendspinClient.Identity {
         val settings = app.settings
-        val metered = connectivity.isActiveNetworkMetered
+        // Con il Music Assistant sul telefono stesso la rete non c'entra: il margine è quello del Wi-Fi.
+        val metered = connectivity.isActiveNetworkMetered && !onPhoneServer
         val formats = buildList {
             // Opus pesa un decimo del PCM: in rete mobile fa la differenza. Il PCM resta come riserva.
             if (AndroidAudio.canDecode(MediaFormat.MIMETYPE_AUDIO_OPUS)) add(StreamFormat("opus", RATE, 2, 16))
@@ -203,6 +233,11 @@ class PlaybackService : MediaLibraryService() {
     private fun onConnection(connection: Connection) {
         when (connection) {
             is Connection.Connected -> {
+                // L'auto ha avuto il menu senza Music Assistant (aspettato invano): lo richieda, ora c'è tutto.
+                if (browsedOffline) {
+                    browsedOffline = false
+                    session.notifyChildrenChanged(Menu.ROOT, Int.MAX_VALUE, null)
+                }
                 // Prima l'API, poi l'audio: così Music Assistant lega il lettore a questa sessione.
                 // Si riapre anche l'audio se è cambiata la rete o il nome del lettore.
                 val name = app.settings.playerName
@@ -217,17 +252,77 @@ class PlaybackService : MediaLibraryService() {
         }
     }
 
+    /** L'audio esce adesso dal telefono. */
+    private var outputting = false
+
+    /** L'auto ha sfogliato il menu mentre Music Assistant non era collegato (vedi [awaitConnected]). */
+    @Volatile private var browsedOffline = false
+
+    /**
+     * Gearslip e myCar chiedono il menu appena si collegano, spesso prima che Xonos sia collegato a Music Assistant
+     * (all'avvio, o col server sul telefono che parte): si aspetta il collegamento, al massimo [BROWSE_WAIT_MS],
+     * invece di rispondere con cartelle in errore e voci vuote che l'auto poi non richiede.
+     */
+    private suspend fun awaitConnected() {
+        val now = app.repo.connection.value
+        // Niente da aspettare: senza un Music Assistant scelto, con un problema che non passa da solo (token, versione,
+        // indirizzo), col server sul telefono da aggiornare o fermo, o dopo un'attesa già andata a vuoto (ogni cartella
+        // aspetterebbe altri 20 s; quando arriva, browsedOffline torna falso).
+        if (now == Connection.NotConfigured || now is Connection.Connected || browsedOffline) return
+        if (now is Connection.Failed && now.problem in LASTING) return
+        val server = app.phoneServer
+        if (server != null && onPhoneServer && (!server.installed || server.state == PhoneServerControl.State.FAILED)) return
+        val ok = withTimeoutOrNull(BROWSE_WAIT_MS) { app.repo.connection.first { it is Connection.Connected } } != null
+        if (!ok) browsedOffline = true
+    }
+
+    /**
+     * Col Music Assistant sul telefono, perché non risponde detto per quello che è (parte, va aggiornato, non è
+     * partito) invece di "Errore di rete: Failed to connect to /127.0.0.1:8095". null: non è quello, o risponde.
+     */
+    private fun phoneServerProblem(context: Context, connection: Connection): String? {
+        if (connection is Connection.Connected) return null
+        val server = app.phoneServer ?: return null
+        if (app.settings.load().homeUrl != server.url) return null
+        return when {
+            !server.installed -> context.getString(R.string.phone_server_outdated)
+            server.state == PhoneServerControl.State.STARTING -> context.getString(R.string.phone_server_starting)
+            server.state == PhoneServerControl.State.FAILED ->
+                context.getString(R.string.phone_server_failed, server.error.ifBlank { server.state.name })
+            else -> null
+        }
+    }
+
+    /**
+     * Sveglio (processore e Wi-Fi) mentre esce l'audio, e per al massimo [PREPARE_LOCK_MS] (solo il processore) anche
+     * quando Music Assistant sta per suonare ma l'audio non esce ancora: col server sul telefono, in auto a schermo
+     * spento, la preparazione del brano (Soloist: circa 7 s) o la riconnessione dopo un calo di rete si fermerebbero.
+     */
+    private fun updateLocks() {
+        when {
+            outputting -> acquireLocks()
+            player.playWhenReady -> {
+                // Solo il processore, al massimo 2 minuti: il Wi-Fi a piena potenza serve mentre l'audio esce (prima
+                // restava tenuto senza limite anche con Music Assistant sparito e la coda vecchia "in riproduzione").
+                wifiLock?.takeIf { it.isHeld }?.release()
+                acquireCpu(PREPARE_LOCK_MS)
+            }
+            else -> releaseLocks()
+        }
+    }
+
     private fun onOutputting(on: Boolean) {
+        outputting = on
         if (on) {
             main.removeCallbacks(abandonFocus)
-            acquireLocks()
+            updateLocks()
             setNoisyReceiver(true)
             if (!focus.request()) {
                 Log.i(TAG, "Un'altra app ha l'audio (telefonata?): metto in pausa")
                 player.pauseFromSystem()
             }
         } else {
-            releaseLocks()
+            updateLocks()
             setNoisyReceiver(false)
             // Ferma per un po': si lascia l'audio alle altre app, ma non durante una telefonata.
             if (!resumeAfterInterruption) main.postDelayed(abandonFocus, FOCUS_GRACE_MS)
@@ -255,10 +350,32 @@ class PlaybackService : MediaLibraryService() {
         }
     }
 
+    /**
+     * Il Bluetooth dell'auto (o le cuffie) si stacca anche quando la musica è già ferma, per esempio perché la rete
+     * è caduta in galleria: allora, al ritorno della rete, non si riprende da soli (uscirebbe dall'altoparlante).
+     * Mentre suona ci pensa [noisy].
+     */
+    private val outputs = object : AudioDeviceCallback() {
+        override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>) {
+            if (removedDevices.none { it.isSink && it.type !in BUILT_IN_OUTPUTS }) return
+            player.forgetDrop()
+            // La musica sta partendo (Soloist, 7 s) ma non esce ancora: Android non manda "noisy", e appena arriva
+            // uscirebbe dall'altoparlante. Come una pausa della persona.
+            if (player.playWhenReady && !outputting) {
+                engine.silence()
+                player.pauseFromSystem()
+            }
+        }
+    }
+
     /** Il Bluetooth dell'auto si stacca: la musica si ferma invece di passare all'altoparlante del telefono. */
     private val noisy = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            if (intent.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY) player.pauseFromSystem()
+            if (intent.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY) {
+                // Si è staccata l'uscita in uso: zitti subito, anche se la pausa non arriva a Music Assistant.
+                engine.silence()
+                player.pauseFromSystem()
+            }
         }
     }
 
@@ -279,12 +396,16 @@ class PlaybackService : MediaLibraryService() {
 
     /** A schermo spento il telefono non deve addormentarsi né spegnere il Wi-Fi mentre suona. */
     @Suppress("DEPRECATION")
-    private fun acquireLocks() {
+    private fun acquireCpu(timeoutMs: Long) {
         val wake = wakeLock ?: getSystemService(PowerManager::class.java)
             .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Xonos:audio")
             .apply { setReferenceCounted(false) }
             .also { wakeLock = it }
-        wake.acquire(LOCK_TIMEOUT_MS)
+        wake.acquire(timeoutMs)
+    }
+
+    private fun acquireLocks() {
+        acquireCpu(LOCK_TIMEOUT_MS)
         val wifi = wifiLock ?: applicationContext.getSystemService(WifiManager::class.java)
             ?.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "Xonos:audio")
             ?.apply { setReferenceCounted(false) }
@@ -297,6 +418,10 @@ class PlaybackService : MediaLibraryService() {
         wifiLock?.takeIf { it.isHeld }?.release()
     }
 
+    /** Xonos usa il Music Assistant sul telefono stesso (127.0.0.1). */
+    private val onPhoneServer: Boolean
+        get() = app.phoneServer?.url?.let { it == app.settings.load().homeUrl } == true
+
     /** Uscendo di casa il Wi-Fi lascia il posto alla rete mobile: le connessioni vecchie sono morte, si riapre tutto. */
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
@@ -304,6 +429,12 @@ class PlaybackService : MediaLibraryService() {
                 val previous = lastNetwork
                 lastNetwork = network
                 if (previous != null && previous != network) {
+                    // Il Music Assistant sul telefono è a 127.0.0.1: il cambio di rete non tocca la connessione, e
+                    // ricollegarsi farebbe fermare la coda a Music Assistant (con Soloist il brano ripartirebbe).
+                    if (onPhoneServer) {
+                        Log.i(TAG, "Rete cambiata: Music Assistant è sul telefono, resto collegato")
+                        return@post
+                    }
                     Log.i(TAG, "Rete cambiata: mi ricollego")
                     networkChanged = true
                     app.repo.reconnect()
@@ -346,6 +477,7 @@ class PlaybackService : MediaLibraryService() {
             pageSize: Int,
             params: LibraryParams?,
         ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> = scope.future {
+            awaitConnected()
             try {
                 LibraryResult.ofItemList(tree.children(parentId).page(page, pageSize), params)
             } catch (e: Exception) {
@@ -360,6 +492,7 @@ class PlaybackService : MediaLibraryService() {
             query: String,
             params: LibraryParams?,
         ): ListenableFuture<LibraryResult<Void>> = scope.future {
+            awaitConnected()
             val results = try {
                 tree.search(query)
             } catch (e: Exception) {
@@ -379,6 +512,8 @@ class PlaybackService : MediaLibraryService() {
             pageSize: Int,
             params: LibraryParams?,
         ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> = scope.future {
+            // onSearch ha già aspettato e messo i risultati.
+            if (searches[query] == null) awaitConnected()
             try {
                 val results = searches[query] ?: tree.search(query)
                 LibraryResult.ofItemList(results.page(page, pageSize), params)
@@ -454,7 +589,29 @@ class PlaybackService : MediaLibraryService() {
         const val RATE = 48_000
         const val FOCUS_GRACE_MS = 30_000L
         const val LOCK_TIMEOUT_MS = 6 * 60 * 60 * 1000L
+        const val PREPARE_LOCK_MS = 2 * 60 * 1000L
+
+        /** Quanto aspetta il menu dell'auto che Xonos si colleghi a Music Assistant (vedi [awaitConnected]). */
+        const val BROWSE_WAIT_MS = 20_000L
+
+        /** I problemi di connessione che non passano da soli: il menu dell'auto non li aspetta. */
+        val LASTING = setOf(
+            Problem.BAD_TOKEN,
+            Problem.TOO_OLD,
+            Problem.DENIED,
+            Problem.NOT_MUSIC_ASSISTANT,
+            Problem.SETUP_REQUIRED,
+            Problem.BAD_ADDRESS,
+        )
         const val QUEUE_WAIT_MS = 10_000L
         const val QUEUE_POLL_MS = 200L
+
+        /** Le uscite del telefono stesso: staccarle non c'entra con il Bluetooth o le cuffie. */
+        val BUILT_IN_OUTPUTS = setOf(
+            AudioDeviceInfo.TYPE_BUILTIN_SPEAKER,
+            AudioDeviceInfo.TYPE_BUILTIN_EARPIECE,
+            AudioDeviceInfo.TYPE_TELEPHONY,
+            AudioDeviceInfo.TYPE_REMOTE_SUBMIX,
+        )
     }
 }

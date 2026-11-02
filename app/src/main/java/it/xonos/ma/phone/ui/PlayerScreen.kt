@@ -33,6 +33,7 @@ import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -65,10 +66,13 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.stateDescription
 import it.xonos.ma.R
 import it.xonos.ma.data.Lyrics
 import it.xonos.ma.phone.model.Load
@@ -88,14 +92,38 @@ import kotlinx.coroutines.delay
  */
 @Composable
 private fun rememberPosition(player: PlayerLink, now: NowPlaying): State<Long> {
-    val position = remember { mutableLongStateOf(player.positionMs()) }
-    LaunchedEffect(now.playing, now.buffering, now.uri) {
+    // Anche [player] fra le chiavi: con "Suona su" lo schermo passa dal telefono alla cassa (stesso brano).
+    val position = remember(player) { mutableLongStateOf(player.positionMs()) }
+    LaunchedEffect(player, now.playing, now.buffering, now.uri) {
         while (true) {
             position.longValue = player.positionMs()
             delay(if (now.playing && !now.buffering) 200 else 1_000)
         }
     }
     return position
+}
+
+/** La rotella al posto di play mentre la musica parte; chi usa un lettore di schermo sente "Avvio la musica…". */
+@Composable
+private fun Waiting(modifier: Modifier, stroke: Dp, color: Color) {
+    val text = stringResource(R.string.play_starting)
+    CircularProgressIndicator(modifier.semantics { contentDescription = text }, strokeWidth = stroke, color = color)
+}
+
+/** Al posto del mini-lettore quando prima non suonava niente: Music Assistant sta preparando la musica. */
+@Composable
+internal fun StartingBar() {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.testTag("starting_bar").fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+    ) {
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+            Spacer(Modifier.width(12.dp))
+            Text(stringResource(R.string.play_starting), style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
 }
 
 /** Il mini-lettore sopra le schede: copertina, titolo, play e avanti; toccandolo si apre il lettore. */
@@ -130,7 +158,7 @@ internal fun MiniPlayer(now: NowPlaying, player: PlayerLink, model: PhoneModel) 
                         }
                     }
                 }
-                PlayPauseButton(now, player, Modifier.size(48.dp), 28.dp)
+                PlayPauseButton(now, player, Modifier.size(48.dp), 28.dp, busy = model.starting)
                 IconButton(onClick = player::next) { Icon(XIcons.Next, stringResource(R.string.next)) }
             }
             if (now.durationMs > 0) {
@@ -148,10 +176,11 @@ internal fun MiniPlayer(now: NowPlaying, player: PlayerLink, model: PhoneModel) 
 }
 
 @Composable
-private fun PlayPauseButton(now: NowPlaying, player: PlayerLink, modifier: Modifier, iconSize: Dp) {
-    IconButton(onClick = player::playPause, modifier = modifier) {
-        if (now.playing && now.buffering) {
-            CircularProgressIndicator(Modifier.size(iconSize - 4.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onSurface)
+private fun PlayPauseButton(now: NowPlaying, player: PlayerLink, modifier: Modifier, iconSize: Dp, busy: Boolean = false) {
+    // Mentre Music Assistant prepara un "suona" un play qui farebbe ripartire il brano da capo (resume).
+    IconButton(onClick = player::playPause, modifier = modifier, enabled = !busy) {
+        if (busy || now.playing && now.buffering) {
+            Waiting(Modifier.size(iconSize - 4.dp), 2.dp, MaterialTheme.colorScheme.onSurface)
         } else {
             Icon(
                 if (now.playing) XIcons.Pause else XIcons.Play,
@@ -180,7 +209,9 @@ internal fun PlayerScreen(now: NowPlaying, player: PlayerLink, model: PhoneModel
             Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { model.playerOpen = false }) { Icon(XIcons.Down, stringResource(R.string.close_player), Modifier.size(30.dp)) }
                 // Dove suona: toccandolo si sceglie un altro lettore ("Suona su").
-                Box(Modifier.weight(1f).padding(horizontal = 8.dp), contentAlignment = Alignment.Center) { PlayOnButton(model) }
+                Box(Modifier.weight(1f).padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
+                    if (model.canPlayElsewhere) PlayOnButton(model)
+                }
                 NowPlayingMenu(now, model)
             }
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -229,7 +260,7 @@ internal fun PlayerScreen(now: NowPlaying, player: PlayerLink, model: PhoneModel
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, maxLines = 2)
             }
             Spacer(Modifier.height(8.dp))
-            Controls(now, player)
+            Controls(now, player, busy = model.starting)
             (player as? RemoteLink)?.let { RemoteVolume(it) }
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -284,11 +315,12 @@ private fun SeekBar(now: NowPlaying, player: PlayerLink, position: State<Long>) 
 }
 
 @Composable
-private fun Controls(now: NowPlaying, player: PlayerLink) {
+private fun Controls(now: NowPlaying, player: PlayerLink, busy: Boolean) {
     val accent = MaterialTheme.colorScheme.primary
     val normal = MaterialTheme.colorScheme.onSurface
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-        IconButton(onClick = { player.setShuffle(!now.shuffle) }) {
+        // Tasti a due stati (IconToggleButton): chi usa TalkBack sente se sono accesi, non solo il nome.
+        IconToggleButton(checked = now.shuffle, onCheckedChange = { player.setShuffle(it) }) {
             Icon(XIcons.Shuffle, stringResource(R.string.shuffle), tint = if (now.shuffle) accent else normal.copy(alpha = 0.7f))
         }
         IconButton(onClick = player::previous, modifier = Modifier.size(56.dp)) {
@@ -296,11 +328,18 @@ private fun Controls(now: NowPlaying, player: PlayerLink) {
         }
         FilledIconButton(
             onClick = player::playPause,
+            enabled = !busy,
             modifier = Modifier.size(76.dp),
-            colors = IconButtonDefaults.filledIconButtonColors(containerColor = normal, contentColor = MaterialTheme.colorScheme.background),
+            // Spento mentre la musica parte, ma con lo stesso aspetto: si vede la rotella, non un tasto grigio.
+            colors = IconButtonDefaults.filledIconButtonColors(
+                containerColor = normal,
+                contentColor = MaterialTheme.colorScheme.background,
+                disabledContainerColor = normal,
+                disabledContentColor = MaterialTheme.colorScheme.background,
+            ),
         ) {
-            if (now.playing && now.buffering) {
-                CircularProgressIndicator(Modifier.size(32.dp), strokeWidth = 3.dp, color = MaterialTheme.colorScheme.background)
+            if (busy || now.playing && now.buffering) {
+                Waiting(Modifier.size(32.dp), 3.dp, MaterialTheme.colorScheme.background)
             } else {
                 Icon(
                     if (now.playing) XIcons.Pause else XIcons.Play,
@@ -312,8 +351,16 @@ private fun Controls(now: NowPlaying, player: PlayerLink) {
         IconButton(onClick = player::next, modifier = Modifier.size(56.dp)) {
             Icon(XIcons.Next, stringResource(R.string.next), Modifier.size(36.dp))
         }
-        IconButton(
-            onClick = {
+        // Ripeti ha tre stati: acceso o spento lo dice il tasto, quale dei due accesi lo dice questa descrizione.
+        val repeatState = when (now.repeat) {
+            Repeat.ALL -> stringResource(R.string.repeat_all_state)
+            Repeat.ONE -> stringResource(R.string.repeat_one_state)
+            Repeat.OFF -> null
+        }
+        IconToggleButton(
+            checked = now.repeat != Repeat.OFF,
+            modifier = Modifier.semantics { repeatState?.let { stateDescription = it } },
+            onCheckedChange = {
                 player.setRepeat(
                     when (now.repeat) {
                         Repeat.OFF -> Repeat.ALL
@@ -335,8 +382,9 @@ private fun Controls(now: NowPlaying, player: PlayerLink) {
 @Composable
 private fun PanelButton(icon: ImageVector, label: Int, model: PhoneModel, panel: PlayerPanel) {
     val selected = model.playerPanel == panel
-    IconButton(
-        onClick = { model.playerPanel = if (selected) PlayerPanel.COVER else panel },
+    IconToggleButton(
+        checked = selected,
+        onCheckedChange = { model.playerPanel = if (selected) PlayerPanel.COVER else panel },
         modifier = Modifier.clip(CircleShape).background(if (selected) Color.White.copy(alpha = 0.16f) else Color.Transparent),
     ) {
         Icon(icon, stringResource(label), tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f))

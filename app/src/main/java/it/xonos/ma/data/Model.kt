@@ -73,6 +73,8 @@ data class ServerInfo(
     /** Chi ha fatto l'accesso (il nome da mostrare) e il suo ruolo: "admin", "user", "guest"... */
     val user: String? = null,
     val role: String? = null,
+    /** L'identità del server (server_id): la stessa da casa e da fuori, diversa per ogni Music Assistant. */
+    val id: String = "",
 ) {
     /** Solo gli amministratori gestiscono i servizi di Music Assistant. */
     val admin: Boolean get() = role == "admin"
@@ -81,6 +83,7 @@ data class ServerInfo(
         fun from(info: JSONObject): ServerInfo? {
             if (info.str("server_id") == null) return null
             return ServerInfo(
+                id = info.str("server_id").orEmpty(),
                 name = info.str("name") ?: "Music Assistant",
                 version = info.str("server_version") ?: "?",
                 schemaVersion = info.optInt("schema_version"),

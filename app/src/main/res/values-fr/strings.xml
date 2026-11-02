@@ -31,6 +31,7 @@
     <string name="phone_server_help">Pas de Music Assistant à la maison ? Xonos peut en faire tourner un sur ce téléphone, rien que pour lui et pour myCar. Ajoutez ensuite votre musique depuis Services de Music Assistant : les fichiers du téléphone, la radio, les podcasts et les services de streaming.</string>
     <string name="phone_server_use">Utiliser Music Assistant sur ce téléphone</string>
     <string name="phone_server_starting">Démarrage… (la première fois, cela prend une minute)</string>
+    <string name="phone_server_preparing">Vérification et préparation de Music Assistant…</string>
     <string name="phone_server_in_use">Xonos utilise le Music Assistant de ce téléphone. Ajoutez votre musique depuis Services de Music Assistant.</string>
     <string name="phone_server_leave">Utiliser un autre Music Assistant</string>
     <string name="phone_server_failed">Music Assistant n’a pas démarré : %1$s</string>
@@ -164,10 +165,13 @@
     <string name="close_player">Fermer le lecteur</string>
     <string name="play">Lecture</string>
     <string name="pause">Pause</string>
+    <string name="play_starting">Lancement de la musique…</string>
     <string name="shuffle">Aléatoire</string>
     <string name="next">Suivant</string>
     <string name="previous">Précédent</string>
     <string name="repeat">Répéter</string>
+    <string name="repeat_all_state">Tous les titres</string>
+    <string name="repeat_one_state">Un titre</string>
     <string name="favorite_add">Ajouter aux favoris</string>
     <string name="favorite_remove">Retirer des favoris</string>
     <string name="play_next">Lire ensuite</string>
@@ -239,9 +243,14 @@
     <string name="secret_saved">Enregistré (tapez pour le changer)</string>
     <string name="field_required">Obligatoire</string>
     <string name="field_invalid">Valeur non valide</string>
+    <string name="folder_not_found">Ce dossier n’existe pas, ou Xonos ne peut pas le lire.</string>
     <string name="show_advanced">Afficher les options avancées</string>
     <string name="hide_advanced">Masquer les options avancées</string>
     <string name="flow_cancel">Annuler</string>
+    <string name="flow_leave_title">Arrêter la configuration de %1$s ?</string>
+    <string name="flow_leave_text">Les étapes déjà faites seront perdues et il faudra recommencer.</string>
+    <string name="flow_leave">Arrêter</string>
+    <string name="flow_stay">Continuer</string>
     <string name="flow_finish">Terminer</string>
     <string name="flow_next">Suivant</string>
     <string name="flow_open_browser">Ouvrir dans le navigateur</string>
@@ -252,6 +261,7 @@
     <string name="flow_done">OK</string>
     <string name="flow_aborted">Configuration interrompue : %1$s</string>
     <string name="flow_aborted_plain">Configuration interrompue.</string>
+    <string name="flow_ended_away">La configuration s’est terminée pendant que tu étais hors de Xonos. Si le service n’est pas dans la liste, recommence.</string>
     <string name="flow_close">Fermer</string>
     <string name="notice_saved">Enregistré</string>
     <string name="notice_removed">Service retiré</string>

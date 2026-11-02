@@ -66,8 +66,8 @@ prima di cominciare: le cose scritte qui sono già state verificate, non vanno r
   senza chiave e passa ricetta e APK a `fdroid lint` e `fdroid scanner`. `dependenciesInfo` è spento
   (F-Droid rifiuta quel blocco). Build riproducibili: il workflow "Riproducibile" compila la release
   come F-Droid (la loro immagine `fdroidserver:buildserver-trixie`, OpenJDK 21, Gradle del wrapper,
-  senza `tools/`) e la confronta byte per byte con l'APK della release tolta la firma: per la 0.1.38 e la
-  0.1.42 identici. Così la ricetta ha `Binaries` e `AllowedAPKSigningKeys` (SHA-256 del certificato
+  senza `tools/`) e la confronta byte per byte con l'APK della release tolta la firma: per la 0.1.38, la
+  0.1.42, la 0.1.49 e la 0.1.50 identici. Così la ricetta ha `Binaries` e `AllowedAPKSigningKeys` (SHA-256 del certificato
   `18ef3fc3…2c836`): F-Droid pubblica l'APK con la nostra firma e si passa da GitHub/Obtainium a F-Droid
   senza disinstallare. Dopo ogni release va lanciato a mano "Riproducibile": una versione non identica
   F-Droid non la pubblica. Il modello delle richieste di fdroiddata vuole in `commit` l'hash completo e
@@ -100,7 +100,7 @@ prima di cominciare: le cose scritte qui sono già state verificate, non vanno r
   identica. Dalla 0.1.50 `proot.sh` mette
   nel GNUmakefile il `llvm-readelf` dell'NDK e al posto dello script di proot `app/native/loader-info.awk` (stesso
   file generato, con ogni awk; si ferma se mancano i simboli), controlla l'offset e scrive le impronte SHA-256 delle
-  quattro librerie nel log: in CI uguali a quelle della 0.1.49. gawk e binutils allora non dovrebbero più servire
+  quattro librerie nel log: in CI uguali a quelle della 0.1.49, e Riproducibile dà la 0.1.50 identica. gawk e binutils allora non dovrebbero più servire
   (da provare con Riproducibile prima di toglierli dalla ricetta). In locale (sandbox) non si compila né si esegue:
   solo in CI.
 - R8 è acceso nella release (`isMinifyEnabled` e `isShrinkResources`, regole in `app/proguard-rules.pro`,
@@ -257,8 +257,12 @@ prima di cominciare: le cose scritte qui sono già state verificate, non vanno r
   un'esecuzione sola per volta (`SoloistBackend._acquire_run`); se ne è in corso una per un altro brano, ogni
   play riceve `soloist_session_busy` ("… is already playing something else. Spotify Soloist plays one thing at a
   time, so stop the other player first"), con `translation_args` il nome del servizio. Un flusso che nessuno
-  ritira (il telefono scollegato a metà brano) tiene l'esecuzione finché il servizio non si ricarica. Gli errori
-  di MA portano `translation_key` e `translation_args` (in `MaException.key`/`args`). `SoloistUnlock`: se nessun
+  ritira (il telefono scollegato a metà brano) tiene l'esecuzione finché il servizio non si ricarica. Attraverso
+  `/ws` gli errori di MA 2.10 arrivano già tradotti nella lingua della connessione e senza `translation_key` e
+  `translation_args` (`ErrorResultMessage.__post_serialize__` li toglie: il traduttore è sempre legato in
+  `websocket_client`), quindi `MaException.key`/`args` restano vuoti e `SoloistUnlock.busy` riconosce il testo in
+  ogni lingua in cui MA lo traduce (de, es, nl, ru_RU, sr_Latn; le altre restano in inglese) e in quella italiana di
+  `server/ma/ma-strings.json` (da tenere uguali; `SoloistCheckKt` usa i testi veri). `SoloistUnlock`: se nessun
   altro lettore suona Spotify (`player_queues/all`: `state` playing, `available`, brano con fonte spotify)
   ricarica il servizio (`config/providers/reload`, solo admin) e riprova una volta; più errori entro 15 s, una
   ricarica sola. `SoloistCheckKt` lo prova col servizio dei file al posto di Spotify (errore finto). In
@@ -493,7 +497,13 @@ di Xonos suona dal server sul telefono; la release ridotta con R8, da capo come 
     reale: PulseAudio 1%, proot 1%, pacat 0% (3,87 MB letti su 3,53 MB del tempo reale).
   - **Il processore nel registro**: ogni minuto (`CPU_EVERY_S`), finché gira un programma Linux, una riga
     "Processore dei programmi Linux negli ultimi 60 s: soloist N%, proot N%, pulseaudio N%" (100% = un core, i nomi
-    dall'argv[0] di /proc; gli zombie non contano), così dal registro di una persona si vede quanto pesa proot.
+    dall'argv[0] di /proc; gli zombie non contano), così dal registro di una persona si vede quanto pesa proot. Sul
+    telefono dell'utente (0.1.50, Soloist che suona): soloist 16%, proot 14% (2 processi), pulseaudio 13%. Dal
+    pacchetto 2.10.8-6 si guarda ogni 5 s (`CPU_SAMPLE_S`): con un'occhiata al minuto il Soloist di un brano finito
+    prima della riga non compariva; "(N processi)" è quanti ne giravano insieme al massimo. Dal 2.10.8-6 ogni proot porta il
+    nome del programma che segue (`proot[soloist]`, `proot[pulseaudio]`, dopo `-w <cartella>` nella sua riga di comando). Il proot di Termux
+    intercetta anche `sendto`, `recvfrom`, `sendmsg`, `recvmsg`, `close`, `ioctl`, `brk` (`proot_sysnums` in
+    `syscall/seccomp.c`): la rete di Soloist e il protocollo di PulseAudio passano tutti da lui, da qui il suo peso.
     In CI la riga non compare (le prove con i programmi Linux durano 21 s, prima del primo minuto): provata in
     locale; `_processes` e `SC_CLK_TCK` sull'emulatore li usa anche `cpu-audio`.
   - **prepare.py** (`_soloist`): `_resolve_architecture` accetta Android quando c'è XONOS_PROOT; il flusso di Spotify
@@ -534,13 +544,17 @@ di Xonos suona dal server sul telefono; la release ridotta con R8, da capo come 
   (`usePhoneServer`): avvia il server, la prima volta crea l'account `xonos` (amministratore) con una password
   che Xonos tiene in `Settings` (per rientrare se perde il token), poi token e prova della connessione come
   per ogni Music Assistant. Scaricato: "Usa Music Assistant su questo telefono" e "Togli dal telefono" (con
-  conferma); in uso: "Usa un altro Music Assistant". `XonosApp` riavvia il server all'avvio e quando la
+  conferma); in uso: "Usa un altro Music Assistant". In uso ma senza il pacchetto di questa versione (Xonos
+  aggiornato, il server non parte) dalla 0.1.51 la scheda dice di aggiornarlo e ha "Aggiorna Music Assistant su
+  questo telefono" (fino alla 0.1.50 il tasto compariva solo dopo "Usa un altro Music Assistant", e l'utente non lo
+  trovava), e la Home lo dice nel `ConnectionBanner`, con un tasto per le Impostazioni. I dati restano. `XonosApp` riavvia il server all'avvio e quando la
   connessione cade, se l'indirizzo salvato è il suo e il pacchetto c'è. `PhoneServerControl` è l'interfaccia
   senza Android: `PhoneServerCheckKt` (banco JVM) la prova con un download finto contro il server avviato sul
   computer.
 - **La musica del telefono**: l'app dichiara `READ_MEDIA_AUDIO` (`READ_EXTERNAL_STORAGE` fino ad Android 12) e
   lo chiede al sì del download (`Host.askMusicFiles`); il servizio dei file sul disco (Filesystem (local
-  disk)) propone `/storage/emulated/0/Music` invece di `/media` (`prepare.py`).
+  disk)) propone la cartella Music del profilo (`XONOS_MUSIC_DIR` da Xonos, di solito `/storage/emulated/0/Music`)
+  invece di `/media` (`prepare.py`).
 - **ABI**: `xonosServerAbis` in `gradle.properties` (arm64-v8a e x86_64, quella dell'emulatore delle prove).
   La release pubblica solo il pacchetto arm64-v8a.
 - **Le prove** (workflow "Server MA", `tools/server/emulator.sh`, a ogni cambio all'app su un ramo `claude/`):
@@ -580,6 +594,10 @@ di Xonos suona dal server sul telefono; la release ridotta con R8, da capo come 
   `XonosApp.phone`, così sopravvive a rotazione e cambio di lingua (`recreate()`). Tre schede (Home,
   Cerca, Libreria) con la loro pila di pagine; il lettore a schermo intero sta sopra tutto, e la sua
   vista (copertina, testo, coda) è nel modello.
+- Music Assistant risponde a `play_media` solo quando la musica parte (con Soloist circa 7 s sul telefono
+  dell'utente): `PhoneModel.starting` accende subito la rotella al posto di play (o `StartingBar` se prima non
+  suonava niente) e lo stesso "suona" toccato di nuovo nel frattempo non parte una seconda volta (con Soloist
+  rifarebbe tutto da capo). Dalla 0.1.51.
 - Si suona con `Library.playMedia` sulla coda del telefono (id del lettore), dopo aver aspettato
   `XonosApp.playerReady`, che il servizio accende quando API e Sendspin sono pronti e Music Assistant ha la
   coda del telefono (`player_queues/get` con `available`, al massimo 10 s): MA registra il lettore un attimo
@@ -614,6 +632,120 @@ di Xonos suona dal server sul telefono; la release ridotta con R8, da capo come 
   a suonare da sé, lo schermo torna al telefono (`phonePlaying`). La scelta non si salva.
 - Ciò che sta fuori dallo `Scaffold` (lettore, benvenuto) ha bisogno della `Surface` della radice
   sopra, altrimenti `LocalContentColor` è nero.
+
+## Correzioni della notte (1–2 novembre 2026, ramo `claude/notte`)
+
+Da una caccia ai bug con più agenti (8 aree, un giudice avversario per area) e verificate nel codice:
+- `MaPlayer.forgetDrop` + `AudioDeviceCallback` in `PlaybackService`: un'uscita esterna (Bluetooth, cuffie) che si
+  stacca a musica già ferma (rete caduta) annulla la ripresa automatica, che durava 10 minuti e sarebbe uscita
+  dall'altoparlante.
+- Dall'auto una scelta arriva con un play subito dopo: `player_queues/play` su una coda non in pausa per Music
+  Assistant è un `resume` che rifà partire il brano (Soloist: altri 7 s). `MaPlayer.choosing`: durante la scelta il
+  play si ignora, una pausa si mette appena la musica parte. Sul telefono il tasto play è spento mentre parte.
+- Server sul telefono: al cambio di rete niente `repo.reconnect()` (127.0.0.1 non cambia; ricollegarsi fermava la
+  coda) e margine Sendspin del Wi-Fi anche in rete mobile (`PlaybackService.onPhoneServer`).
+- `SendspinClient.start`: se il ciclo sta solo aspettando il prossimo tentativo (fino a 30 s), riparte subito.
+- `MaPlayer.stateItems` si aggiorna subito a ogni "togli"/"sposta": la modifica dopo arriva con le posizioni del
+  segnaposto di Media3.
+- Wake lock anche mentre la coda deve suonare ma l'audio non esce ancora (al massimo 2 minuti, solo processore):
+  in auto a schermo spento la preparazione di Soloist si sarebbe fermata.
+- `AudioEngine.decode`: un decoder guasto si sostituisce (al massimo una volta al secondo).
+- Token: Music Assistant 2.10 fa durare un anno i token a lunga durata, senza rinnovo (2.7–2.9: dieci anni).
+  `TokenInfo` legge il JWT (`exp`, `is_long_lived`, `token_name`); collegato a meno di 30 giorni dalla scadenza
+  `MaRepository.renewToken` se ne fa dare uno nuovo con lo stesso nome e lo salva (il vecchio resta valido: revocarlo
+  chiuderebbe anche questa connessione). Col server sul telefono, su `BAD_TOKEN` `XonosApp` rientra con
+  `phoneServerPassword`. `TokenCheckKt` (contro la 2.10.8 in Docker).
+- `MaClient`: per gli elenchi a pezzi il tempo concesso conta dall'ultimo pezzo (`lastPart`), e i pezzi di una
+  richiesta già lasciata si buttano. `SlowListCheckKt` con `tools/harness/slow_ma.py` (finto MA a pezzi lenti).
+- Fuori casa: con un indirizzo remoto, quello di casa ha 3 s per aprire la connessione (`homeHttp`, prima 8 s);
+  `MaPlayer.handlePrepare` si ricollega solo se il collegamento è fallito. `HomeCheckKt`: 3,1 s.
+- `AudioEngine`: prima del primo tempo vero dell'uscita (`timed`, al massimo `UNTIMED_GRACE_US` = 5 s) un ritardo
+  stimato non fa saltare niente, e quello che il primo tempo vero rivela si tratta come all'avvio (`lateUs`). Un
+  Bluetooth sospeso (autoradio dopo una pausa) faceva saltare 240–300 ms subito dopo l'inizio: `StartCheckKt`, caso
+  "Bluetooth dell'auto lento a ripartire" (uscita ferma 1,5 s), ora niente saltato con Android 11 e 12.
+- Telefono: avvisi sopra il lettore a schermo intero, errori 10 s con la ×; benvenuto nel modello
+  (`welcomePage`, regge a rotazione e lingua); "Togli dal telefono" guarda le impostazioni salvate; la notifica apre
+  il lettore solo alla prima `onCreate`; `RemoteLink` rilegge la coda della cassa a ogni collegamento; Casuale,
+  Ripeti, Testo e Coda sono `IconToggleButton` (TalkBack); "Suona su" non c'è col server sul telefono
+  (`canPlayElsewhere`); un server trovato in rete diverso da quello salvato non riceve il token (`choose`).
+- Server sul telefono, app: download uno alla volta (`Mutex`), l'estrazione si ferma ad "Annulla", a download finito
+  "Controllo e preparo Music Assistant…"; se non parte la Home dice perché (`phoneServerFailure`) con "Riprova", e
+  `XonosApp` smette di riavviarlo dopo 3 avvii falliti di fila (`AUTO_STARTS`; prima ogni 20 s per sempre); si ferma
+  quando si passa a un altro Music Assistant; dopo l'uscita di Python Xonos chiude il tubo (2 s) e lo stato di un
+  processo vecchio non tocca quello nuovo; `stop()` manda un SIGKILL vero con `Os.kill` (il pid da
+  `Process.toString()`, "Process[pid=…": su Android `destroyForcibly()` è un altro SIGTERM). Android 10:
+  `requestLegacyExternalStorage`.
+- Server sul telefono, pacchetto 2.10.8-6: le righe per Xonos con una write sola (`_line`: con `-u`/PYTHONUNBUFFERED
+  `print()` scrive testo e a capo in due volte, e una riga del registro finiva in mezzo: in locale 5608 righe
+  rovinate su 20000, poi nessuna; Xonos restava 180 s su "Avvio…"); l'uscita dei programmi Linux che nessuno legge va
+  a /dev/null (PulseAudio la ereditava e teneva aperto il tubo dopo Python); il flusso di Spotify ripete il passo
+  finale con l'errore (`xonos_finish_retry`) invece di chiudersi e cancellare l'abbinamento di Soloist; all'avvio una
+  prova di ptrace (`_ptrace_refused`: proot con `pactl --version`, cerca "ptrace" nell'errore, il messaggio di
+  `tracee/event.c` è "ptrace(TRACEME)"): se negato `XONOS_PROOT_ERROR=ptrace`, niente Soloist (prima lo scaricava e
+  buttava a ogni tentativo), riga nel registro e passo `xonos_soloist_blocked` nel flusso.
+- Auto: menu e ricerca aspettano il collegamento (`awaitConnected`, 20 s) e se non arriva, collegati, si chiede
+  all'auto di rileggere la radice (`notifyChildrenChanged`); col server sul telefono l'errore dice che parte, va
+  aggiornato o perché non è partito (`phoneServerProblem`); gli errori di play e dei comandi vanno alla sessione
+  (`MaPlayer.onFailure` → `MediaSession.sendError`, Media3 1.11, `@UnstableApi`).
+- Play dopo una pausa (Soloist 7 s): Music Assistant risponde a `player_queues/play` solo quando la musica parte.
+  `getPlaceholderState` dà BUFFERING finché un play aspetta (rotella invece di "sta suonando"), i 3 s di attesa
+  dell'effetto contano dalla risposta (`COMMAND_CAP_MS` 60 s in ogni caso), un secondo play mentre parte non manda
+  niente, una pausa mentre parte manda `stop` (in Music Assistant `_handle_stop` aspetta la fine dell'avvio, `pause`
+  no). La ripresa dopo un calo di rete non parte se un'uscita esterna si è staccata dopo l'ultima musica
+  (`outputGoneAt`) o se il server è cambiato (`Drop.server`).
+- Dalla revisione delle modifiche e dal percorso di chi reinstalla (due giri con verificatori avversari):
+  - Ripresa dopo un calo: il server si riconosce dal `server_id` (`ServerInfo.id`, lo stesso da casa e da fuori), non
+    dall'indirizzo: uscendo di casa la ripresa sarebbe saltata.
+  - Auto: niente attese del menu se il problema non passa da solo (`LASTING`: token, versione, indirizzo...), col
+    server sul telefono da aggiornare o fermo, o dopo un'attesa già andata a vuoto; i Generi restano nella radice se
+    il conteggio fallisce senza collegamento (spariscono solo se Music Assistant rifiuta il comando); mentre la musica
+    deve partire si tiene solo il processore (il Wi-Fi lock si libera).
+  - Uscita in uso staccata (`BECOMING_NOISY`): `AudioEngine.silence()`, l'audio già ricevuto resta zitto fino al
+    prossimo play (`unsilence` da `onPlayWhenReadyChanged`) o a uno stream nuovo; senza rete il buffer (30 s) usciva
+    dall'altoparlante. `SilenceCheckKt`. Decoder guasto due volte in un secondo: si riprova dopo un secondo
+    (`decoderBroken`; con Sendspin il flusso è continuo). `DecoderCheckKt`: prima 1,0 s di musica su 6, ora 4,0.
+  - Home e Libreria si ricaricano all'evento `music_sync_completed` (Music Assistant ha finito di leggere la libreria:
+    67 ms dopo `music/sync` nella 2.10.8, `SyncEventCheckKt`); "Aggiungi un servizio" nella Home vuota apre la scelta.
+  - Server sul telefono: schermo acceso (`KeepScreenOn` in Platform.kt) finché la scheda scarica, prepara o controlla;
+    l'attesa dell'avvio conta solo il tempo passato davvero (a schermo spento Android congela l'app); la cartella Music
+    del profilo (`XONOS_MUSIC_DIR`, in un profilo secondario non è /storage/emulated/0); testo per
+    `music_directory_not_found`; myCar che chiede l'account fa ripartire il server (`startPhoneServerIfUsed`).
+  - Flussi sul server del telefono (`_flows` in prepare.py): `IDLE_FLOW_TTL` 3 ore; `config/flows/get` dà ancora
+    l'ultimo passo dei 16 flussi finiti più recenti (prima "Unknown (or finished) setup flow" a chi tornava dal
+    browser; con gli altri Music Assistant l'app lo dice a parole, `ENDED_AWAY`). Spotify: passo `xonos_finishing`
+    ("Avvio di Spotify…") prima di `finish`, e se l'errore dice che il token non vale più (`refresh_token_invalid`,
+    `invalid_grant`, `revoked`) il riprova rifà l'accesso nel browser. Descrizioni selezionabili, avanzamento in Markdown.
+    Account non scritto nella User Management dell'app Spotify della persona (Development Mode: il proprietario e altri
+    4): l'accesso riesce, poi `/v1/me` risponde 403 con "registered" nel testo e Music Assistant saltava il controllo.
+    Ora il passo `xonos_user_not_registered` spiega cosa fare e, ad Avanti, ricontrolla con lo stesso token
+    (`_xonos_verify_account`). Non provato con Spotify vero (il testo del 403 è quello che riportano gli sviluppatori).
+    I testi di Soloist che Music Assistant non traduce in italiano (35) sono in `server/ma/ma-strings.json`: `_texts`
+    li unisce solo per voci che Music Assistant ha in inglese (sennò si ferma).
+    Indietro o "Annulla" in un flusso andato oltre il primo passo prima chiede conferma (`FlowPage.confirmLeave`,
+    `ServicesModel.asksBeforeLeaving`; mentre si chiede indietro chiude solo la domanda, si esce con Interrompi; l'uscita
+    da un passo progress non conta, la fa il server): con Spotify buttava Client ID e accessi. Se
+    il flusso finisce mentre si chiede, la domanda si chiude e "Interrompi" esce come dalla fine (`close`).
+    `ServicesCheckKt`, scena `flow-leave` di `tools/screens`.
+  - Correzioni alle correzioni: tornando al server salvato in `choose` tornano token e accesso; avvisi sopra il
+    lettore solo se si vede; "Riprova" con `phoneServerRetrying`; `forgetServer` solo se cambia l'indirizzo di casa,
+    e tiene la pagina delle Impostazioni in qualsiasi scheda; `MaRepository.release()` mette Connecting (il prossimo
+    Connected si vede); Ripeti dice a TalkBack quale modo (tutti i brani / un brano).
+- Auto (dal percorso in auto): Media3 taglia a 256 KB l'elenco per i browser legacy come Gearslip
+  (`truncateListBySize` in `MediaLibraryServiceLegacyStub`, `TRANSACTION_SIZE_LIMIT_IN_BYTES`): oltre 150 voci
+  (`Menu.PART`) un elenco diventa cartelle `part|<k>|<cartella>` ("1–150"...), con voci dagli stessi id dell'elenco
+  intero (`LongListCheckKt`: 2880 brani, 20 cartelle). La ricerca chiede sempre di nuovo (`fresh`). La stessa voce
+  toccata di nuovo mentre parte non manda un secondo play_media (`lastChoice`: aspetta il primo; per le ricerche a
+  voce conta la frase, perché l'id è vuoto; uno stop lo azzera, una pausa no: il play del nuovo tocco la toglie).
+  Nel lettore:
+  indietro con un salto in corso passa da `skip`; pausa durante un salto → stop dopo il salto (`pauseAfterSkip`);
+  `pauseFromSystem`/`resumeFromSystem` come pausa e play della persona; pausa o stop voluti tolgono la ripresa
+  automatica; pausa non arrivata per la rete → `onPauseLost` → `engine.silence()` (torna su solo con un play
+  USER_REQUEST); uscita esterna staccata mentre la musica parte → silenzio e pausa; i salti falliti vanno a
+  `onFailure`.
+- Proposte non fatte: PulseAudio senza shm né memfd (`rootfs.py`: `enable-shm = no`, `enable-memfd = no`) non apre lo
+  srbchannel, e ogni pacchetto audio tra Soloist e PulseAudio passa da sendto/recvmsg, che proot intercetta: con memfd
+  (che non usa /dev/shm) il peso di proot (14% sul telefono) potrebbe scendere. Da provare sul telefono prima di
+  pubblicarlo. Il backup di Android porta con sé token e dati di Music Assistant (nessun `allowBackup`): da decidere.
 
 ## Lingue
 

@@ -6,7 +6,10 @@ import android.net.LinkProperties
 import android.net.Network
 import android.net.wifi.WifiManager
 import android.os.Build
+import android.os.Environment
 import android.os.SystemClock
+import android.system.Os
+import android.system.OsConstants
 import android.util.Log
 import it.xonos.ma.BuildConfig
 import it.xonos.ma.phone.model.PhoneServerControl
@@ -98,13 +101,19 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
 
     override suspend fun start(): Boolean = withContext(Dispatchers.IO) {
         launch()
-        val deadline = SystemClock.elapsedRealtime() + START_TIMEOUT_MS
-        while (SystemClock.elapsedRealtime() < deadline) {
+        // Si conta solo il tempo aspettato davvero: a schermo spento Android può congelare l'app (e il server con lei),
+        // e al risveglio quel tempo non è un avvio lento (prima: "it didn't start in 180 s" col server che partiva).
+        var waited = 0L
+        var last = SystemClock.elapsedRealtime()
+        while (waited < START_TIMEOUT_MS) {
             when (state) {
                 State.RUNNING -> return@withContext true
                 State.FAILED, State.STOPPED -> return@withContext false
                 State.STARTING -> delay(POLL_MS)
             }
+            val now = SystemClock.elapsedRealtime()
+            waited += minOf(now - last, 4 * POLL_MS)
+            last = now
         }
         error = "it didn't start in ${START_TIMEOUT_MS / 1000} s"
         false
@@ -115,9 +124,14 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
             stopping = true
             process
         } ?: return
-        // SIGTERM: Music Assistant chiude il database e i servizi; se non basta, SIGKILL.
+        // SIGTERM: Music Assistant chiude il database e i servizi; se non basta, SIGKILL. Su Android
+        // destroyForcibly() manda un altro SIGTERM, che Python ignora (sta già chiudendo): il SIGKILL va mandato a mano.
         running.destroy()
-        if (!running.waitFor(STOP_TIMEOUT_S, TimeUnit.SECONDS)) running.destroyForcibly()
+        if (!running.waitFor(STOP_TIMEOUT_S, TimeUnit.SECONDS)) {
+            val pid = PID.find(running.toString())?.groupValues?.get(1)?.toIntOrNull()
+            if (pid != null) runCatching { Os.kill(pid, OsConstants.SIGKILL) } else running.destroyForcibly()
+            running.waitFor(KILL_WAIT_S, TimeUnit.SECONDS)
+        }
     }
 
     private fun launch() {
@@ -153,6 +167,8 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
                 put("XONOS_PROOT_LOADER", prootLoader.path)
             }
             put("XONOS_DNS_FILE", dnsFile.path)
+            // La cartella Music di questo profilo (in un profilo secondario non è /storage/emulated/0/Music).
+            put("XONOS_MUSIC_DIR", Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC).path)
             put("PYTHONHOME", dir.path)
             put("PYTHONPATH", "$dir/app:$dir/site-packages")
             put("LD_LIBRARY_PATH", "$dir/lib:$dir/site-packages/chaquopy/lib")
@@ -177,7 +193,14 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
         }
         process = started
         Log.i(TAG, "Avvio di Music Assistant sul telefono")
-        thread(name = "music-assistant-log", isDaemon = true) { follow(started) }
+        val reader = thread(name = "music-assistant-log", isDaemon = true) { follow(started) }
+        thread(name = "music-assistant-exit", isDaemon = true) {
+            runCatching { started.waitFor() }
+            // Python è uscito ma il tubo è ancora aperto: lo tiene un programma rimasto acceso (pacchetti fino al
+            // 2.10.8-5, PulseAudio). Lo si chiude da qui: il registro finisce e lo stato dice che il server non c'è.
+            reader.join(EXIT_GRACE_MS)
+            if (reader.isAlive) runCatching { started.inputStream.close() }
+        }
     }
 
     /** Il registro del processo nel logcat; le righe XONOS_STATE dicono a che punto è. */
@@ -185,14 +208,16 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
         val last = ArrayDeque<String>()
         runCatching {
             running.inputStream.bufferedReader().forEachLine { line ->
+                // Con i startsWith anche una riga a cui si è attaccata una riga del registro (pacchetti fino al 2.10.8-5,
+                // che scrivevano testo e a capo in due volte): "XONOS_STATE running2026-11-01 ...".
                 if (line.startsWith(MULTICAST_PREFIX)) {
-                    multicast(line.removePrefix(MULTICAST_PREFIX).trim() == "on")
+                    multicast(line.removePrefix(MULTICAST_PREFIX).trim().startsWith("on"))
                 } else if (line.startsWith(STATE_PREFIX)) {
                     val said = line.removePrefix(STATE_PREFIX).trim()
                     when {
-                        said == "running" -> state = State.RUNNING
-                        said == "starting" -> state = State.STARTING
-                        said == "stopped" -> state = State.STOPPED
+                        said.startsWith("running") -> state = State.RUNNING
+                        said.startsWith("starting") -> state = State.STARTING
+                        said.startsWith("stopped") -> state = State.STOPPED
                         said.startsWith("failed") -> {
                             error = said.removePrefix("failed").trim()
                             state = State.FAILED
@@ -208,7 +233,9 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
         val code = running.waitFor()
         multicast(false)
         synchronized(lock) {
-            if (process === running) process = null
+            // Un processo di prima (il suo tubo è rimasto aperto più di lui) non tocca lo stato di quello nuovo.
+            if (process !== running) return@synchronized
+            process = null
             unwatchDns()
             if (stopping) {
                 state = State.STOPPED
@@ -275,6 +302,13 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
         private const val START_TIMEOUT_MS = 180_000L
         private const val POLL_MS = 250L
         private const val STOP_TIMEOUT_S = 15L
+        private const val KILL_WAIT_S = 2L
+
+        /** Quanto si lascia al registro per finire da solo dopo l'uscita di Python. */
+        private const val EXIT_GRACE_MS = 2_000L
+
+        /** Il numero del processo, da Process.toString() di Android: "Process[pid=1234, hasExited=false]". */
+        private val PID = Regex("pid=(\\d+)")
         private const val LAST_LINES = 20
         /** Quanto registro si condivide: le ultime righe bastano, e stanno in una condivisione di Android. */
         private const val LOG_BYTES = 96 * 1024

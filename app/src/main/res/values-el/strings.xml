@@ -31,6 +31,7 @@
     <string name="phone_server_help">Δεν έχετε Music Assistant στο σπίτι; Το Xonos μπορεί να εκτελέσει ένα σε αυτό το τηλέφωνο, μόνο για τον εαυτό του και για το myCar. Μετά προσθέστε τη μουσική σας από τις Υπηρεσίες του Music Assistant: αρχεία του τηλεφώνου, ραδιόφωνο, podcast και υπηρεσίες streaming.</string>
     <string name="phone_server_use">Χρήση του Music Assistant σε αυτό το τηλέφωνο</string>
     <string name="phone_server_starting">Εκκίνηση… (την πρώτη φορά χρειάζεται ένα λεπτό)</string>
+    <string name="phone_server_preparing">Έλεγχος και προετοιμασία του Music Assistant…</string>
     <string name="phone_server_in_use">Το Xonos χρησιμοποιεί το Music Assistant αυτού του τηλεφώνου. Προσθέστε τη μουσική σας από τις Υπηρεσίες του Music Assistant.</string>
     <string name="phone_server_leave">Χρήση άλλου Music Assistant</string>
     <string name="phone_server_failed">Το Music Assistant δεν ξεκίνησε: %1$s</string>
@@ -164,10 +165,13 @@
     <string name="close_player">Κλείσιμο του προγράμματος αναπαραγωγής</string>
     <string name="play">Αναπαραγωγή</string>
     <string name="pause">Παύση</string>
+    <string name="play_starting">Ξεκινά η μουσική…</string>
     <string name="shuffle">Τυχαία σειρά</string>
     <string name="next">Επόμενο</string>
     <string name="previous">Προηγούμενο</string>
     <string name="repeat">Επανάληψη</string>
+    <string name="repeat_all_state">Όλα τα τραγούδια</string>
+    <string name="repeat_one_state">Ένα τραγούδι</string>
     <string name="favorite_add">Προσθήκη στα αγαπημένα</string>
     <string name="favorite_remove">Αφαίρεση από τα αγαπημένα</string>
     <string name="play_next">Αναπαραγωγή μετά</string>
@@ -239,9 +243,14 @@
     <string name="secret_saved">Αποθηκευμένο (γράψτε για αλλαγή)</string>
     <string name="field_required">Υποχρεωτικό</string>
     <string name="field_invalid">Μη έγκυρη τιμή</string>
+    <string name="folder_not_found">Αυτός ο φάκελος δεν υπάρχει ή το Xonos δεν μπορεί να τον διαβάσει.</string>
     <string name="show_advanced">Εμφάνιση προηγμένων επιλογών</string>
     <string name="hide_advanced">Απόκρυψη προηγμένων επιλογών</string>
     <string name="flow_cancel">Ακύρωση</string>
+    <string name="flow_leave_title">Διακοπή της ρύθμισης του %1$s;</string>
+    <string name="flow_leave_text">Τα βήματα που έγιναν ως τώρα θα χαθούν και θα πρέπει να ξεκινήσετε από την αρχή.</string>
+    <string name="flow_leave">Διακοπή</string>
+    <string name="flow_stay">Συνέχεια</string>
     <string name="flow_finish">Ολοκλήρωση</string>
     <string name="flow_next">Επόμενο</string>
     <string name="flow_open_browser">Άνοιγμα στο πρόγραμμα περιήγησης</string>
@@ -252,6 +261,7 @@
     <string name="flow_done">Τέλος</string>
     <string name="flow_aborted">Η ρύθμιση σταμάτησε: %1$s</string>
     <string name="flow_aborted_plain">Η ρύθμιση σταμάτησε.</string>
+    <string name="flow_ended_away">Η ρύθμιση έκλεισε ενώ ήσουν έξω από το Xonos. Αν η υπηρεσία δεν είναι στη λίστα, ξεκίνα ξανά.</string>
     <string name="flow_close">Κλείσιμο</string>
     <string name="notice_saved">Αποθηκεύτηκε</string>
     <string name="notice_removed">Η υπηρεσία αφαιρέθηκε</string>

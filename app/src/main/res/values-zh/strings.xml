@@ -31,6 +31,7 @@
     <string name="phone_server_help">家里没有 Music Assistant？Xonos 可以在这部手机上运行一个，只供它自己和 myCar 使用。然后在“Music Assistant 服务”中添加你的音乐：手机里的文件、电台、播客和流媒体服务。</string>
     <string name="phone_server_use">在这部手机上使用 Music Assistant</string>
     <string name="phone_server_starting">正在启动…（第一次需要一分钟左右）</string>
+    <string name="phone_server_preparing">正在检查并准备 Music Assistant…</string>
     <string name="phone_server_in_use">Xonos 正在使用这部手机上的 Music Assistant。在“Music Assistant 服务”中添加你的音乐。</string>
     <string name="phone_server_leave">使用其他 Music Assistant</string>
     <string name="phone_server_failed">Music Assistant 未能启动：%1$s</string>
@@ -154,10 +155,13 @@
     <string name="close_player">关闭播放器</string>
     <string name="play">播放</string>
     <string name="pause">暂停</string>
+    <string name="play_starting">正在开始播放…</string>
     <string name="shuffle">随机播放</string>
     <string name="next">下一首</string>
     <string name="previous">上一首</string>
     <string name="repeat">重复</string>
+    <string name="repeat_all_state">全部歌曲</string>
+    <string name="repeat_one_state">单曲</string>
     <string name="favorite_add">添加到收藏</string>
     <string name="favorite_remove">从收藏中移除</string>
     <string name="play_next">下一首播放</string>
@@ -229,9 +233,14 @@
     <string name="secret_saved">已保存（输入以更改）</string>
     <string name="field_required">必填</string>
     <string name="field_invalid">无效的值</string>
+    <string name="folder_not_found">此文件夹不存在，或 Xonos 无法读取它。</string>
     <string name="show_advanced">显示高级选项</string>
     <string name="hide_advanced">隐藏高级选项</string>
     <string name="flow_cancel">取消</string>
+    <string name="flow_leave_title">要停止设置 %1$s 吗？</string>
+    <string name="flow_leave_text">目前完成的步骤将会丢失，需要从头开始。</string>
+    <string name="flow_leave">停止</string>
+    <string name="flow_stay">继续</string>
     <string name="flow_finish">完成</string>
     <string name="flow_next">下一步</string>
     <string name="flow_open_browser">在浏览器中打开</string>
@@ -242,6 +251,7 @@
     <string name="flow_done">完成</string>
     <string name="flow_aborted">设置已停止：%1$s</string>
     <string name="flow_aborted_plain">设置已停止。</string>
+    <string name="flow_ended_away">你离开 Xonos 时设置已结束。如果服务不在列表中，请重新开始。</string>
     <string name="flow_close">关闭</string>
     <string name="notice_saved">已保存</string>
     <string name="notice_removed">服务已移除</string>

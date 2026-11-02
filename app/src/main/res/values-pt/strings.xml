@@ -31,6 +31,7 @@
     <string name="phone_server_help">Não tem um Music Assistant em casa? O Xonos pode rodar um neste telefone, só para ele mesmo e para o myCar. Depois adicione sua música em Serviços do Music Assistant: os arquivos do telefone, rádio, podcasts e serviços de streaming.</string>
     <string name="phone_server_use">Usar o Music Assistant neste telefone</string>
     <string name="phone_server_starting">Iniciando… (na primeira vez leva um minuto)</string>
+    <string name="phone_server_preparing">Verificando e preparando o Music Assistant…</string>
     <string name="phone_server_in_use">O Xonos está usando o Music Assistant deste telefone. Adicione sua música em Serviços do Music Assistant.</string>
     <string name="phone_server_leave">Usar outro Music Assistant</string>
     <string name="phone_server_failed">O Music Assistant não iniciou: %1$s</string>
@@ -164,10 +165,13 @@
     <string name="close_player">Fechar o player</string>
     <string name="play">Tocar</string>
     <string name="pause">Pausar</string>
+    <string name="play_starting">Iniciando a música…</string>
     <string name="shuffle">Aleatório</string>
     <string name="next">Próxima</string>
     <string name="previous">Anterior</string>
     <string name="repeat">Repetir</string>
+    <string name="repeat_all_state">Todas as faixas</string>
+    <string name="repeat_one_state">Uma faixa</string>
     <string name="favorite_add">Adicionar aos favoritos</string>
     <string name="favorite_remove">Remover dos favoritos</string>
     <string name="play_next">Tocar em seguida</string>
@@ -239,9 +243,14 @@
     <string name="secret_saved">Salva (digite para mudar)</string>
     <string name="field_required">Obrigatório</string>
     <string name="field_invalid">Valor inválido</string>
+    <string name="folder_not_found">Esta pasta não existe ou o Xonos não a consegue ler.</string>
     <string name="show_advanced">Mostrar opções avançadas</string>
     <string name="hide_advanced">Ocultar opções avançadas</string>
     <string name="flow_cancel">Cancelar</string>
+    <string name="flow_leave_title">Parar a configuração de %1$s?</string>
+    <string name="flow_leave_text">Os passos feitos até agora serão perdidos e será preciso recomeçar.</string>
+    <string name="flow_leave">Parar</string>
+    <string name="flow_stay">Continuar</string>
     <string name="flow_finish">Concluir</string>
     <string name="flow_next">Avançar</string>
     <string name="flow_open_browser">Abrir no navegador</string>
@@ -252,6 +261,7 @@
     <string name="flow_done">Concluído</string>
     <string name="flow_aborted">Configuração interrompida: %1$s</string>
     <string name="flow_aborted_plain">Configuração interrompida.</string>
+    <string name="flow_ended_away">A configuração terminou enquanto estavas fora do Xonos. Se o serviço não estiver na lista, começa de novo.</string>
     <string name="flow_close">Fechar</string>
     <string name="notice_saved">Salvo</string>
     <string name="notice_removed">Serviço removido</string>

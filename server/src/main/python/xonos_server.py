@@ -117,7 +117,17 @@ def stop(timeout: float = 15.0) -> None:
 
 
 def _say(what: str) -> None:
-    print(f"{STATE_PREFIX} {what}", flush=True)
+    _line(f"{STATE_PREFIX} {what}")
+
+
+def _line(text: str) -> None:
+    """
+    Una riga per Xonos con una write sola, che in un tubo (sotto i 4096 byte) è atomica. Con print() il testo e l'a
+    capo erano due write, e una riga del registro di Music Assistant, scritta da un altro thread nello stesso tubo,
+    poteva finire in mezzo: "XONOS_STATE running2026-11-01 ...", e Xonos non vedeva mai che il server era partito.
+    """
+    sys.stdout.write(text.replace("\r", " ").replace("\n", " ") + "\n")
+    sys.stdout.flush()
 
 
 def _tools_through_linker() -> None:
@@ -170,13 +180,39 @@ LINUX_PROGRAMS = {"pulseaudio", "pactl", "pacat", "parec"}
 GUEST_ENV_DROP = {"LD_LIBRARY_PATH", "LD_PRELOAD", "PYTHONHOME", "PYTHONPATH", "SSL_CERT_FILE", "SSL_CERT_DIR"}
 FALLBACK_DNS = "nameserver 1.1.1.1\nnameserver 8.8.8.8\n"
 MULTICAST_PREFIX = "XONOS_MULTICAST"
-# Ogni quanto il registro dice quanto processore usano proot e i programmi Linux, mentre girano.
+# Ogni quanto il registro dice quanto processore usano proot e i programmi Linux, mentre girano, e ogni quanto
+# li si guarda (un Soloist per brano: guardando di rado, quello di un brano finito non si vedeva).
 CPU_EVERY_S = 60
+CPU_SAMPLE_S = 5
 
 # I gruppi di processi dei programmi Linux: uno per ogni proot avviato, con il numero di proot (vedi _linux_programs).
 _guest_groups: set[int] = set()
 # Quanti processi Linux di un server di prima erano rimasti accesi (tolti all'avvio, detto nel registro).
 _leftovers = 0
+
+
+# Perché i programmi Linux non possono girare (ptrace negato), se è così: lo si scrive nel registro all'avvio.
+_ptrace_blocked = ""
+
+
+def _ptrace_refused(base: list[str], loader: str, tmp: Path) -> str:
+    """
+    Una prova sola all'avvio (qualche decimo di secondo): proot fa girare un programma del sistema Linux. Se Android
+    non gli lascia seguire i programmi (ptrace negato: su GrapheneOS l'opzione che blocca il debug del codice nativo
+    per le app), il messaggio di proot; se va, o se non va per un altro motivo, "".
+    """
+    env = {"PATH": "/usr/bin:/bin", "PROOT_LOADER": loader, "PROOT_TMP_DIR": str(tmp)}
+    try:
+        done = subprocess.run(
+            [*base, "-w", "/", "/usr/bin/pactl", "--version"],
+            env=env, capture_output=True, timeout=30, start_new_session=True, check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    if done.returncode == 0:
+        return ""
+    text = " ".join((done.stderr + done.stdout).decode(errors="replace").split())
+    return text[:300] if "ptrace" in text.lower() else ""
 
 
 def _linux_programs(data_dir: str, cache_dir: str) -> None:
@@ -243,6 +279,16 @@ def _linux_programs(data_dir: str, cache_dir: str) -> None:
     # Un server fermato con SIGKILL lascia accesi i suoi programmi Linux (in un gruppo loro): via prima di partire.
     _end_leftovers(proot, tuple(dict.fromkeys([os.path.abspath(data_dir) + os.sep, data + os.sep])))
 
+    # Se Android non lascia a Xonos seguire i suoi programmi (ptrace), proot non fa girare niente: Music Assistant
+    # offrirebbe Soloist, lo scaricherebbe (34 MB) e lo butterebbe a ogni tentativo. Allora resta librespot, e il
+    # flusso di Spotify dice cosa permettere (XONOS_PROOT_ERROR).
+    global _ptrace_blocked
+    _ptrace_blocked = _ptrace_refused(base, loader, tmp)
+    if _ptrace_blocked:
+        os.environ.pop("XONOS_PROOT", None)
+        os.environ["XONOS_PROOT_ERROR"] = "ptrace"
+        return
+
     previous = subprocess.Popen
 
     class Popen(previous):  # type: ignore[misc, valid-type]
@@ -263,6 +309,13 @@ def _linux_programs(data_dir: str, cache_dir: str) -> None:
                     # Un gruppo di processi suo, con il numero di proot: i segnali vanno a tutto il gruppo.
                     if "process_group" not in kwargs:
                         kwargs["start_new_session"] = True
+                    # L'uscita che nessuno legge non va nel tubo verso Xonos (PulseAudio di Music Assistant la eredita):
+                    # un programma Linux rimasto acceso dopo Python lo terrebbe aperto, e Xonos non vedrebbe mai che
+                    # il server si è fermato. stdout ed stderr sono il 4° e il 5° argomento dopo args.
+                    if len(rest) < 4 and kwargs.get("stdout") is None:
+                        kwargs["stdout"] = subprocess.DEVNULL
+                    if len(rest) < 5 and kwargs.get("stderr") is None:
+                        kwargs["stderr"] = subprocess.DEVNULL
                     pairing = "--pair" in args
                     args = [*base, "-w", inside, program, *map(os.fsdecode, args[1:])]
             super().__init__(args, *rest, **kwargs)
@@ -365,7 +418,8 @@ def _watch_cpu() -> None:
     """
     Ogni CPU_EVERY_S secondi, se girano programmi Linux, scrive nel registro quanto processore hanno usato nel
     frattempo (100% = un core intero), per nome: proot, soloist, pulseaudio... Serve a capire, dal registro di una
-    persona, se proot pesa troppo sul telefono.
+    persona, se proot pesa troppo sul telefono. Guarda ogni CPU_SAMPLE_S secondi: Music Assistant avvia un Soloist
+    per brano, e uno finito tra due righe (quando si guardava solo una volta al minuto) non compariva affatto.
     """
     import time  # noqa: PLC0415
 
@@ -374,48 +428,64 @@ def _watch_cpu() -> None:
     except (ValueError, OSError):
         ticks = 100
     logger = logging.getLogger("xonos")
+    window = _CpuWindow(time.monotonic())
     before: dict[int, int] = {}
-    started = time.monotonic()
     while True:
-        time.sleep(CPU_EVERY_S)
+        time.sleep(CPU_SAMPLE_S)
         try:
-            before, started = _cpu_round(logger, ticks, before, started)
+            before = _cpu_sample(ticks, before, window)
+            now = time.monotonic()
+            if now - window.started >= CPU_EVERY_S:
+                window.log(logger, now)
+                window = _CpuWindow(now)
         except Exception:  # noqa: BLE001 - solo un aiuto per capire: non deve mai fermarsi
             logger.debug("Conto del processore non riuscito", exc_info=True)
 
 
-def _cpu_round(
-    logger: logging.Logger, ticks: int, before: dict[int, int], started: float
-) -> tuple[dict[int, int], float]:
-    """Un giro di _watch_cpu: scrive la riga se girano programmi Linux; dà i tick visti e il momento del giro."""
-    import time  # noqa: PLC0415
+class _CpuWindow:
+    """Il processore usato dai programmi Linux in un intervallo, per nome, e quanti ne giravano insieme al massimo."""
 
-    now = time.monotonic()
-    seconds = max(now - started, 1.0)
+    def __init__(self, started: float) -> None:
+        self.started = started
+        self.used: dict[str, float] = {}
+        self.most: dict[str, int] = {}
+
+    def log(self, logger: logging.Logger, now: float) -> None:
+        if not self.used:
+            return
+        seconds = max(now - self.started, 1.0)
+        parts = [
+            f"{name} {100 * value / seconds:.0f}%" + (f" ({self.most[name]} processi)" if self.most[name] > 1 else "")
+            for name, value in sorted(self.used.items(), key=lambda item: -item[1])
+        ]
+        logger.info("Processore dei programmi Linux negli ultimi %.0f s: %s", seconds, ", ".join(parts))
+
+
+def _cpu_sample(ticks: int, before: dict[int, int], window: _CpuWindow) -> dict[int, int]:
+    """Un'occhiata: aggiunge a [window] il processore usato dall'occhiata prima; dà i tick visti per processo."""
     groups = set(_guest_groups)
-    used: dict[str, float] = {}
-    counted: dict[str, int] = {}
     current: dict[int, int] = {}
     alive: set[int] = set()
+    together: dict[str, int] = {}
     for pid, (argv, group, total) in _processes().items():
         if group not in groups:
             continue
         alive.add(group)
         current[pid] = total
         name = os.path.basename(argv[0])
-        name = "proot" if name.startswith("libproot") else name
-        # Un processo nato nel frattempo conta tutto il suo tempo.
-        used[name] = used.get(name, 0.0) + (total - before.get(pid, 0)) / ticks
-        counted[name] = counted.get(name, 0) + 1
+        if name.startswith("libproot"):
+            # Col programma che segue (quello dopo "-w <cartella>"): proot[soloist] e proot[pulseaudio] separati, così
+            # dal registro si vede per quale dei due proot lavora di più.
+            at = argv.index("-w") + 2 if "-w" in argv else len(argv)
+            name = f"proot[{os.path.basename(argv[at])}]" if at < len(argv) else "proot"
+        # Un processo nato nel frattempo (al più CPU_SAMPLE_S secondi fa) conta tutto il suo tempo.
+        window.used[name] = window.used.get(name, 0.0) + (total - before.get(pid, 0)) / ticks
+        together[name] = together.get(name, 0) + 1
+    for name, count in together.items():
+        window.most[name] = max(window.most.get(name, 0), count)
     for group in groups - alive:
         _guest_groups.discard(group)
-    if used:
-        parts = [
-            f"{name} {100 * value / seconds:.0f}%" + (f" ({counted[name]} processi)" if counted[name] > 1 else "")
-            for name, value in sorted(used.items(), key=lambda item: -item[1])
-        ]
-        logger.info("Processore dei programmi Linux negli ultimi %.0f s: %s", seconds, ", ".join(parts))
-    return current, now
+    return current
 
 
 def _rootfs(package: Path) -> Path | None:
@@ -440,7 +510,7 @@ def _rootfs(package: Path) -> Path | None:
 
 
 def _say_multicast(on: bool) -> None:
-    print(f"{MULTICAST_PREFIX} {'on' if on else 'off'}", flush=True)
+    _line(f"{MULTICAST_PREFIX} {'on' if on else 'off'}")
 
 
 def _multicast_off_at_exit(pid: int) -> None:
@@ -477,6 +547,13 @@ def _run(data_dir: str, cache_dir: str, log_level: str) -> None:
                 if _leftovers:
                     logging.getLogger("xonos").warning(
                         "Tolti %d processi Linux rimasti accesi da prima (proot, Soloist, PulseAudio)", _leftovers
+                    )
+                if _ptrace_blocked:
+                    logging.getLogger("xonos").warning(
+                        "Soloist non può girare: Android non lascia a Xonos seguire i suoi programmi (ptrace: %s). "
+                        "Spotify resta con librespot. Su GrapheneOS: nelle informazioni dell'app Xonos permetti il "
+                        "debug del codice nativo (Native code debugging), poi Forza interruzione e riapri Xonos.",
+                        _ptrace_blocked,
                     )
                 selftest = None
                 if (Path(data_dir) / SELFTEST_FILE).is_file():

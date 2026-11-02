@@ -77,8 +77,28 @@ class SoloistUnlock(private val repo: MaRepository, private val domain: String =
         private val lock = Mutex()
         @Volatile private var lastUnlock = 0L
 
+        /**
+         * Il rifiuto di Soloist occupato in ogni lingua in cui Music Assistant lo traduce. Music Assistant 2.10 manda gli
+         * errori già tradotti nella lingua della connessione e senza `translation_key`: si riconosce dal testo. Le frasi
+         * vengono dalle sue traduzioni (de, es, nl, ru_RU, sr_Latn; le altre lingue restano in inglese) e da quella
+         * italiana del server sul telefono (`server/ma/ma-strings.json`): se cambiano lì, vanno cambiate qui.
+         */
+        private val BUSY = listOf(
+            "plays one thing at a time",
+            "una cosa alla volta",
+            "jeweils nur einen",
+            "una cosa a la vez",
+            "één stream tegelijk",
+            "только один трек за раз",
+            "samo jednu stvar istovremeno",
+        )
+
         /** L'errore di Music Assistant per Spotify Soloist occupato (anche quando lo dice in un'altra lingua). */
-        fun busy(e: Throwable): Boolean =
-            e is MaException && (e.key == "soloist_session_busy" || e.message.orEmpty().contains("plays one thing at a time"))
+        fun busy(e: Throwable): Boolean {
+            if (e !is MaException) return false
+            if (e.key == "soloist_session_busy") return true
+            val text = e.message.orEmpty()
+            return text.contains("Soloist") && BUSY.any { text.contains(it, ignoreCase = true) }
+        }
     }
 }

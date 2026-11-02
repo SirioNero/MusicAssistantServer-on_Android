@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.ReportDrawnWhen
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -13,6 +14,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import coil3.SingletonImageLoader
@@ -35,6 +37,19 @@ internal fun PlatformBackHandler(enabled: Boolean, onBack: () -> Unit) = BackHan
  */
 @Composable
 internal fun PlatformReportReady(ready: () -> Boolean) = ReportDrawnWhen(ready)
+
+/**
+ * Lo schermo resta acceso finché [on]: a schermo spento Android congela l'app (e il server sul telefono, suo figlio), e
+ * download, estrazione e primo avvio si fermavano senza dirlo.
+ */
+@Composable
+internal fun KeepScreenOn(on: Boolean) {
+    val view = LocalView.current
+    DisposableEffect(view, on) {
+        view.keepScreenOn = on
+        onDispose { view.keepScreenOn = false }
+    }
+}
 
 /** Copia un testo negli appunti di Android. */
 @Composable

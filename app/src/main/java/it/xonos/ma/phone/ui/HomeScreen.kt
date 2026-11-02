@@ -25,6 +25,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -64,7 +65,9 @@ internal fun HomeScreen(page: HomePage, model: PhoneModel, host: Host) {
             item(key = "header", contentType = "header") {
                 Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
-                    IconButton(onClick = model::openDevices, modifier = Modifier.testTag("home_play_on")) { Icon(XIcons.Cast, stringResource(R.string.play_on)) }
+                    if (model.canPlayElsewhere) {
+                        IconButton(onClick = model::openDevices, modifier = Modifier.testTag("home_play_on")) { Icon(XIcons.Cast, stringResource(R.string.play_on)) }
+                    }
                     IconButton(onClick = model::openSettings) { Icon(XIcons.Settings, stringResource(R.string.settings)) }
                 }
                 ConnectionBanner(model, host)
@@ -91,13 +94,25 @@ internal fun HomeScreen(page: HomePage, model: PhoneModel, host: Host) {
     }
 }
 
-/** Una riga sotto il titolo quando Music Assistant non risponde: il motivo, o che ci si sta collegando. */
+/**
+ * Una riga sotto il titolo quando Music Assistant non risponde: il motivo, o che ci si sta collegando. Se è quello
+ * sul telefono e Xonos è stato aggiornato senza il suo pacchetto nuovo, lo dice, con il tasto per aggiornarlo.
+ */
 @Composable
 internal fun ConnectionBanner(model: PhoneModel, host: Host) {
     val connection by model.connection.collectAsState()
-    val text = when (connection) {
-        is Connection.Connected -> return
-        is Connection.Connecting -> stringResource(R.string.connecting)
+    // Il server sul telefono parte solo con il pacchetto della versione di Xonos: finché non lo si scarica, niente.
+    val serverOld = connection !is Connection.Connected && model.onPhoneServer && model.phoneServerOutdated
+    // Mentre il server sul telefono parte la connessione non riesce: non è un errore di rete, è l'avvio.
+    val starting = connection !is Connection.Connected && !serverOld && (model.phoneServerStarting || model.phoneServerRetrying)
+    // Non è partito, o si è fermato: il perché (non solo "non raggiungibile"), con il tasto per riprovare.
+    val failure = if (connection !is Connection.Connected && !serverOld && !starting) model.phoneServerFailure else null
+    val text = when {
+        serverOld -> stringResource(R.string.phone_server_outdated)
+        connection is Connection.Connected -> return
+        starting -> stringResource(R.string.phone_server_starting)
+        failure != null -> stringResource(R.string.phone_server_failed, failure)
+        connection is Connection.Connecting -> stringResource(R.string.connecting)
         else -> host.describe(connection) ?: return
     }
     Surface(
@@ -105,13 +120,24 @@ internal fun ConnectionBanner(model: PhoneModel, host: Host) {
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (connection is Connection.Connecting) {
-                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-            } else {
-                Icon(XIcons.Offline, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.error)
+        Column(Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                if ((connection is Connection.Connecting || starting) && !serverOld) {
+                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(XIcons.Offline, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.error)
+                }
+                Text(text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
             }
-            Text(text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            if (serverOld) {
+                TextButton(onClick = { model.openSettings() }, modifier = Modifier.align(Alignment.End).testTag("update_phone_server")) {
+                    Text(stringResource(R.string.phone_server_update))
+                }
+            } else if (failure != null) {
+                TextButton(onClick = { model.retryPhoneServer() }, modifier = Modifier.align(Alignment.End).testTag("retry_phone_server")) {
+                    Text(stringResource(R.string.retry))
+                }
+            }
         }
     }
 }
@@ -138,7 +164,8 @@ private fun EmptyHome(model: PhoneModel) {
         )
         if (admin) {
             Spacer(Modifier.height(16.dp))
-            Button(onClick = { model.services.open() }, modifier = Modifier.testTag("home_services")) { Text(stringResource(R.string.services_add)) }
+            // "Aggiungi un servizio" porta dritto alla scelta del servizio (prima all'elenco di quelli interni di Music Assistant).
+            Button(onClick = { model.services.add() }, modifier = Modifier.testTag("home_services")) { Text(stringResource(R.string.services_add)) }
         }
     }
 }

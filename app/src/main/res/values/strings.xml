@@ -34,6 +34,7 @@
     <string name="phone_server_help">No Music Assistant at home? Xonos can run one on this phone, just for itself and for myCar. Then add your music from Music Assistant services: the phone’s files, radio, podcasts and streaming services.</string>
     <string name="phone_server_use">Use Music Assistant on this phone</string>
     <string name="phone_server_starting">Starting… (the first time takes a minute)</string>
+    <string name="phone_server_preparing">Checking and unpacking Music Assistant…</string>
     <string name="phone_server_in_use">Xonos is using the Music Assistant on this phone. Add your music from Music Assistant services.</string>
     <string name="phone_server_leave">Use another Music Assistant</string>
     <string name="phone_server_failed">Music Assistant didn’t start: %1$s</string>
@@ -167,10 +168,13 @@
     <string name="close_player">Close the player</string>
     <string name="play">Play</string>
     <string name="pause">Pause</string>
+    <string name="play_starting">Starting the music…</string>
     <string name="shuffle">Shuffle</string>
     <string name="next">Next</string>
     <string name="previous">Previous</string>
     <string name="repeat">Repeat</string>
+    <string name="repeat_all_state">All songs</string>
+    <string name="repeat_one_state">One song</string>
     <string name="favorite_add">Add to favorites</string>
     <string name="favorite_remove">Remove from favorites</string>
     <string name="play_next">Play next</string>
@@ -242,9 +246,14 @@
     <string name="secret_saved">Saved (type to change it)</string>
     <string name="field_required">Required</string>
     <string name="field_invalid">Not a valid value</string>
+    <string name="folder_not_found">This folder doesn’t exist, or Xonos can’t read it.</string>
     <string name="show_advanced">Show advanced options</string>
     <string name="hide_advanced">Hide advanced options</string>
     <string name="flow_cancel">Cancel</string>
+    <string name="flow_leave_title">Stop setting up %1$s?</string>
+    <string name="flow_leave_text">The steps done so far will be lost and you\'ll have to start again.</string>
+    <string name="flow_leave">Stop</string>
+    <string name="flow_stay">Continue</string>
     <string name="flow_finish">Finish</string>
     <string name="flow_next">Next</string>
     <string name="flow_open_browser">Open in the browser</string>
@@ -255,6 +264,7 @@
     <string name="flow_done">Done</string>
     <string name="flow_aborted">Setup stopped: %1$s</string>
     <string name="flow_aborted_plain">Setup stopped.</string>
+    <string name="flow_ended_away">Setup ended while you were outside Xonos. If the service isn’t in the list, start it again.</string>
     <string name="flow_close">Close</string>
     <string name="notice_saved">Saved</string>
     <string name="notice_removed">Service removed</string>

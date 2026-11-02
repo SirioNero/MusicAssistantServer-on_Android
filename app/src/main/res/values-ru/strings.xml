@@ -31,6 +31,7 @@
     <string name="phone_server_help">Нет Music Assistant дома? Xonos может запустить его на этом телефоне — только для себя и для myCar. Затем добавьте музыку в разделе «Сервисы Music Assistant»: файлы телефона, радио, подкасты и стриминговые сервисы.</string>
     <string name="phone_server_use">Использовать Music Assistant на этом телефоне</string>
     <string name="phone_server_starting">Запуск… (в первый раз это занимает минуту)</string>
+    <string name="phone_server_preparing">Проверяю и подготавливаю Music Assistant…</string>
     <string name="phone_server_in_use">Xonos использует Music Assistant на этом телефоне. Добавьте музыку в разделе «Сервисы Music Assistant».</string>
     <string name="phone_server_leave">Использовать другой Music Assistant</string>
     <string name="phone_server_failed">Music Assistant не запустился: %1$s</string>
@@ -184,10 +185,13 @@
     <string name="close_player">Закрыть плеер</string>
     <string name="play">Воспроизвести</string>
     <string name="pause">Пауза</string>
+    <string name="play_starting">Запускаю музыку…</string>
     <string name="shuffle">Перемешать</string>
     <string name="next">Следующий</string>
     <string name="previous">Предыдущий</string>
     <string name="repeat">Повтор</string>
+    <string name="repeat_all_state">Все треки</string>
+    <string name="repeat_one_state">Один трек</string>
     <string name="favorite_add">Добавить в избранное</string>
     <string name="favorite_remove">Убрать из избранного</string>
     <string name="play_next">Воспроизвести следующим</string>
@@ -259,9 +263,14 @@
     <string name="secret_saved">Сохранено (введите, чтобы изменить)</string>
     <string name="field_required">Обязательно</string>
     <string name="field_invalid">Недопустимое значение</string>
+    <string name="folder_not_found">Этой папки нет, или Xonos не может её прочитать.</string>
     <string name="show_advanced">Показать дополнительные настройки</string>
     <string name="hide_advanced">Скрыть дополнительные настройки</string>
     <string name="flow_cancel">Отмена</string>
+    <string name="flow_leave_title">Прервать настройку %1$s?</string>
+    <string name="flow_leave_text">Пройденные шаги пропадут, и придётся начать заново.</string>
+    <string name="flow_leave">Прервать</string>
+    <string name="flow_stay">Продолжить</string>
     <string name="flow_finish">Завершить</string>
     <string name="flow_next">Далее</string>
     <string name="flow_open_browser">Открыть в браузере</string>
@@ -272,6 +281,7 @@
     <string name="flow_done">Готово</string>
     <string name="flow_aborted">Настройка прервана: %1$s</string>
     <string name="flow_aborted_plain">Настройка прервана.</string>
+    <string name="flow_ended_away">Настройка завершилась, пока вы были вне Xonos. Если сервиса нет в списке, начните заново.</string>
     <string name="flow_close">Закрыть</string>
     <string name="notice_saved">Сохранено</string>
     <string name="notice_removed">Сервис удалён</string>

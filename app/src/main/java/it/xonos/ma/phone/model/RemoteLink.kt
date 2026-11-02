@@ -1,5 +1,6 @@
 package it.xonos.ma.phone.model
 
+import it.xonos.ma.data.Connection
 import it.xonos.ma.data.Device
 import it.xonos.ma.data.Devices
 import it.xonos.ma.data.Library
@@ -55,6 +56,7 @@ class RemoteLink internal constructor(
     private var elapsedAt = 0L
     private val favorites = mutableMapOf<String, Boolean>()
     private var windowJob: Job? = null
+    private var sync: Job? = null
 
     /** Il brano verso cui si sta saltando: lo schermo lo mostra subito, Music Assistant ci arriva dopo. */
     private var pendingIndex: Int? = null
@@ -67,20 +69,26 @@ class RemoteLink internal constructor(
     /** Comincia a seguire il lettore. */
     fun start() {
         repo.addEventListener(listener)
-        scope.launch {
-            try {
-                devices.queue(device.id)?.let { apply(it) }
-                refreshWindow(now = true)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                // Arriverà con gli eventi.
+        // A ogni collegamento, anche il primo: con l'app chiusa la connessione cade e gli eventi della cassa si
+        // perdono, quindi al ritorno si rilegge la sua coda (invece di mostrare il brano di quando la si era lasciata).
+        sync = scope.launch {
+            repo.connection.collect { connection ->
+                if (connection !is Connection.Connected) return@collect
+                try {
+                    devices.queue(device.id)?.let { apply(it) }
+                    refreshWindow(now = true)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // Arriverà con gli eventi.
+                }
             }
         }
     }
 
     fun stop() {
         repo.removeEventListener(listener)
+        sync?.cancel()
         windowJob?.cancel()
     }
 

@@ -20,6 +20,8 @@ import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.SettableFuture
 import it.xonos.ma.data.Connection
+import it.xonos.ma.data.Problem
+import it.xonos.ma.data.MaException
 import it.xonos.ma.data.MaImage
 import it.xonos.ma.data.MaRepository
 import it.xonos.ma.data.QueueItem
@@ -27,6 +29,7 @@ import it.xonos.ma.data.QueueState
 import it.xonos.ma.data.SkipSender
 import it.xonos.ma.data.SoloistUnlock
 import it.xonos.ma.data.objects
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -100,9 +103,18 @@ class MaPlayer(
     private val windowExpectations = mutableListOf<WindowExpectation>()
 
     /** Quando la rete cade a metà di un brano: per riprendere lì appena torna. */
-    private class Drop(val index: Int, val positionMs: Long, val at: Long)
+    private class Drop(val index: Int, val positionMs: Long, val at: Long, val server: String?)
     private var drop: Drop? = null
     private var lastPlayingAt = 0L
+
+    /** Quando si è staccata l'ultima uscita esterna (Bluetooth, cuffie): vedi [forgetDrop]. */
+    private var outputGoneAt = Long.MIN_VALUE
+
+    /**
+     * Il Music Assistant dell'ultima connessione (server_id): lo stesso da casa e da fuori, così dopo un calo la musica
+     * riprende anche se ci si ricollega dall'indirizzo remoto, ma non su un altro server.
+     */
+    private var serverId: String? = null
 
     private class Expectation(val test: (QueueState?) -> Boolean, val future: SettableFuture<Void?>)
     private val expectations = mutableListOf<Expectation>()
@@ -113,11 +125,19 @@ class MaPlayer(
     // Il salto in attesa (vedi [skip]): uno per volta, verso l'ultimo brano chiesto.
     private var pendingSkip: SettableFuture<Void?>? = null
     private val skips = SkipSender(scope) { index ->
-        unlock.retrying(queueId) {
-            repo.command("player_queues/play_index") {
-                put("queue_id", queueId)
-                put("index", index)
+        try {
+            unlock.retrying(queueId) {
+                repo.command("player_queues/play_index") {
+                    put("queue_id", queueId)
+                    put("index", index)
+                }
             }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Anche un salto che non riesce (Spotify occupato, servizio fermo) dice perché, in auto come per il play.
+            Log.w(TAG, "Salto a $index non riuscito: ${e.message}")
+            onFailure?.invoke(e)
         }
     }
 
@@ -129,6 +149,7 @@ class MaPlayer(
         repo.addEventListener(listener)
         scope.launch {
             repo.connection.collect { connection ->
+                if (connection is Connection.Connected) serverId = connection.server.id
                 // Mentre si ricollega resta il problema di prima, se c'era.
                 problem = if (connection is Connection.Connecting) problem else describe(connection)
                 invalidateState()
@@ -368,7 +389,7 @@ class MaPlayer(
         val q = queue ?: return
         val now = SystemClock.elapsedRealtime()
         val index = q.currentIndex ?: return
-        if (q.playing || now - lastPlayingAt < RECENT_PLAY_MS) drop = Drop(index, currentPositionMs(), now)
+        if (q.playing || now - lastPlayingAt < RECENT_PLAY_MS) drop = Drop(index, currentPositionMs(), now, serverId)
     }
 
     /**
@@ -381,6 +402,9 @@ class MaPlayer(
         val q = queue ?: return
         val away = SystemClock.elapsedRealtime() - d.at
         if (away > RESUME_WINDOW_MS || q.playing || q.currentIndex != d.index) return
+        // Un'uscita esterna si è staccata dopo l'ultima volta che si suonava (anche prima che Xonos vedesse il calo,
+        // che col ping arriva 20-40 s dopo): la musica uscirebbe dall'altoparlante. E un altro server non è il calo.
+        if (outputGoneAt > lastPlayingAt || (d.server != null && serverId != d.server)) return
         val target = d.positionMs + min(away, BUFFER_GUESS_MS)
         val duration = (q.current?.durationSec ?: 0) * 1000L
         Log.i(TAG, "Riprendo dopo ${away / 1000} s senza rete")
@@ -406,18 +430,86 @@ class MaPlayer(
 
     // ---------- Comandi ----------
 
+    /** Scelte dall'auto (handleSetMediaItems) per cui Music Assistant sta ancora preparando la musica. */
+    private var choosing = 0
+
+    /** Pausa toccata mentre Music Assistant preparava una scelta: si mette appena la musica parte. */
+    private var pauseAfterChoice = false
+
+    /** L'ultima scelta dall'auto (id della voce e la sua attesa): la stessa voce toccata di nuovo mentre parte non riparte. */
+    private var lastChoice: Pair<String, ListenableFuture<*>>? = null
+
+    /** Il play mandato a Music Assistant finché la musica non parte (con Soloist circa 7 s). */
+    private var pendingPlay: ListenableFuture<*>? = null
+
+    /** Pausa toccata durante un salto: stop appena il salto è mandato (vedi [skip]). */
+    private var pauseAfterSkip = false
+
     override fun handleSetPlayWhenReady(playWhenReady: Boolean): ListenableFuture<*> {
+        if (choosing > 0) {
+            // Dall'auto arrivano insieme la scelta e "play": il play_media della scelta fa già partire la musica, e
+            // un player_queues/play adesso (la coda non è in pausa) la farebbe ripartire da capo (Soloist: 7 s).
+            // (La stessa voce toccata di nuovo dopo una pausa qui aspetta la scelta di prima: il suo play toglie la pausa.)
+            pauseAfterChoice = !playWhenReady
+            return Futures.immediateVoidFuture()
+        }
+        if (!playWhenReady) {
+            // Una pausa voluta: dopo un calo di rete non si riprende da soli.
+            drop = null
+            lastPlayingAt = 0L
+        }
+        if (!playWhenReady && pendingSkip?.isDone == false) {
+            // Pausa durante un salto: "pause" arriverebbe prima del brano nuovo, che poi partirebbe lo stesso. Si
+            // ferma appena il salto è mandato, con stop, che Music Assistant esegue dopo l'avvio.
+            pauseAfterSkip = true
+            return pendingSkip ?: Futures.immediateVoidFuture()
+        }
+        val pending = pendingPlay?.takeUnless { it.isDone }
+        if (pending != null) {
+            // Un secondo play (cuffie, auto) mentre la musica parte: per Music Assistant sarebbe un resume, che con la
+            // coda già in partenza fa ripartire il brano da capo. Niente di nuovo.
+            if (playWhenReady) return pending
+            // Una pausa adesso: "pause" arriverebbe prima dell'avvio e Music Assistant lo ignorerebbe (la musica
+            // partirebbe lo stesso); "stop" aspetta che l'avvio finisca e poi ferma.
+            pendingPlay = null
+            return command("player_queues/stop") { it?.playing != true }
+        }
         val q = queue ?: return Futures.immediateVoidFuture()
         if (q.playing == playWhenReady) return Futures.immediateVoidFuture()
-        return command(if (playWhenReady) "player_queues/play" else "player_queues/pause") { it?.playing == playWhenReady }
+        val future = command(if (playWhenReady) "player_queues/play" else "player_queues/pause") { it?.playing == playWhenReady }
+        if (playWhenReady) pendingPlay = future
+        return future
     }
 
+    /**
+     * Mentre un play aspetta Music Assistant, chi guarda (auto, notifica, telefono) vede la rotella: il segnaposto
+     * di Media3 cambierebbe solo playWhenReady, cioè "sta suonando" senza suono.
+     */
+    override fun getPlaceholderState(suggestedPlaceholderState: State): State =
+        if (suggestedPlaceholderState.playWhenReady &&
+            suggestedPlaceholderState.playbackState == Player.STATE_READY &&
+            queue?.playing != true
+        ) {
+            suggestedPlaceholderState.buildUpon().setPlaybackState(Player.STATE_BUFFERING).build()
+        } else {
+            suggestedPlaceholderState
+        }
+
     override fun handlePrepare(): ListenableFuture<*> {
-        if (repo.connection.value !is Connection.Connected) repo.reconnect()
+        // Solo se il collegamento è fallito: mentre si collega, ricominciare da capo a ogni play (Media3 chiama
+        // prepare a ogni play finché la coda non c'è) farebbe ripartire ogni volta dall'indirizzo di casa.
+        if (repo.connection.value is Connection.Failed) repo.reconnect()
         return Futures.immediateVoidFuture()
     }
 
-    override fun handleStop(): ListenableFuture<*> = command("player_queues/stop") { it?.playing != true }
+    override fun handleStop(): ListenableFuture<*> {
+        // Uno stop voluto: dopo un calo di rete non si riprende da soli.
+        drop = null
+        lastPlayingAt = 0L
+        // e la stessa voce toccata dopo deve ripartire, non aspettare la scelta di prima (che poi si ferma)
+        lastChoice = null
+        return command("player_queues/stop") { it?.playing != true }
+    }
 
     override fun handleSeek(mediaItemIndex: Int, positionMs: Long, seekCommand: Int): ListenableFuture<*> {
         val q = queue ?: return Futures.immediateVoidFuture()
@@ -428,6 +520,10 @@ class MaPlayer(
                 if (mediaItemIndex == C.INDEX_UNSET) command("player_queues/next") { it?.currentIndex != index } else skip(q, target)
             Player.COMMAND_SEEK_TO_PREVIOUS, Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM ->
                 when {
+                    // Avanti appena premuto (con Soloist il brano nuovo ci mette 7 s) e poi indietro: per Music Assistant
+                    // si è ancora sul brano di prima, ma il salto è in viaggio. Si passa dallo stesso giro dei salti,
+                    // che manda solo l'ultimo brano chiesto.
+                    pendingSkip?.isDone == false && mediaItemIndex != C.INDEX_UNSET -> skip(q, target)
                     target == index -> seekWithin(0)
                     mediaItemIndex == C.INDEX_UNSET -> command("player_queues/previous") { it?.currentIndex != index }
                     else -> skip(q, target)
@@ -457,6 +553,10 @@ class MaPlayer(
         pendingSkip = future
         skips.request(target, gather = q.current?.singleStream != false) {
             handler.post {
+                if (pauseAfterSkip) {
+                    pauseAfterSkip = false
+                    command("player_queues/stop") { it?.playing != true }
+                }
                 if (future.isDone) return@post
                 // Mandato: il futuro si chiude quando Music Assistant ci arriva, o dopo qualche secondo.
                 val expectation = Expectation({ it?.currentIndex == target }, future)
@@ -495,8 +595,16 @@ class MaPlayer(
         val item = mediaItems.getOrNull(if (startIndex == C.INDEX_UNSET) 0 else startIndex)
         val request = onPlayRequest
         if (item == null || request == null) return Futures.immediateVoidFuture()
+        // La stessa voce toccata di nuovo mentre Music Assistant la prepara (con Soloist circa 7 s, senza niente che
+        // si muova sullo schermo dell'auto): un secondo play_media rifarebbe tutto da capo. Si aspetta il primo.
+        // Le ricerche a voce hanno tutte l'id vuoto: per loro conta la frase detta.
+        val choice = item.mediaId.ifEmpty { item.requestMetadata.searchQuery?.let { "search|$it" }.orEmpty() }
+        lastChoice?.let { (id, waiting) -> if (choice.isNotEmpty() && id == choice && !waiting.isDone) return waiting }
         val done = SettableFuture.create<Void?>()
+        lastChoice = choice to done
         val before = queue
+        choosing++
+        pauseAfterChoice = false
         scope.launch {
             try {
                 awaitReady()
@@ -509,9 +617,17 @@ class MaPlayer(
                         delay(100)
                     }
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.w(TAG, "Non riesco a suonare ${item.mediaId}: ${e.message}")
+                onFailure?.invoke(e)
             } finally {
+                choosing--
+                if (choosing == 0 && pauseAfterChoice) {
+                    pauseAfterChoice = false
+                    pauseFromSystem()
+                }
                 done.set(null)
             }
         }
@@ -523,6 +639,9 @@ class MaPlayer(
     override fun handleRemoveMediaItems(fromIndex: Int, toIndex: Int): ListenableFuture<*> {
         val ids = stateItems.subList(fromIndex.coerceIn(0, stateItems.size), toIndex.coerceIn(0, stateItems.size)).map { it.id }
         if (ids.isEmpty()) return Futures.immediateVoidFuture()
+        // Media3 mostra già la coda senza quei brani: una seconda modifica fatta prima della risposta di Music
+        // Assistant arriva con le posizioni di quella coda, quindi anche qui si tolgono subito.
+        stateItems = stateItems.filterNot { it.id in ids }
         return windowCommand({ window, _ -> window.none { it.id in ids } }) {
             for (id in ids) {
                 repo.command("player_queues/delete_item") {
@@ -540,6 +659,8 @@ class MaPlayer(
         // Per Music Assistant uno spostamento di 0 vuol dire "in testa ai prossimi".
         val shift = if (newIndex == stateCurrent + 1) 0 else newIndex - fromIndex
         val target = stateStart + newIndex
+        // Come per i brani tolti: le posizioni della prossima modifica sono quelle della coda già spostata.
+        stateItems = stateItems.toMutableList().apply { add(newIndex.coerceAtMost(size - 1), removeAt(fromIndex)) }
         return windowCommand({ window, start -> window.indexOfFirst { it.id == item.id }.let { it >= 0 && start + it == target } }) {
             repo.command("player_queues/move_item") {
                 put("queue_id", queueId)
@@ -577,15 +698,27 @@ class MaPlayer(
         return Futures.immediateVoidFuture()
     }
 
+    /**
+     * Si è staccato il Bluetooth (o le cuffie) mentre la musica era ferma per un calo di rete: al ritorno della rete
+     * non si riprende da soli, perché uscirebbe dall'altoparlante del telefono.
+     */
+    fun forgetDrop() {
+        if (drop != null) Log.i(TAG, "Uscita audio staccata: dopo il calo di rete non riprendo da solo")
+        drop = null
+        outputGoneAt = SystemClock.elapsedRealtime()
+    }
+
     /** Lo stesso play o pausa, ma deciso dal telefono (chiamata in arrivo, cuffie staccate). */
     fun pauseFromSystem() {
-        val q = queue ?: return
-        if (q.playing) command("player_queues/pause") { it?.playing != true }
+        // Come la pausa della persona: durante un avvio o un salto (Soloist, 7 s) diventa uno stop dopo l'avvio,
+        // invece di un "pause" che Music Assistant non vedrebbe.
+        if (playWhenReady) pause()
     }
 
     fun resumeFromSystem() {
         val q = queue ?: return
-        if (!q.playing && q.current != null) command("player_queues/play") { it?.playing == true }
+        // Come il play della persona: rotella mentre parte, e un altro play nel frattempo non lo rifà.
+        if (!q.playing && q.current != null) play()
     }
 
     val isPlayingOnServer: Boolean get() = queue?.playing == true
@@ -600,9 +733,19 @@ class MaPlayer(
     }
 
     /** Aspetta che il telefono sia un lettore di Music Assistant: al primo avvio ci vuole un attimo. */
+    /**
+     * Un comando chiesto da chi comanda il lettore (l'auto, la notifica, il telefono) non è riuscito: il perché, da
+     * mostrare. Prima restava nel logcat, e in auto la scelta compariva un attimo e poi niente (per esempio "Qui non
+     * c'è niente da suonare: ..." di Music Assistant). Sul thread principale.
+     */
+    var onFailure: ((Exception) -> Unit)? = null
+
+    /** Una pausa (o uno stop) chiesta ma non arrivata a Music Assistant per la connessione. Sul thread principale. */
+    var onPauseLost: (() -> Unit)? = null
+
     private suspend fun awaitReady() {
         withTimeoutOrNull(READY_TIMEOUT_MS) { ready.first { it } }
-            ?: throw IllegalStateException("Music Assistant non è pronto")
+            ?: throw MaException("Music Assistant non è pronto", problem = Problem.NOT_CONNECTED)
     }
 
     /**
@@ -617,7 +760,8 @@ class MaPlayer(
         val future = SettableFuture.create<Void?>()
         val expectation = Expectation(until, future)
         expectations += expectation
-        handler.postDelayed({ if (expectations.remove(expectation)) future.set(null) }, EXPECT_TIMEOUT_MS)
+        // Un limite in ogni caso, se la risposta non arriva mai.
+        handler.postDelayed({ if (expectations.remove(expectation)) future.set(null) }, COMMAND_CAP_MS)
         scope.launch {
             try {
                 unlock.retrying(queueId) {
@@ -627,9 +771,21 @@ class MaPlayer(
                     }
                 }
                 checkExpectations()
+                // Il tempo per vedere l'effetto conta dalla risposta: player_queues/play risponde solo quando la musica
+                // parte (con Soloist circa 7 s). Contato dall'invio, dopo 3 s l'auto e il telefono tornavano a "play"
+                // mentre la musica stava ancora partendo, e un secondo tocco la faceva ripartire da capo.
+                handler.postDelayed({ if (expectations.remove(expectation)) future.set(null) }, EXPECT_TIMEOUT_MS)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.w(TAG, "$name non riuscito: ${e.message}")
+                // Una pausa che non arriva perché manca la rete: l'audio già ricevuto (fino a 30 s) non deve
+                // continuare a suonare come se niente fosse.
+                if ((name == "player_queues/pause" || name == "player_queues/stop") && (e as? MaException)?.problem in UNREACHABLE) {
+                    onPauseLost?.invoke()
+                }
                 if (expectations.remove(expectation)) future.set(null)
+                onFailure?.invoke(e)
             }
         }
         return future
@@ -663,6 +819,10 @@ class MaPlayer(
         private const val POSITION_TOLERANCE_MS = 1_500L
         private const val WINDOW_DEBOUNCE_MS = 150L
         private const val EXPECT_TIMEOUT_MS = 3_000L
+
+        /** I problemi per cui un comando non arriva a Music Assistant. */
+        private val UNREACHABLE = setOf(Problem.NOT_CONNECTED, Problem.LOST, Problem.NO_ANSWER, Problem.NETWORK)
+        private const val COMMAND_CAP_MS = 60_000L
 
         private const val PLAY_SETTLE_MS = 4_000L
         private const val READY_TIMEOUT_MS = 20_000L

@@ -24,6 +24,9 @@ internal fun PlatformBackHandler(enabled: Boolean, onBack: () -> Unit) = Unit
 internal fun PlatformReportReady(ready: () -> Boolean) = Unit
 
 @Composable
+internal fun KeepScreenOn(on: Boolean) = Unit
+
+@Composable
 internal fun rememberCopy(): (String) -> Unit = remember { { _ -> } }
 
 internal fun Modifier.automationIds(): Modifier = this

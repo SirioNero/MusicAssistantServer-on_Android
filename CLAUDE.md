@@ -549,7 +549,8 @@ di Xonos suona dal server sul telefono; la release ridotta con R8, da capo come 
   computer.
 - **La musica del telefono**: l'app dichiara `READ_MEDIA_AUDIO` (`READ_EXTERNAL_STORAGE` fino ad Android 12) e
   lo chiede al sì del download (`Host.askMusicFiles`); il servizio dei file sul disco (Filesystem (local
-  disk)) propone `/storage/emulated/0/Music` invece di `/media` (`prepare.py`).
+  disk)) propone la cartella Music del profilo (`XONOS_MUSIC_DIR` da Xonos, di solito `/storage/emulated/0/Music`)
+  invece di `/media` (`prepare.py`).
 - **ABI**: `xonosServerAbis` in `gradle.properties` (arm64-v8a e x86_64, quella dell'emulatore delle prove).
   La release pubblica solo il pacchetto arm64-v8a.
 - **Le prove** (workflow "Server MA", `tools/server/emulator.sh`, a ogni cambio all'app su un ramo `claude/`):
@@ -688,6 +689,32 @@ Da una caccia ai bug con più agenti (8 aree, un giudice avversario per area) e 
   niente, una pausa mentre parte manda `stop` (in Music Assistant `_handle_stop` aspetta la fine dell'avvio, `pause`
   no). La ripresa dopo un calo di rete non parte se un'uscita esterna si è staccata dopo l'ultima musica
   (`outputGoneAt`) o se il server è cambiato (`Drop.server`).
+- Dalla revisione delle modifiche e dal percorso di chi reinstalla (due giri con verificatori avversari):
+  - Ripresa dopo un calo: il server si riconosce dal `server_id` (`ServerInfo.id`, lo stesso da casa e da fuori), non
+    dall'indirizzo: uscendo di casa la ripresa sarebbe saltata.
+  - Auto: niente attese del menu se il problema non passa da solo (`LASTING`: token, versione, indirizzo...), col
+    server sul telefono da aggiornare o fermo, o dopo un'attesa già andata a vuoto; i Generi restano nella radice se
+    il conteggio fallisce senza collegamento (spariscono solo se Music Assistant rifiuta il comando); mentre la musica
+    deve partire si tiene solo il processore (il Wi-Fi lock si libera).
+  - Uscita in uso staccata (`BECOMING_NOISY`): `AudioEngine.silence()`, l'audio già ricevuto resta zitto fino al
+    prossimo play (`unsilence` da `onPlayWhenReadyChanged`) o a uno stream nuovo; senza rete il buffer (30 s) usciva
+    dall'altoparlante. `SilenceCheckKt`. Decoder guasto due volte in un secondo: si riprova dopo un secondo
+    (`decoderBroken`; con Sendspin il flusso è continuo). `DecoderCheckKt`: prima 1,0 s di musica su 6, ora 4,0.
+  - Home e Libreria si ricaricano all'evento `music_sync_completed` (Music Assistant ha finito di leggere la libreria:
+    67 ms dopo `music/sync` nella 2.10.8, `SyncEventCheckKt`); "Aggiungi un servizio" nella Home vuota apre la scelta.
+  - Server sul telefono: schermo acceso (`KeepScreenOn` in Platform.kt) finché la scheda scarica, prepara o controlla;
+    l'attesa dell'avvio conta solo il tempo passato davvero (a schermo spento Android congela l'app); la cartella Music
+    del profilo (`XONOS_MUSIC_DIR`, in un profilo secondario non è /storage/emulated/0); testo per
+    `music_directory_not_found`; myCar che chiede l'account fa ripartire il server (`startPhoneServerIfUsed`).
+  - Flussi sul server del telefono (`_flows` in prepare.py): `IDLE_FLOW_TTL` 3 ore; `config/flows/get` dà ancora
+    l'ultimo passo dei 16 flussi finiti più recenti (prima "Unknown (or finished) setup flow" a chi tornava dal
+    browser; con gli altri Music Assistant l'app lo dice a parole, `ENDED_AWAY`). Spotify: passo `xonos_finishing`
+    ("Avvio di Spotify…") prima di `finish`, e se l'errore dice che il token non vale più (`refresh_token_invalid`,
+    `invalid_grant`, `revoked`) il riprova rifà l'accesso nel browser. Descrizioni selezionabili, avanzamento in Markdown.
+  - Correzioni alle correzioni: tornando al server salvato in `choose` tornano token e accesso; avvisi sopra il
+    lettore solo se si vede; "Riprova" con `phoneServerRetrying`; `forgetServer` solo se cambia l'indirizzo di casa,
+    e tiene la pagina delle Impostazioni in qualsiasi scheda; `MaRepository.release()` mette Connecting (il prossimo
+    Connected si vede); Ripeti dice a TalkBack quale modo (tutti i brani / un brano).
 - Proposte non fatte: PulseAudio senza shm né memfd (`rootfs.py`: `enable-shm = no`, `enable-memfd = no`) non apre lo
   srbchannel, e ogni pacchetto audio tra Soloist e PulseAudio passa da sendto/recvmsg, che proot intercetta: con memfd
   (che non usa /dev/shm) il peso di proot (14% sul telefono) potrebbe scendere. Da provare sul telefono prima di

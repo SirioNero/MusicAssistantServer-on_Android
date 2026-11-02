@@ -5,13 +5,14 @@ Serve a provare la sessione che resta accesa tra un brano e l'altro (_soloist_li
 account Spotify. Parla lo stesso protocollo locale di Soloist: la WebSocket su 127.0.0.1, l'indirizzo e la porta nei
 file ws.addr e ws.port della cartella dei dati, gli eventi (auth_state, track_changed, playback_state,
 playback_changed, position_sync) e la conferma di ogni comando (command_result). Al posto della musica scrive nel tubo
-del pipe sink di Music Assistant un valore fisso per brano (marker): l'autotest riconosce di quale brano è l'audio
-che gli arriva. Come Soloist con --single-track suona un brano, accetta pausa, ripresa, seek e play di un altro brano,
-e a fine brano passa a un altro (autoplay) e si chiude.
+del pipe sink di Music Assistant un valore per brano e per secondo (sample_value): l'autotest riconosce di quale brano,
+e da quale secondo, è l'audio che gli arriva. Come Soloist con --single-track suona un brano, accetta pausa, ripresa,
+seek (anche in pausa) e play di un altro brano, e a fine brano passa a un altro (autoplay) e si chiude.
 
 Variabili d'ambiente: XONOS_FAKE_DURATION_MS (durata dei brani, 30 s di base), XONOS_FAKE_NO_JUMP=1 (il play di un
-altro brano non fa niente, come un Soloist che non accettasse salti), XONOS_FAKE_LEAK=1 (dopo la pausa scrive ancora
-0,2 s del brano nel tubo, come audio rimasto indietro).
+altro brano non fa niente, come un Soloist che non accettasse salti), XONOS_FAKE_LEAK=1 (alla pausa, prima di
+confermarla, scrive ancora 0,2 s del brano nel tubo, come audio rimasto indietro), XONOS_FAKE_DELAY_PLAY=<ms> (il play
+di un altro brano parte dopo tanto, come un brano che si carica piano).
 """
 
 from __future__ import annotations
@@ -39,6 +40,11 @@ def marker(uri: str) -> int:
     return (sum(uri.encode()) % 900 + 100) * 1_000_000
 
 
+def sample_value(uri: str, position_ms: float) -> int:
+    """Il valore di un campione: il brano nei milioni, il secondo del brano nelle migliaia."""
+    return marker(uri) + int(position_ms // 1000) % 1000 * 1000
+
+
 class FakeSoloist:
     """Un brano alla volta, comandato dalla WebSocket come Soloist."""
 
@@ -47,6 +53,7 @@ class FakeSoloist:
         self.duration_ms = int(os.environ.get("XONOS_FAKE_DURATION_MS", "30000"))
         self.no_jump = os.environ.get("XONOS_FAKE_NO_JUMP") == "1"
         self.leak = os.environ.get("XONOS_FAKE_LEAK") == "1"
+        self.delay_play_s = int(os.environ.get("XONOS_FAKE_DELAY_PLAY", "0")) / 1000
         self.playing = True
         self.position_ms = 0.0
         self.sockets: set[web.WebSocketResponse] = set()
@@ -101,17 +108,20 @@ class FakeSoloist:
     async def command(self, cmd: dict) -> None:
         name = str(cmd.get("command") or "")
         print(f"finto soloist: comando {name} {cmd.get('uri') or cmd.get('position_ms') or ''}", flush=True)
+        if name == "pause" and self.leak:
+            # audio del brano rimasto indietro: è già nel tubo quando la pausa è confermata
+            self.write(int(RATE * 0.2))
         await self.send({"type": "command_result", "command": name})
         if name == "pause":
             self.playing = False
             await self.state()
-            if self.leak:
-                self.write(int(RATE * 0.2))
         elif name == "play":
             uri = cmd.get("uri")
             if uri and uri != self.uri:
                 if self.no_jump:
                     return
+                if self.delay_play_s:
+                    await asyncio.sleep(self.delay_play_s)
                 self.uri = str(uri)
                 self.position_ms = 0.0
                 self.playing = True
@@ -129,7 +139,8 @@ class FakeSoloist:
                 self.fd = os.open(self.fifo, os.O_WRONLY | os.O_NONBLOCK)
             except OSError:
                 return 0
-        sample = struct.pack("<ii", marker(self.uri), marker(self.uri))
+        value = sample_value(self.uri, self.position_ms)
+        sample = struct.pack("<ii", value, value)
         written = 0
         while written < frames:
             count = min(CHUNK_FRAMES, frames - written)

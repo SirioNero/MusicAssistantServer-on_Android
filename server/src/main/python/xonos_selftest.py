@@ -323,9 +323,11 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
 
     Col codice vero di Music Assistant (SoloistBackend, PulseAudio, il tubo, il ritmo di lettura) e un finto Soloist
     (xonos_fake_soloist.py, avviato col Python del pacchetto al posto del programma di Spotify): un brano, un salto a un
-    altro, una ripresa a 5 s, lo spegnimento dopo la pausa, la fine naturale di un brano e un Soloist che non accetta
-    salti (allora si riparte da capo). L'audio che arriva deve essere sempre e solo del brano chiesto: il finto
-    Soloist scrive un valore fisso per brano, e dopo ogni pausa lascia nel tubo un po' del brano di prima.
+    altro, una ripresa a 1 s (Soloist in pausa è più avanti: deve ripartire dal punto chiesto), lo spegnimento dopo la
+    pausa, la fine naturale di un brano, un cambio annullato a metà (Soloist si spegne), un Soloist che non accetta
+    salti (allora si riparte da capo) e i salti riprovati dopo un po' quando ne sono falliti due. L'audio che arriva
+    deve essere sempre e solo del brano chiesto, dal secondo chiesto: il finto Soloist scrive un valore per brano e per
+    secondo, e a ogni pausa lascia nel tubo un po' del brano di prima.
     """
     from array import array  # noqa: PLC0415
     from types import SimpleNamespace  # noqa: PLC0415
@@ -384,19 +386,29 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
         """Il valore del brano, come lo scrive il finto Soloist (in milioni)."""
         return sum(uri.encode()) % 900 + 100
 
+    early: set[int] = set()
+
     async def take(uri: str, name: str, seek: int = 0, seconds: float = 1.0, duration: int = 30) -> tuple:
-        """Uno stream come lo chiede Music Assistant: secondi al primo audio, i brani dei valori arrivati, byte."""
+        """
+        Uno stream come lo chiede Music Assistant: secondi al primo audio, i brani dei valori arrivati, byte.
+
+        In early i secondi del brano dei primi 0,3 s di audio.
+        """
         details = SimpleNamespace(uri=f"spotify--xonos://track/{name}", queue_id="xonos_fake_queue", duration=duration)
         start = time.monotonic()
         first = -1.0
         values: set[int] = set()
+        early.clear()
         got = 0
         gen = backend.stream_spotify_uri(uri, seek, streamdetails=details)
         try:
             async for chunk in gen:
                 if first < 0:
                     first = time.monotonic() - start
-                values.update(value // 1_000_000 for value in array("i", chunk[: len(chunk) // 4 * 4]))
+                samples = array("i", chunk[: len(chunk) // 4 * 4])
+                values.update(value // 1_000_000 for value in samples)
+                if got < 0.3 * FIFO_BYTES_PER_S:
+                    early.update(value % 1_000_000 // 1000 for value in samples)
                 got += len(chunk)
                 if got >= seconds * FIFO_BYTES_PER_S:
                     break
@@ -413,8 +425,10 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
         if not ok:
             failed.append(f"{what} ({seen})" if seen != "" else what)
 
-    a, b, c, d, e = (f"spotify:track:xonos{x}" for x in "abcde")
-    first_a = first_b = first_r = first_e = -1.0
+    a, b, c, d, e, f, g, h, i = (f"spotify:track:xonos{x}" for x in "abcdefghi")
+    first_a = first_b = first_r = first_g = first_h = first_i = -1.0
+    real_switch = solo._XONOS_SWITCH_S
+    real_retry = solo._XONOS_RETRY_S
     try:
         os.environ["XONOS_FAKE_LEAK"] = "1"
         os.environ["XONOS_FAKE_DURATION_MS"] = "30000"
@@ -422,13 +436,17 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
         run = backend._run
         check("audio del primo brano", values == {mark(a)}, values)
         check("in pausa e acceso dopo lo stream", alive(run) and run.xonos_parked)
-        first_b, values, _ = await take(b, "b", seconds=1.5)
+        first_b, values, _ = await take(b, "b", seconds=3.0)
         check("salto sullo stesso processo", backend._run is run and alive(run))
         check("solo audio del brano saltato", values == {mark(b)}, values)
+        check("salto dall'inizio del brano", early == {0}, early)
+        # Soloist in pausa è oltre i 3 s (letti, più il tubo e il resto della pausa): la ripresa a 1 s deve partire
+        # da lì, non dal punto in cui Soloist si era fermato
         solo._XONOS_PARK_S = 1.0
-        first_r, values, _ = await take(b, "b", seek=5, seconds=1.0)
+        first_r, values, _ = await take(b, "b", seek=1, seconds=1.0)
         check("ripresa sullo stesso processo", backend._run is run, backend._run)
         check("solo audio del brano ripreso", values == {mark(b)}, values)
+        check("ripresa dal punto chiesto", early == {1}, early)
         await asyncio.sleep(2.5)
         check("spento dopo la pausa", backend._run is None and not alive(run))
         solo._XONOS_PARK_S = real_park
@@ -436,21 +454,58 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
         _, values, got = await take(c, "c", seconds=10, duration=3)
         await asyncio.sleep(0.5)
         check("fine naturale del brano", got > 0 and values == {mark(c)} and backend._run is None, (got, values))
+        # un cambio annullato a metà (il brano chiesto si carica piano): Soloist si spegne, il brano dopo da capo
         os.environ["XONOS_FAKE_DURATION_MS"] = "30000"
-        os.environ["XONOS_FAKE_NO_JUMP"] = "1"
+        os.environ["XONOS_FAKE_DELAY_PLAY"] = "1500"
         await take(d, "d", seconds=1.0)
         run_d = backend._run
-        first_e, values, _ = await take(e, "e", seconds=1.0)
-        check("da capo dopo un salto rifiutato", backend._run is not run_d and values == {mark(e)}, values)
+        cancelled = asyncio.create_task(take(e, "e", seconds=1.0))
+        await asyncio.sleep(0.3)
+        cancelled.cancel()
+        with suppress(asyncio.CancelledError):
+            await cancelled
+        for _ in range(40):
+            if backend._run is None and not alive(run_d):
+                break
+            await asyncio.sleep(0.05)
+        check("spento dopo un cambio annullato", backend._run is None and not alive(run_d), backend._run)
+        os.environ.pop("XONOS_FAKE_DELAY_PLAY")
+        # un Soloist che non accetta salti: dopo l'attesa si riparte da capo, e il fallimento si conta
+        os.environ["XONOS_FAKE_NO_JUMP"] = "1"
+        solo._XONOS_SWITCH_S = 2.0
+        await take(f, "f", seconds=1.0)
+        run_f = backend._run
+        first_g, values, _ = await take(g, "g", seconds=1.0)
+        check("da capo dopo un salto rifiutato", backend._run is not run_f and values == {mark(g)}, values)
         check("salto rifiutato contato", backend._xonos_failures["salto"] == 1, backend._xonos_failures)
+        # due salti falliti di fila: per un po' niente tentativi (si riparte subito da capo)...
+        backend._xonos_failures["salto"] = 2
+        backend._xonos_failed_at["salto"] = time.monotonic()
+        run_g = backend._run
+        first_h, values, _ = await take(h, "h", seconds=1.0)
+        check(
+            "niente tentativi dopo due salti falliti",
+            backend._run is not run_g and values == {mark(h)} and first_h < 1.9,
+            (first_h, values),
+        )
+        # ... e passato quel tempo si riprova
+        solo._XONOS_RETRY_S = 0.0
+        first_i, values, _ = await take(i, "i", seconds=1.0)
+        check(
+            "salto riprovato dopo un po'",
+            values == {mark(i)} and first_i >= 2.0 and backend._xonos_failures["salto"] == 2,
+            (first_i, backend._xonos_failures),
+        )
     except Exception as err:  # noqa: BLE001 - nel risultato, con le ultime righe del motore
         failed.append(repr(err))
     finally:
         log.removeHandler(keep)
-        for key in ("XONOS_FAKE_LEAK", "XONOS_FAKE_DURATION_MS", "XONOS_FAKE_NO_JUMP"):
+        for key in ("XONOS_FAKE_LEAK", "XONOS_FAKE_DURATION_MS", "XONOS_FAKE_NO_JUMP", "XONOS_FAKE_DELAY_PLAY"):
             os.environ.pop(key, None)
         solo.SoloistBinaryManager = real_manager
         solo._XONOS_PARK_S = real_park
+        solo._XONOS_SWITCH_S = real_switch
+        solo._XONOS_RETRY_S = real_retry
         backend._xonos_cancel_park()
         async with backend._run_lock:
             if (left := backend._run) is not None:
@@ -458,7 +513,8 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
                 backend._run = None
     detail = (
         f"primo audio: da capo {first_a:.2f} s, salto {first_b:.2f} s, ripresa {first_r:.2f} s,"
-        f" da capo dopo un salto rifiutato {first_e:.2f} s"
+        f" da capo dopo un salto rifiutato {first_g:.2f} s, senza tentativo {first_h:.2f} s,"
+        f" tentativo dopo un po' {first_i:.2f} s"
     )
     if failed:
         detail += "; non va: " + ", ".join(failed) + " | motore: " + " / ".join(records[-15:])

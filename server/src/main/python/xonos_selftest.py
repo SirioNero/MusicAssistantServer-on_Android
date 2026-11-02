@@ -81,6 +81,15 @@ async def run(mass: Any) -> None:
     except Exception as err:  # noqa: BLE001
         say("pulseaudio", False, f"{err!r}; {await _pulseaudio_alone(Path(mass.cache_path))}")
 
+    if server is not None:
+        # La sessione di Soloist che resta accesa tra un brano e l'altro, col codice vero di Music Assistant e un
+        # finto Soloist (xonos_fake_soloist.py): play, salto, ripresa, spegnimento, fine brano, salto rifiutato.
+        try:
+            session_ok, detail = await _soloist_session(mass, server)
+            say("soloist-sessione", session_ok, detail)
+        except Exception as err:  # noqa: BLE001
+            say("soloist-sessione", False, repr(err))
+
     if binary is not None and server is not None and sink is not None:
         try:
             lines, found = await _soloist(binary, server, sink, Path(mass.cache_path))
@@ -306,6 +315,139 @@ async def _pulse_commands(server: Any, rounds: int = 5) -> tuple[bool, str]:
         f" (socket usato: {used_socket})"
     )
     return used_socket and socket_ms < pactl_ms, detail
+
+
+async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
+    """
+    La sessione di Soloist che resta accesa tra un brano e l'altro (_soloist_live in prepare.py).
+
+    Col codice vero di Music Assistant (SoloistBackend, PulseAudio, il tubo, il ritmo di lettura) e un finto Soloist
+    (xonos_fake_soloist.py, avviato col Python del pacchetto al posto del programma di Spotify): un brano, un salto a un
+    altro, una ripresa a 5 s, lo spegnimento dopo la pausa, la fine naturale di un brano e un Soloist che non accetta
+    salti (allora si riparte da capo). L'audio che arriva deve essere sempre e solo del brano chiesto: il finto
+    Soloist scrive un valore fisso per brano, e dopo ogni pausa lascia nel tubo un po' del brano di prima.
+    """
+    from array import array  # noqa: PLC0415
+    from types import SimpleNamespace  # noqa: PLC0415
+
+    from music_assistant.providers.spotify.backends import soloist as solo  # noqa: PLC0415
+    from music_assistant.providers.spotify.constants import (  # noqa: PLC0415
+        CONF_SOLOIST_API_KEY,
+        CONF_SOLOIST_CONSENT,
+    )
+
+    python = os.path.join(os.environ.get("XONOS_BIN", ""), "python3")
+    script = Path(__file__).with_name("xonos_fake_soloist.py")
+    setup = {CONF_SOLOIST_API_KEY: "xonos-finta", CONF_SOLOIST_CONSENT: True}
+    provider = SimpleNamespace(
+        mass=mass,
+        logger=logging.getLogger("xonos.selftest.soloist"),
+        instance_id="xonos_fake",
+        name="Spotify finto",
+        available=True,
+        spotify_normalization_configured=False,
+        get_setup_value=setup.get,
+        config=SimpleNamespace(get_value=lambda _key: None),
+        unload_with_error=lambda _err: None,
+    )
+    backend = solo.SoloistBackend(provider)
+    backend._server = server
+    backend._binary = Path(python)
+
+    class FakeManager:
+        """Il programma di Soloist c'è già: è il finto."""
+
+        def __init__(self, _mass: Any) -> None:
+            pass
+
+        async def ensure_fresh(self, _consent: bool, **_kwargs: Any) -> Path:
+            return Path(python)
+
+    real_manager = solo.SoloistBinaryManager
+    real_park = solo._XONOS_PARK_S
+    solo.SoloistBinaryManager = FakeManager
+    plain_args = backend._session_args
+    backend._session_args = lambda uri: [python, str(script), *plain_args(uri)[1:]]
+
+    def mark(uri: str) -> int:
+        """Il valore del brano, come lo scrive il finto Soloist (in milioni)."""
+        return sum(uri.encode()) % 900 + 100
+
+    async def take(uri: str, name: str, seek: int = 0, seconds: float = 1.0, duration: int = 30) -> tuple:
+        """Uno stream come lo chiede Music Assistant: secondi al primo audio, i brani dei valori arrivati, byte."""
+        details = SimpleNamespace(uri=f"spotify--xonos://track/{name}", queue_id="xonos_fake_queue", duration=duration)
+        start = time.monotonic()
+        first = -1.0
+        values: set[int] = set()
+        got = 0
+        gen = backend.stream_spotify_uri(uri, seek, streamdetails=details)
+        try:
+            async for chunk in gen:
+                if first < 0:
+                    first = time.monotonic() - start
+                values.update(value // 1_000_000 for value in array("i", chunk[: len(chunk) // 4 * 4]))
+                got += len(chunk)
+                if got >= seconds * FIFO_BYTES_PER_S:
+                    break
+        finally:
+            await gen.aclose()
+        return first, values, got
+
+    def alive(run: Any) -> bool:
+        return run is not None and run._proc is not None and run._proc.returncode is None
+
+    failed: list[str] = []
+
+    def check(what: str, ok: bool, seen: Any = "") -> None:
+        if not ok:
+            failed.append(f"{what} ({seen})" if seen != "" else what)
+
+    a, b, c, d, e = (f"spotify:track:xonos{x}" for x in "abcde")
+    try:
+        os.environ["XONOS_FAKE_LEAK"] = "1"
+        os.environ["XONOS_FAKE_DURATION_MS"] = "30000"
+        first_a, values, _ = await take(a, "a", seconds=1.5)
+        run = backend._run
+        check("audio del primo brano", values == {mark(a)}, values)
+        check("in pausa e acceso dopo lo stream", alive(run) and run.xonos_parked)
+        first_b, values, _ = await take(b, "b", seconds=1.5)
+        check("salto sullo stesso processo", backend._run is run and alive(run))
+        check("solo audio del brano saltato", values == {mark(b)}, values)
+        solo._XONOS_PARK_S = 1.0
+        first_r, values, _ = await take(b, "b", seek=5, seconds=1.0)
+        check("ripresa sullo stesso processo", backend._run is run, backend._run)
+        check("solo audio del brano ripreso", values == {mark(b)}, values)
+        await asyncio.sleep(2.5)
+        check("spento dopo la pausa", backend._run is None and not alive(run))
+        solo._XONOS_PARK_S = real_park
+        os.environ["XONOS_FAKE_DURATION_MS"] = "2500"
+        _, values, got = await take(c, "c", seconds=10, duration=3)
+        await asyncio.sleep(0.5)
+        check("fine naturale del brano", got > 0 and values == {mark(c)} and backend._run is None, (got, values))
+        os.environ["XONOS_FAKE_DURATION_MS"] = "30000"
+        os.environ["XONOS_FAKE_NO_JUMP"] = "1"
+        await take(d, "d", seconds=1.0)
+        run_d = backend._run
+        first_e, values, _ = await take(e, "e", seconds=1.0)
+        check("da capo dopo un salto rifiutato", backend._run is not run_d and values == {mark(e)}, values)
+        check("salto rifiutato contato", backend._xonos_jump_failures == 1, backend._xonos_jump_failures)
+    finally:
+        for key in ("XONOS_FAKE_LEAK", "XONOS_FAKE_DURATION_MS", "XONOS_FAKE_NO_JUMP"):
+            os.environ.pop(key, None)
+        solo.SoloistBinaryManager = real_manager
+        solo._XONOS_PARK_S = real_park
+        backend._xonos_cancel_park()
+        async with backend._run_lock:
+            if (left := backend._run) is not None:
+                await left.stop()
+                backend._run = None
+    detail = (
+        f"primo audio: da capo {first_a:.2f} s, salto {first_b:.2f} s, ripresa {first_r:.2f} s,"
+        f" da capo dopo un salto rifiutato {first_e:.2f} s"
+    )
+    if failed:
+        detail += "; non va: " + ", ".join(failed)
+    return not failed, detail
 
 
 async def _pulseaudio_alone(cache: Path) -> str:

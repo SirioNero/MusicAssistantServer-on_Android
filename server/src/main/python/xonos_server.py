@@ -275,6 +275,13 @@ def _linux_programs(data_dir: str, cache_dir: str) -> None:
                     # Un gruppo di processi suo, con il numero di proot: i segnali vanno a tutto il gruppo.
                     if "process_group" not in kwargs:
                         kwargs["start_new_session"] = True
+                    # L'uscita che nessuno legge non va nel tubo verso Xonos (PulseAudio di Music Assistant la eredita):
+                    # un programma Linux rimasto acceso dopo Python lo terrebbe aperto, e Xonos non vedrebbe mai che
+                    # il server si è fermato. stdout ed stderr sono il 4° e il 5° argomento dopo args.
+                    if len(rest) < 4 and kwargs.get("stdout") is None:
+                        kwargs["stdout"] = subprocess.DEVNULL
+                    if len(rest) < 5 and kwargs.get("stderr") is None:
+                        kwargs["stderr"] = subprocess.DEVNULL
                     pairing = "--pair" in args
                     args = [*base, "-w", inside, program, *map(os.fsdecode, args[1:])]
             super().__init__(args, *rest, **kwargs)

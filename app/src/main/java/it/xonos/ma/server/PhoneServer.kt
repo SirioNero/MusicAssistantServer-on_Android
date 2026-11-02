@@ -7,6 +7,8 @@ import android.net.Network
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.SystemClock
+import android.system.Os
+import android.system.OsConstants
 import android.util.Log
 import it.xonos.ma.BuildConfig
 import it.xonos.ma.phone.model.PhoneServerControl
@@ -115,9 +117,14 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
             stopping = true
             process
         } ?: return
-        // SIGTERM: Music Assistant chiude il database e i servizi; se non basta, SIGKILL.
+        // SIGTERM: Music Assistant chiude il database e i servizi; se non basta, SIGKILL. Su Android
+        // destroyForcibly() manda un altro SIGTERM, che Python ignora (sta già chiudendo): il SIGKILL va mandato a mano.
         running.destroy()
-        if (!running.waitFor(STOP_TIMEOUT_S, TimeUnit.SECONDS)) running.destroyForcibly()
+        if (!running.waitFor(STOP_TIMEOUT_S, TimeUnit.SECONDS)) {
+            val pid = PID.find(running.toString())?.groupValues?.get(1)?.toIntOrNull()
+            if (pid != null) runCatching { Os.kill(pid, OsConstants.SIGKILL) } else running.destroyForcibly()
+            running.waitFor(KILL_WAIT_S, TimeUnit.SECONDS)
+        }
     }
 
     private fun launch() {
@@ -177,7 +184,14 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
         }
         process = started
         Log.i(TAG, "Avvio di Music Assistant sul telefono")
-        thread(name = "music-assistant-log", isDaemon = true) { follow(started) }
+        val reader = thread(name = "music-assistant-log", isDaemon = true) { follow(started) }
+        thread(name = "music-assistant-exit", isDaemon = true) {
+            runCatching { started.waitFor() }
+            // Python è uscito ma il tubo è ancora aperto: lo tiene un programma rimasto acceso (pacchetti fino al
+            // 2.10.8-5, PulseAudio). Lo si chiude da qui: il registro finisce e lo stato dice che il server non c'è.
+            reader.join(EXIT_GRACE_MS)
+            if (reader.isAlive) runCatching { started.inputStream.close() }
+        }
     }
 
     /** Il registro del processo nel logcat; le righe XONOS_STATE dicono a che punto è. */
@@ -210,7 +224,9 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
         val code = running.waitFor()
         multicast(false)
         synchronized(lock) {
-            if (process === running) process = null
+            // Un processo di prima (il suo tubo è rimasto aperto più di lui) non tocca lo stato di quello nuovo.
+            if (process !== running) return@synchronized
+            process = null
             unwatchDns()
             if (stopping) {
                 state = State.STOPPED
@@ -277,6 +293,13 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
         private const val START_TIMEOUT_MS = 180_000L
         private const val POLL_MS = 250L
         private const val STOP_TIMEOUT_S = 15L
+        private const val KILL_WAIT_S = 2L
+
+        /** Quanto si lascia al registro per finire da solo dopo l'uscita di Python. */
+        private const val EXIT_GRACE_MS = 2_000L
+
+        /** Il numero del processo, da Process.toString() di Android: "Process[pid=1234, hasExited=false]". */
+        private val PID = Regex("pid=(\\d+)")
         private const val LAST_LINES = 20
         /** Quanto registro si condivide: le ultime righe bastano, e stanno in una condivisione di Android. */
         private const val LOG_BYTES = 96 * 1024

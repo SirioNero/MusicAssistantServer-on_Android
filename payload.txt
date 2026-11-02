@@ -1,0 +1,51 @@
+file: 93, peso: 16.5 MB in /tmp/tmpjssky3se/rootfs
+NOTICE.txt: 11 parti, 102 pacchetti Python
+ELF: 156, allineati a meno di 16 KB: 4
+    site-packages/chaquopy/lib/libfreetype.so (4096)
+    site-packages/chaquopy/lib/libgfortran.so.3 (4096)
+    site-packages/chaquopy/lib/libjpeg_chaquopy.so (4096)
+    site-packages/chaquopy/lib/libopenblas.so (4096)
+pacchetto 2.10.8-8 per x86_64: payload/xonos-server-x86_64.zip, 78.8 MB, estratto 195.1 MB
+8828753 app/music_assistant
+8282238 site-packages/numpy
+6673229 site-packages/chaquopy
+6320358 bin/librespot
+6210250 site-packages/pycountry
+4269393 lib/python313.zip
+2632647 lib/libavcodec.so
+1882019 site-packages/Crypto
+1843083 lib/libavfilter.so
+1806517 site-packages/pygments
+1789250 lib/python3.13
+1780689 lib/libpython3.13.so
+1767149 lib/libcrypto_python.so
+1577704 lib/libavformat.so
+1270905 site-packages/cryptography
+860495 site-packages/PIL
+779171 site-packages/aiohttp
+699256 site-packages/chardet
+666542 site-packages/aiosendspin
+644929 lib/libsqlite3_python.so
+560101 site-packages/rich
+458013 site-packages/graphql
+430199 lib/libssl_python.so
+371595 site-packages/mutagen
+349169 site-packages/plexapi
+339310 lib/libswscale.so
+317878 site-packages/pkg_resources
+317206 lib/libavutil.so
+302195 site-packages/anyio
+268334 site-packages/pydantic
+250173 site-packages/charset_normalizer
+246242 site-packages/anyascii
+234047 site-packages/typer
+218126 site-packages/urllib3
+191634 site-packages/cffi
+171832 site-packages/zeroconf
+164407 site-packages/gql
+159109 site-packages/mashumaro
+158438 site-packages/bs4
+157014 site-packages/socketio
+total 76964
+-rw-r--r-- 1 runner runner 78804459 Nov  2 15:29 xonos-server-x86_64.zip
+-rw-r--r-- 1 runner runner      256 Nov  2 15:29 xonos-server-x86_64.zip.sig

@@ -1,0 +1,192 @@
+2026-11-02 15:31:36,766.766 INFO (music-assistant) [music_assistant] Starting Music Assistant Server (96573b44adf141babf88681113d3739b) version 0.0.0 - HA add-on: False - Safe mode: False
+2026-11-02 15:31:36,866.866 INFO (music-assistant) [music_assistant.cache] Initializing cache controller...
+2026-11-02 15:31:36,991.991 INFO (music-assistant) [ffmpeg] Detected ffmpeg version 7.1.5 
+2026-11-02 15:31:36,998.998 WARNING (music-assistant) [music_assistant.streams] 
+
+################################################################################
+Started streamserver on 127.0.0.1:8097
+This is the IP address that is communicated to players.
+If this is incorrect, audio will not play!
+See the documentation for how to configure the publish IP for the Streamserver
+in Settings --> System --> Streams
+################################################################################
+
+2026-11-02 15:31:37,236.236 INFO (music-assistant) [music_assistant.auth] Generated new JWT secret key
+2026-11-02 15:31:37,238.238 INFO (music-assistant) [music_assistant.auth] Authentication manager initialized (providers=1)
+2026-11-02 15:31:37,240.240 WARNING (music-assistant) [music_assistant.webserver] 
+
+################################################################################
+###                           SETUP REQUIRED                                 ###
+################################################################################
+
+Music Assistant is running in setup mode.
+Please complete the setup by visiting:
+
+    http://127.0.0.1:8095/setup
+
+################################################################################
+
+2026-11-02 15:31:37,296.296 INFO (music-assistant) [music_assistant] Loaded metadata provider Cover Art Archive
+2026-11-02 15:31:37,380.380 INFO (music-assistant) [music_assistant] Loaded music provider Music Assistant
+2026-11-02 15:31:37,392.392 INFO (music-assistant) [music_assistant] Loaded metadata provider iTunes Artwork
+2026-11-02 15:31:37,393.393 INFO (music-assistant) [music_assistant] Loaded metadata provider LRCLIB
+2026-11-02 15:31:37,406.406 INFO (music-assistant) [music_assistant] Loaded audio_analysis provider Loudness Analysis
+2026-11-02 15:31:37,666.666 INFO (music-assistant) [music_assistant] Loaded metadata provider MusicBrainz
+2026-11-02 15:31:37,667.667 INFO (music-assistant) [music_assistant.musicbrainz] MusicBrainz recommendations: scanning 3 days before/after today
+2026-11-02 15:31:37,710.710 INFO (music-assistant) [music_assistant] Loaded metadata provider Playlist Metadata
+2026-11-02 15:31:37,718.718 INFO (music-assistant) [music_assistant] Loaded plugin provider Endless Mix Playlists
+2026-11-02 15:31:37,720.720 INFO (music-assistant) [music_assistant] Loaded plugin provider Library Recommendations
+2026-11-02 15:31:37,728.728 INFO (music-assistant) [music_assistant] Loaded metadata provider Wikipedia
+2026-11-02 15:31:37,730.730 INFO (music-assistant) [music_assistant] Loaded player provider Sync Group Player
+2026-11-02 15:31:37,732.732 INFO (music-assistant) [music_assistant] Loaded player provider Universal Player
+2026-11-02 15:31:41,231.231 INFO (music-assistant) [music_assistant] Loaded player provider Sendspin
+2026-11-02 15:31:41,276.276 INFO (music-assistant) [music_assistant] Loaded music provider Ambient Sounds
+2026-11-02 15:31:41,282.282 INFO (music-assistant) [xonos] Music Assistant pronto sul telefono
+2026-11-02 15:31:43,213.213 INFO (music-assistant) [music_assistant.auth] Migrated existing playlog entries to first user: LuPqtaPB3AgOLmyM24R4XetZ2jtOV7y8ZfX6ABjeMsU
+2026-11-02 15:31:43,426.426 INFO (music-assistant) [music_assistant.webserver] First admin user created: xonos
+2026-11-02 15:31:43,479.479 INFO (music-assistant) [music_assistant.webserver] WebSocket client authenticated as xonos
+2026-11-02 15:31:43,484.484 INFO (music-assistant) [music_assistant.auth] Created long-lived token 'Xonos check' for user 'xonos'
+2026-11-02 15:31:43,490.490 INFO (music-assistant) [music_assistant.controllers.config.controller] Onboarding completed
+2026-11-02 15:31:44,260.260 INFO (music-assistant) [music_assistant] Loaded music provider Filesystem (local disk)
+2026-11-02 15:31:44,392.392 INFO (music-assistant) [music_assistant.Filesystem (local disk)] Found 2 changed/new items to process for Filesystem (local disk)
+2026-11-02 15:31:44,643.643 INFO (music-assistant) [music_assistant.Filesystem (local disk)] Found 0 changed/new items to process for Filesystem (local disk)
+2026-11-02 15:31:44,704.704 INFO (music-assistant) [music_assistant.music.genre] Genre mapping scan completed: 0 items mapped (0.0s)
+2026-11-02 15:31:46,448.448 WARNING (music-assistant) [aiosendspin.server.connection.unknown-127.0.0.1] non-compliant client Xonos check (Xonos Mobile Application, software check): connected unencrypted (transition mode)
+2026-11-02 15:31:46,448.448 WARNING (music-assistant) [aiosendspin.server.connection.xonos-check-0c169135] non-compliant client Xonos check (Xonos Mobile Application, software check): client/hello declared player supported_commands, superseded by client/state
+2026-11-02 15:31:46,488.488 WARNING (music-assistant) [aiosendspin.server.client.xonos-check-0c169135] non-compliant client Xonos check (Xonos Mobile Application, software check): client/state used the legacy top-level 'state' field
+2026-11-02 15:31:46,496.496 INFO (music-assistant) [music_assistant.players] Player (type player) registered: xonos-check-0c169135/Xonos check
+2026-11-02 15:31:47,483.483 INFO (music-assistant) [music_assistant.player_queues] User xonos requested playback.
+2026-11-02 15:31:47,485.485 INFO (music-assistant) [music_assistant.player_queues] Xonos tempi: play_index 0 ricevuto
+2026-11-02 15:31:47,614.614 INFO (music-assistant) [music_assistant.player_queues] Xonos tempi: brano pronto in 0.13 s
+2026-11-02 15:31:47,616.616 INFO (music-assistant) [music_assistant.Sendspin.xonos-check-0c169135] Setting active output protocol on Xonos check to Native
+2026-11-02 15:31:47,721.721 INFO (music-assistant) [music_assistant.streams.audio] Start Queue Flow stream for Queue Xonos check - crossfade: disabled 
+2026-11-02 15:31:47,722.722 INFO (music-assistant) [music_assistant.player_queues] Xonos tempi: comando al lettore dato 0.24 s dopo play_index (non è ancora audio)
+2026-11-02 15:31:47,970.970 INFO (music-assistant) [music_assistant.Sendspin.xonos-check-0c169135] Xonos tempi: primo audio al lettore 0.35 s dopo l'inizio del flusso, da suonare fra 300 ms
+2026-11-02 15:31:49,918.918 INFO (music-assistant) [music_assistant.streams.audio] Finished Queue Flow stream for Queue Xonos check
+2026-11-02 15:31:59,763.763 INFO (music-assistant) [music_assistant.Sendspin.xonos-check-0c169135] Clearing active output protocol on Xonos check
+2026-11-02 15:31:59,770.770 INFO (music-assistant) [music_assistant.player_queues] User xonos requested playback.
+2026-11-02 15:31:59,772.772 WARNING (music-assistant) [music_assistant.player_queues] Skipping library://track/999999: track not found in library: 999999
+2026-11-02 15:31:59,773.773 WARNING (music-assistant) [music_assistant.webserver] player_queues/play_media: No playable items found: track not found in library: 999999
+2026-11-02 15:31:59,818.818 INFO (music-assistant) [music_assistant.players] Player unavailable: Xonos check
+2026-11-02 15:31:59,818.818 INFO (music-assistant) [aiohttp.access] 127.0.0.1 [02/Nov/2026:15:31:46 +0000] "GET /sendspin HTTP/1.1" 101 0 "-" "Music Assistant/0.0.0 aiohttp/3.14.3 Python/3.13"
+2026-11-02 15:32:04,417.417 INFO (music-assistant) [music_assistant.providers.spotify_connect.soloist] Installed soloist binary 1.3.10.34 (x86_64)
+2026-11-02 15:32:04,421.421 INFO (music-assistant) [xonos.selftest] XONOS_SELFTEST soloist-download ok /data/user/0/it.xonos.ma/files/music-assistant/soloist/soloist {'installed': True, 'sha256': 'e73cc1e5b112faa134f202a06645ecc3758d46be8d3e952d766e17ad4adb459f', 'etag': '"b1304a9cd59bcdcbbe9c3570fc8cfbfe"', 'version': '1.3.10.34', 'version_raw': 'soloist 1.3.10.34 build 1793620907 (20261102) (g19412df6ea) (linux/x86_64)', 'installed_at': 1793633524.417161, 'build_timestamp': 1793620907.0, 'expires_at': 1801396907.0}
+2026-11-02 15:32:04,526.526 INFO (music-assistant) [xonos.selftest] XONOS_SELFTEST pulseaudio ok unix:/data/user/0/it.xonos.ma/cache/music-assistant/pulse_capture/native
+2026-11-02 15:32:04,532.532 INFO (music-assistant) [xonos.selftest] XONOS_SELFTEST pipe-sink ok /data/user/0/it.xonos.ma/cache/music-assistant/pulse_capture/xonos_selftest_23eac93c.pcm
+2026-11-02 15:32:08,593.593 INFO (music-assistant) [xonos.selftest] XONOS_SELFTEST audio-nel-tubo ok 516640 byte in 4 s
+2026-11-02 15:32:10,066.066 INFO (music-assistant) [xonos.selftest] XONOS_SELFTEST pulse-comandi ok per brano (mediana di 5): col socket 6 ms, con pactl in proot 297 ms (socket usato: True)
+2026-11-02 15:32:10,067.067 INFO (music-assistant) [xonos.selftest.soloist] Soloist: parte da capo (controllo del programma 0.00 s)
+2026-11-02 15:32:11,116.116 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] finto soloist: parte
+2026-11-02 15:32:11,127.127 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] finto soloist: spotify:track:xonosa su 127.0.0.1:44121
+2026-11-02 15:32:11,134.134 DEBUG (music-assistant) [xonos.selftest.soloist] Connected to the soloist websocket at 127.0.0.1:44121
+2026-11-02 15:32:11,179.179 INFO (music-assistant) [xonos.selftest.soloist] Soloist: avvio in 1.1 s (PulseAudio 0.02 s, processo 0.01 s, collegato e dentro Spotify 1.09 s, il brano suona 0.00 s, posizione e tubo 0.00 s)
+2026-11-02 15:32:11,179.179 INFO (music-assistant) [xonos.selftest.soloist] Soloist: primo audio 1.11 s dopo l'avvio
+2026-11-02 15:32:11,336.336 INFO (music-assistant) [xonos.selftest.soloist] Soloist: dal sink ripartito, primo audio in 0.00 s e primo secondo intero in 0.16 s (silenzio tolto all'inizio 0.00 s)
+2026-11-02 15:32:11,487.487 INFO (music-assistant) [xonos.selftest.soloist] Soloist: in pausa e acceso in 0.00 s, pronto per il prossimo brano
+2026-11-02 15:32:11,489.489 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] finto soloist: comando pause
+2026-11-02 15:32:11,690.690 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] finto soloist: resto 8192
+2026-11-02 15:32:11,712.712 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] finto soloist: comando play spotify:track:xonosb
+2026-11-02 15:32:11,715.715 INFO (music-assistant) [xonos.selftest.soloist] Soloist: salto sulla sessione accesa in 0.23 s (pausa di prima 0.20 s, tubo 0.02 s, comando 0.00 s, il brano suona 0.00 s, posizione 0.00 s, sink 0.00 s)
+2026-11-02 15:32:11,728.728 INFO (music-assistant) [xonos.selftest.soloist] Soloist: primo audio 0.24 s dopo l'avvio
+2026-11-02 15:32:11,874.874 INFO (music-assistant) [xonos.selftest.soloist] Soloist: dal sink ripartito, primo audio in 0.01 s e primo secondo intero in 0.16 s (silenzio tolto all'inizio 0.00 s)
+2026-11-02 15:32:13,392.392 INFO (music-assistant) [xonos.selftest.soloist] Soloist: in pausa e acceso in 0.00 s, pronto per il prossimo brano
+2026-11-02 15:32:13,393.393 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] finto soloist: comando pause
+2026-11-02 15:32:13,595.595 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] finto soloist: resto 4096
+2026-11-02 15:32:13,619.619 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] finto soloist: comando seek 1000
+2026-11-02 15:32:13,624.624 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] finto soloist: comando play
+2026-11-02 15:32:13,628.628 INFO (music-assistant) [xonos.selftest.soloist] Soloist: ripresa sulla sessione accesa in 0.24 s (pausa di prima 0.20 s, tubo 0.02 s, comando 0.01 s, il brano suona 0.00 s, posizione 0.00 s, sink 0.00 s)
+2026-11-02 15:32:13,633.633 INFO (music-assistant) [xonos.selftest.soloist] Soloist: primo audio 0.24 s dopo l'avvio
+2026-11-02 15:32:13,800.800 INFO (music-assistant) [xonos.selftest.soloist] Soloist: dal sink ripartito, primo audio in 0.01 s e primo secondo intero in 0.18 s (silenzio tolto all'inizio 0.00 s)
+2026-11-02 15:32:13,804.804 INFO (music-assistant) [xonos.selftest.soloist] Soloist: in pausa e acceso in 0.00 s, pronto per il prossimo brano
+2026-11-02 15:32:13,805.805 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] finto soloist: comando pause
+2026-11-02 15:32:14,007.007 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] finto soloist: resto 8704
+2026-11-02 15:32:14,805.805 INFO (music-assistant) [xonos.selftest.soloist] Soloist: in pausa da 1 s senza brani, lo spengo
+2026-11-02 15:32:14,809.809 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] Traceback (most recent call last):
+2026-11-02 15:32:14,888.888 INFO (music-assistant) [xonos.selftest.soloist] Soloist: fermato in 0.08 s
+2026-11-02 15:32:16,306.306 INFO (music-assistant) [xonos.selftest.soloist] Soloist: parte da capo (controllo del programma 0.00 s)
+2026-11-02 15:32:16,752.752 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] finto soloist: parte
+2026-11-02 15:32:16,756.756 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] finto soloist: spotify:track:xonosc su 127.0.0.1:43133
+2026-11-02 15:32:16,788.788 DEBUG (music-assistant) [xonos.selftest.soloist] Connected to the soloist websocket at 127.0.0.1:43133
+2026-11-02 15:32:16,823.823 INFO (music-assistant) [xonos.selftest.soloist] Soloist: avvio in 0.5 s (PulseAudio 0.01 s, processo 0.00 s, collegato e dentro Spotify 0.51 s, il brano suona 0.00 s, posizione e tubo 0.00 s)
+2026-11-02 15:32:16,823.823 INFO (music-assistant) [xonos.selftest.soloist] Soloist: primo audio 0.52 s dopo l'avvio
+2026-11-02 15:32:17,025.025 INFO (music-assistant) [xonos.selftest.soloist] Soloist: dal sink ripartito, primo audio in 0.00 s e primo secondo intero in 0.20 s (silenzio tolto all'inizio 0.00 s)
+2026-11-02 15:32:17,679.679 DEBUG (music-assistant) [xonos.selftest.soloist] Engine wandered to spotify:track:xonosautoplay; spotify:track:xonosc has ended
+2026-11-02 15:32:17,680.680 DEBUG (music-assistant) [xonos.selftest.soloist] Engine wandered to spotify:track:xonosautoplay; spotify:track:xonosc has ended
+2026-11-02 15:32:17,985.985 INFO (music-assistant) [xonos.selftest.soloist] Soloist: fermato in 0.31 s
+2026-11-02 15:32:17,986.986 INFO (music-assistant) [xonos.selftest.soloist] Soloist: brano finito, 2.1 s di audio in 1.2 s dal sink ripartito (1.79x)
+2026-11-02 15:32:18,487.487 INFO (music-assistant) [xonos.selftest.soloist] Soloist: parte da capo (controllo del programma 0.00 s)
+2026-11-02 15:32:18,920.920 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] finto soloist: parte
+2026-11-02 15:32:18,923.923 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] finto soloist: spotify:track:xonosd su 127.0.0.1:36581
+2026-11-02 15:32:18,958.958 DEBUG (music-assistant) [xonos.selftest.soloist] Connected to the soloist websocket at 127.0.0.1:36581
+2026-11-02 15:32:19,007.007 INFO (music-assistant) [xonos.selftest.soloist] Soloist: avvio in 0.5 s (PulseAudio 0.00 s, processo 0.00 s, collegato e dentro Spotify 0.51 s, il brano suona 0.00 s, posizione e tubo 0.00 s)
+2026-11-02 15:32:19,007.007 INFO (music-assistant) [xonos.selftest.soloist] Soloist: primo audio 0.52 s dopo l'avvio
+2026-11-02 15:32:19,108.108 INFO (music-assistant) [xonos.selftest.soloist] Soloist: dal sink ripartito, primo audio in 0.00 s e primo secondo intero in 0.10 s (silenzio tolto all'inizio 0.00 s)
+2026-11-02 15:32:19,111.111 INFO (music-assistant) [xonos.selftest.soloist] Soloist: in pausa e acceso in 0.00 s, pronto per il prossimo brano
+2026-11-02 15:32:19,111.111 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] finto soloist: comando pause
+2026-11-02 15:32:19,313.313 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] finto soloist: resto 8192
+2026-11-02 15:32:19,334.334 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] finto soloist: comando play spotify:track:xonose
+2026-11-02 15:32:19,414.414 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] Traceback (most recent call last):
+2026-11-02 15:32:19,466.466 INFO (music-assistant) [xonos.selftest.soloist] Soloist: fermato in 0.05 s
+2026-11-02 15:32:19,466.466 INFO (music-assistant) [xonos.selftest.soloist] Soloist: parte da capo (controllo del programma 0.00 s)
+2026-11-02 15:32:19,812.812 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] finto soloist: parte
+2026-11-02 15:32:19,815.815 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] finto soloist: spotify:track:xonosf su 127.0.0.1:34671
+2026-11-02 15:32:19,832.832 DEBUG (music-assistant) [xonos.selftest.soloist] Connected to the soloist websocket at 127.0.0.1:34671
+2026-11-02 15:32:19,881.881 INFO (music-assistant) [xonos.selftest.soloist] Soloist: avvio in 0.4 s (PulseAudio 0.01 s, processo 0.00 s, collegato e dentro Spotify 0.41 s, il brano suona 0.00 s, posizione e tubo 0.00 s)
+2026-11-02 15:32:19,881.881 INFO (music-assistant) [xonos.selftest.soloist] Soloist: primo audio 0.41 s dopo l'avvio
+2026-11-02 15:32:19,980.980 INFO (music-assistant) [xonos.selftest.soloist] Soloist: dal sink ripartito, primo audio in 0.00 s e primo secondo intero in 0.10 s (silenzio tolto all'inizio 0.00 s)
+2026-11-02 15:32:19,983.983 INFO (music-assistant) [xonos.selftest.soloist] Soloist: in pausa e acceso in 0.00 s, pronto per il prossimo brano
+2026-11-02 15:32:19,983.983 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] finto soloist: comando pause
+2026-11-02 15:32:20,184.184 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] finto soloist: resto 8192
+2026-11-02 15:32:20,206.206 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] finto soloist: comando play spotify:track:xonosg
+2026-11-02 15:32:21,991.991 INFO (music-assistant) [xonos.selftest.soloist] Soloist: salto sulla sessione accesa non riuscito (Spotify Soloist did not start the asked item in time), riparte da capo
+2026-11-02 15:32:21,994.994 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] Traceback (most recent call last):
+2026-11-02 15:32:22,036.036 INFO (music-assistant) [xonos.selftest.soloist] Soloist: fermato in 0.04 s
+2026-11-02 15:32:22,036.036 INFO (music-assistant) [xonos.selftest.soloist] Soloist: parte da capo (controllo del programma 0.00 s)
+2026-11-02 15:32:22,542.542 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] finto soloist: parte
+2026-11-02 15:32:22,545.545 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] finto soloist: spotify:track:xonosg su 127.0.0.1:44695
+2026-11-02 15:32:22,555.555 DEBUG (music-assistant) [xonos.selftest.soloist] Connected to the soloist websocket at 127.0.0.1:44695
+2026-11-02 15:32:22,603.603 INFO (music-assistant) [xonos.selftest.soloist] Soloist: avvio in 0.6 s (PulseAudio 0.01 s, processo 0.00 s, collegato e dentro Spotify 0.56 s, il brano suona 0.00 s, posizione e tubo 0.00 s)
+2026-11-02 15:32:22,603.603 INFO (music-assistant) [xonos.selftest.soloist] Soloist: primo audio 0.57 s dopo l'avvio
+2026-11-02 15:32:22,711.711 INFO (music-assistant) [xonos.selftest.soloist] Soloist: dal sink ripartito, primo audio in 0.00 s e primo secondo intero in 0.11 s (silenzio tolto all'inizio 0.00 s)
+2026-11-02 15:32:22,714.714 INFO (music-assistant) [xonos.selftest.soloist] Soloist: in pausa e acceso in 0.00 s, pronto per il prossimo brano
+2026-11-02 15:32:22,715.715 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] finto soloist: comando pause
+2026-11-02 15:32:22,717.717 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] Traceback (most recent call last):
+2026-11-02 15:32:22,764.764 INFO (music-assistant) [xonos.selftest.soloist] Soloist: fermato in 0.05 s
+2026-11-02 15:32:22,764.764 INFO (music-assistant) [xonos.selftest.soloist] Soloist: parte da capo (controllo del programma 0.00 s)
+2026-11-02 15:32:23,132.132 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] finto soloist: parte
+2026-11-02 15:32:23,135.135 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] finto soloist: spotify:track:xonosh su 127.0.0.1:43983
+2026-11-02 15:32:23,183.183 DEBUG (music-assistant) [xonos.selftest.soloist] Connected to the soloist websocket at 127.0.0.1:43983
+2026-11-02 15:32:23,230.230 INFO (music-assistant) [xonos.selftest.soloist] Soloist: avvio in 0.5 s (PulseAudio 0.01 s, processo 0.00 s, collegato e dentro Spotify 0.46 s, il brano suona 0.00 s, posizione e tubo 0.00 s)
+2026-11-02 15:32:23,230.230 INFO (music-assistant) [xonos.selftest.soloist] Soloist: primo audio 0.47 s dopo l'avvio
+2026-11-02 15:32:23,361.361 INFO (music-assistant) [xonos.selftest.soloist] Soloist: dal sink ripartito, primo audio in 0.00 s e primo secondo intero in 0.13 s (silenzio tolto all'inizio 0.00 s)
+2026-11-02 15:32:23,363.363 INFO (music-assistant) [xonos.selftest.soloist] Soloist: in pausa e acceso in 0.00 s, pronto per il prossimo brano
+2026-11-02 15:32:23,363.363 INFO (music-assistant) [xonos.selftest.soloist] Soloist: riprovo il salto sulla sessione accesa
+2026-11-02 15:32:23,363.363 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] finto soloist: comando pause
+2026-11-02 15:32:23,565.565 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] finto soloist: resto 8192
+2026-11-02 15:32:23,586.586 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] finto soloist: comando play spotify:track:xonosi
+2026-11-02 15:32:25,372.372 WARNING (music-assistant) [xonos.selftest.soloist] Soloist: salto sulla sessione accesa non riesce, per 0 minuti si riparte da capo
+2026-11-02 15:32:25,373.373 INFO (music-assistant) [xonos.selftest.soloist] Soloist: salto sulla sessione accesa non riuscito (Spotify Soloist did not start the asked item in time), riparte da capo
+2026-11-02 15:32:25,375.375 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] Traceback (most recent call last):
+2026-11-02 15:32:25,419.419 INFO (music-assistant) [xonos.selftest.soloist] Soloist: fermato in 0.05 s
+2026-11-02 15:32:25,419.419 INFO (music-assistant) [xonos.selftest.soloist] Soloist: parte da capo (controllo del programma 0.00 s)
+2026-11-02 15:32:25,778.778 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] finto soloist: parte
+2026-11-02 15:32:25,780.780 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] finto soloist: spotify:track:xonosi su 127.0.0.1:36093
+2026-11-02 15:32:25,786.786 DEBUG (music-assistant) [xonos.selftest.soloist] Connected to the soloist websocket at 127.0.0.1:36093
+2026-11-02 15:32:25,835.835 INFO (music-assistant) [xonos.selftest.soloist] Soloist: avvio in 0.4 s (PulseAudio 0.01 s, processo 0.00 s, collegato e dentro Spotify 0.41 s, il brano suona 0.00 s, posizione e tubo 0.00 s)
+2026-11-02 15:32:25,835.835 INFO (music-assistant) [xonos.selftest.soloist] Soloist: primo audio 0.42 s dopo l'avvio
+2026-11-02 15:32:25,945.945 INFO (music-assistant) [xonos.selftest.soloist] Soloist: dal sink ripartito, primo audio in 0.00 s e primo secondo intero in 0.11 s (silenzio tolto all'inizio 0.00 s)
+2026-11-02 15:32:25,948.948 INFO (music-assistant) [xonos.selftest.soloist] Soloist: in pausa e acceso in 0.00 s, pronto per il prossimo brano
+2026-11-02 15:32:25,949.949 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] finto soloist: comando pause
+2026-11-02 15:32:25,951.951 DEBUG (music-assistant) [xonos.selftest.soloist] [soloist] Traceback (most recent call last):
+2026-11-02 15:32:26,001.001 INFO (music-assistant) [xonos.selftest.soloist] Soloist: fermato in 0.05 s
+2026-11-02 15:32:26,001.001 INFO (music-assistant) [xonos.selftest] XONOS_SELFTEST soloist-sessione ok primo audio: da capo 1.11 s, salto 0.24 s, ripresa 0.24 s, da capo dopo un salto rifiutato 2.62 s, senza tentativo 0.52 s, tentativo dopo un po' 2.47 s
+2026-11-02 15:32:26,264.264 INFO (music-assistant) [xonos.selftest] XONOS_SELFTEST soloist-acceso ok 2026-11-02 15:32:26.030: soloist 1.3.10.34 build 1793620907 (20261102) (g19412df6ea) (linux/x86_64) | 2026-11-02 15:32:26.030: client expires in 89 days | 2026-11-02 15:32:26.091: ready, device_name=Xonos prova device_id=779448bf-9be2-4f7e-9d08-59dce9ea667a | 2026-11-02 15:32:26.091: waiting for login — connect to "Xonos prova" from your Spotify app
+2026-11-02 15:32:26,264.264 INFO (music-assistant) [xonos.selftest] XONOS_SELFTEST soloist-mdns ok {'seen': ['10.0.2.16 PTR _spotify-connect._tcp.local 779448bf-9be2-4f7e-9d08-59dce9e._spotify-connect._tcp.local', '10.0.2.16 SRV 779448bf-9be2-4f7e-9d08-59dce9e._spotify-connect._tcp.local 44611', "10.0.2.16 TXT 779448bf-9be2-4f7e-9d08-59dce9e._spotify-connect._tcp.local ['CPath=/zc', 'VERSION=1.0', 'Stack=SP']", '10.0.2.16 A 779448bf-9be2-4f7e-9d08-59dce9e.local 10.0.2.16', '10.0.2.16 A 779448bf-9be2-4f7e-9d08-59dce9e.local 10.0.2.15'], 'local': '10.0.2.16', 'port': 44611, 'instance': '779448bf-9be2-4f7e-9d08-59dce9e._spotify-connect._tcp.local', 'from': '10.0.2.16', 'txt': ['CPath=/zc', 'VERSION=1.0', 'Stack=SP'], 'getinfo 127.0.0.1': '{"aliases":[],"authInfo":"CiRmODFkNzU0ZC1iMzI3LTRlZTItOGRiYS02OGMyMzk3ZDI4MGUSIDMzNGQwMGZlZDI0ZjRlN2I5YWJiZTAyZWUyOGUwYjVmGlwKWgorLW0tZHVlU09IQlFndzdMREFZc3RyVXhmdi1DRnBaZE41OGhvdWY5bXVlSRIrMW1PWTNuVFFlRENNVnlsUlA4V0M2VXhjRUxBdUhEM3MxUlpURGNOZ1BOZw==","availability":"","brandDisplayName":"Soloist","', 'getinfo 10.0.2.16': '{"aliases":[],"authInfo":"CiRjMjM4NGViNi05ZGRhLTRiODYtYWU0ZS01MWRjOWE5ZWFhNjYSIDMzNGQwMGZlZDI0ZjRlN2I5YWJiZTAyZWUyOGUwYjVmGlwKWgorNU1xN3JmalFqU1VDaGJqaFlSZXVzQU9rVldmMFlLczZ2bGRYRnF5Q2V0bxIrb1J3bUM5dkVoaE83VTlOS2ZDZE5tRHhORzhmN01CM3RObi00UUhodkg2UQ==","availability":"","brandDisplayName":"Soloist","', 'getinfo': '{"aliases":[],"authInfo":"CiRmODFkNzU0ZC1iMzI3LTRlZTItOGRiYS02OGMyMzk3ZDI4MGUSIDMzNGQwMGZlZDI0ZjRlN2I5YWJiZTAyZWUyOGUwYjVmGlwKWgorLW0tZHVlU09IQlFndzdMREFZc3RyVXhmdi1DRnBaZE41OGhvdWY5bXVlSRIrMW1PWTNuVFFlRENNVnlsUlA4V0M2VXhjRUxBdUhEM3MxUlpURGNOZ1BOZw==","availability":"","brandDisplayName":"Soloist","'}
+2026-11-02 15:32:26,264.264 INFO (music-assistant) [xonos.selftest] XONOS_SELFTEST soloist-getinfo ok {"aliases":[],"authInfo":"CiRmODFkNzU0ZC1iMzI3LTRlZTItOGRiYS02OGMyMzk3ZDI4MGUSIDMzNGQwMGZlZDI0ZjRlN2I5YWJiZTAyZWUyOGUwYjVmGlwKWgorLW0tZHVlU09IQlFndzdMREFZc3RyVXhmdi1DRnBaZE41OGhvdWY5bXVlSRIrMW1PWTNuVFFlRENNVnlsUlA4V0M2VXhjRUxBdUhEM3MxUlpURGNOZ1BOZw==","availability":"","brandDisplayName":"Soloist","
+2026-11-02 15:32:29,882.882 INFO (music-assistant) [xonos.selftest] XONOS_SELFTEST proot-ignora-sigint ok SIGINT al solo proot: Soloist resta acceso
+2026-11-02 15:32:29,883.883 INFO (music-assistant) [xonos.selftest] XONOS_SELFTEST soloist-ferma ok close() in 0.0 s, codice 0, rimasti 0
+2026-11-02 15:32:32,586.586 INFO (xonos-cpu) [xonos] Processore dei programmi Linux negli ultimi 60 s: pulseaudio 0%, proot[pulseaudio] 0%, soloist 0%, proot[soloist] 0%, proot[pacat] 0%, pacat 0%
+2026-11-02 15:32:37,404.404 INFO (music-assistant) [music_assistant.Music Assistant] Playlist migration completed with 0 errors
+2026-11-02 15:32:40,919.919 INFO (music-assistant) [xonos.selftest] XONOS_SELFTEST cpu-audio ok pulseaudio 1%, proot 1%, pacat 1%; letti 3876270 byte su 3531172 in 10 s
+2026-11-02 15:32:40,934.934 INFO (music-assistant) [xonos.selftest] XONOS_SELFTEST pulseaudio-ferma ok processi rimasti: 0
+2026-11-02 15:32:40,934.934 INFO (music-assistant) [xonos.selftest] XONOS_SELFTEST fine 13/13

@@ -120,9 +120,15 @@ class PlaybackService : MediaLibraryService() {
         // Il perché di un play o di un comando non riuscito arriva anche all'auto (lo stato della sessione).
         player.onFailure = { e ->
             if (::session.isInitialized) {
-                session.sendError(SessionError(SessionError.ERROR_UNKNOWN, describe(settings.language.wrap(this), e)))
+                val context = settings.language.wrap(this)
+                // Col server sul telefono che non risponde, il perché (parte, va aggiornato, non è partito) invece di
+                // "Non collegato a Music Assistant".
+                val text = phoneServerProblem(context, app.repo.connection.value) ?: describe(context, e)
+                session.sendError(SessionError(SessionError.ERROR_UNKNOWN, text))
             }
         }
+        // Pausa non arrivata a Music Assistant (niente rete): l'audio già ricevuto si zittisce.
+        player.onPauseLost = { engine.silence() }
 
         // Toccando la notifica si apre il lettore sul telefono.
         val openPlayer = PendingIntent.getActivity(
@@ -154,8 +160,9 @@ class PlaybackService : MediaLibraryService() {
         scope.launch { engine.outputting.collect(::onOutputting) }
         player.addListener(object : Player.Listener {
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
-                // Di nuovo play (dalla persona o da Music Assistant): il silenzio dopo lo stacco dell'uscita finisce.
-                if (playWhenReady) engine.unsilence()
+                // Un play chiesto (dalla persona, dall'auto, a fine telefonata): il silenzio dopo lo stacco dell'uscita o
+                // una pausa non arrivata finisce. Non quando lo stato torna "in riproduzione" da solo (una pausa fallita).
+                if (playWhenReady && reason == Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST) engine.unsilence()
                 updateLocks()
             }
         })
@@ -350,7 +357,14 @@ class PlaybackService : MediaLibraryService() {
      */
     private val outputs = object : AudioDeviceCallback() {
         override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>) {
-            if (removedDevices.any { it.isSink && it.type !in BUILT_IN_OUTPUTS }) player.forgetDrop()
+            if (removedDevices.none { it.isSink && it.type !in BUILT_IN_OUTPUTS }) return
+            player.forgetDrop()
+            // La musica sta partendo (Soloist, 7 s) ma non esce ancora: Android non manda "noisy", e appena arriva
+            // uscirebbe dall'altoparlante. Come una pausa della persona.
+            if (player.playWhenReady && !outputting) {
+                engine.silence()
+                player.pauseFromSystem()
+            }
         }
     }
 

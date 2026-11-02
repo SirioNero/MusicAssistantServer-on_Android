@@ -322,6 +322,7 @@ class AudioEngine(
         if (start.fresh || previous == null || previous.codec != start.format.codec || previous.header != start.format.header) {
             decoder?.release()
             decoder = decoders(start.format)
+            decoderBroken = false
             if (decoder == null) Log.w(TAG, "Formato non supportato: ${start.format}")
         }
         if (previous != null && (previous.sampleRate != start.format.sampleRate || previous.channels != start.format.channels)) {
@@ -336,6 +337,7 @@ class AudioEngine(
         format?.let {
             decoder?.release()
             decoder = decoders(it)
+            decoderBroken = false
         }
         _outputting.value = false
     }
@@ -344,6 +346,7 @@ class AudioEngine(
         releaseOutput()
         decoder?.release()
         decoder = null
+        decoderBroken = false
         format = null
         _outputting.value = false
     }
@@ -366,7 +369,17 @@ class AudioEngine(
     /** Quando si è preso l'ultimo decoder nuovo dopo un guasto (System.nanoTime). */
     private var decoderResetNs = 0L
 
+    // Il decoder si è guastato e non ce n'è un altro (due guasti in un secondo, o non si crea): si riprova al pacchetto
+    // dopo, passato un secondo. Con Sendspin il flusso è continuo: un brano nuovo non porta uno stream nuovo.
+    private var decoderBroken = false
+
     private fun decode(chunk: Chunk) {
+        if (decoder == null && decoderBroken && System.nanoTime() - decoderResetNs > DECODER_RESET_NS) {
+            decoderResetNs = System.nanoTime()
+            decoder = runCatching { format?.let(decoders) }.getOrNull()
+            decoderBroken = decoder == null
+            Log.w(TAG, if (decoderBroken) "Decoder ancora non disponibile: riprovo tra un secondo" else "Decoder di nuovo pronto dopo un guasto")
+        }
         val decoder = decoder ?: return
         var rendering = false
         try {
@@ -382,9 +395,10 @@ class AudioEngine(
             runCatching { decoder.release() }
             val now = System.nanoTime()
             val again = now - decoderResetNs > DECODER_RESET_NS
-            this.decoder = if (again) format?.let(decoders) else null
+            this.decoder = if (again) runCatching { format?.let(decoders) }.getOrNull() else null
+            decoderBroken = this.decoder == null
             decoderResetNs = now
-            Log.w(TAG, if (again) "Decoder guasto, ne prendo uno nuovo: ${e.message}" else "Decoder guasto di nuovo: aspetto il prossimo brano")
+            Log.w(TAG, if (again) "Decoder guasto, ne prendo uno nuovo: ${e.message}" else "Decoder guasto di nuovo: riprovo tra un secondo")
         }
     }
 

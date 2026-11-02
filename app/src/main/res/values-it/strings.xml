@@ -170,6 +170,8 @@
     <string name="next">Successivo</string>
     <string name="previous">Precedente</string>
     <string name="repeat">Ripeti</string>
+    <string name="repeat_all_state">Tutti i brani</string>
+    <string name="repeat_one_state">Un brano</string>
     <string name="favorite_add">Aggiungi ai preferiti</string>
     <string name="favorite_remove">Togli dai preferiti</string>
     <string name="play_next">Riproduci dopo</string>

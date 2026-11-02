@@ -170,6 +170,8 @@
     <string name="next">Próxima</string>
     <string name="previous">Anterior</string>
     <string name="repeat">Repetir</string>
+    <string name="repeat_all_state">Todas as faixas</string>
+    <string name="repeat_one_state">Uma faixa</string>
     <string name="favorite_add">Adicionar aos favoritos</string>
     <string name="favorite_remove">Remover dos favoritos</string>
     <string name="play_next">Tocar em seguida</string>

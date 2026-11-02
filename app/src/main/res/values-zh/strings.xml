@@ -160,6 +160,8 @@
     <string name="next">下一首</string>
     <string name="previous">上一首</string>
     <string name="repeat">重复</string>
+    <string name="repeat_all_state">全部歌曲</string>
+    <string name="repeat_one_state">单曲</string>
     <string name="favorite_add">添加到收藏</string>
     <string name="favorite_remove">从收藏中移除</string>
     <string name="play_next">下一首播放</string>

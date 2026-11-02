@@ -36,7 +36,10 @@ class AccountProvider : ContentProvider() {
             Log.w(TAG, "Account negato a $caller")
             return null
         }
-        val settings = (context.applicationContext as XonosApp).settings
+        val app = context.applicationContext as XonosApp
+        // myCar si collega da sé: se Xonos usa il server sul telefono e si è fermato (Android l'ha chiuso), ripartire.
+        app.startPhoneServerIfUsed()
+        val settings = app.settings
         val config = settings.load()
         // Xonos non ancora configurato: niente da passare, ma la risposta dice che Xonos c'è.
         if (!config.isComplete) return Bundle()

@@ -190,6 +190,8 @@
     <string name="next">Следующий</string>
     <string name="previous">Предыдущий</string>
     <string name="repeat">Повтор</string>
+    <string name="repeat_all_state">Все треки</string>
+    <string name="repeat_one_state">Один трек</string>
     <string name="favorite_add">Добавить в избранное</string>
     <string name="favorite_remove">Убрать из избранного</string>
     <string name="play_next">Воспроизвести следующим</string>

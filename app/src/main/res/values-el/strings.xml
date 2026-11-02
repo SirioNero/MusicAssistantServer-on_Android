@@ -170,6 +170,8 @@
     <string name="next">Επόμενο</string>
     <string name="previous">Προηγούμενο</string>
     <string name="repeat">Επανάληψη</string>
+    <string name="repeat_all_state">Όλα τα τραγούδια</string>
+    <string name="repeat_one_state">Ένα τραγούδι</string>
     <string name="favorite_add">Προσθήκη στα αγαπημένα</string>
     <string name="favorite_remove">Αφαίρεση από τα αγαπημένα</string>
     <string name="play_next">Αναπαραγωγή μετά</string>

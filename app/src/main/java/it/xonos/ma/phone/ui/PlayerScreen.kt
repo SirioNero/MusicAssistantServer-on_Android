@@ -72,6 +72,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.stateDescription
 import it.xonos.ma.R
 import it.xonos.ma.data.Lyrics
 import it.xonos.ma.phone.model.Load
@@ -350,8 +351,15 @@ private fun Controls(now: NowPlaying, player: PlayerLink, busy: Boolean) {
         IconButton(onClick = player::next, modifier = Modifier.size(56.dp)) {
             Icon(XIcons.Next, stringResource(R.string.next), Modifier.size(36.dp))
         }
+        // Ripeti ha tre stati: acceso o spento lo dice il tasto, quale dei due accesi lo dice questa descrizione.
+        val repeatState = when (now.repeat) {
+            Repeat.ALL -> stringResource(R.string.repeat_all_state)
+            Repeat.ONE -> stringResource(R.string.repeat_one_state)
+            Repeat.OFF -> null
+        }
         IconToggleButton(
             checked = now.repeat != Repeat.OFF,
+            modifier = Modifier.semantics { repeatState?.let { stateDescription = it } },
             onCheckedChange = {
                 player.setRepeat(
                     when (now.repeat) {

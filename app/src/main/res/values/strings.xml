@@ -173,6 +173,8 @@
     <string name="next">Next</string>
     <string name="previous">Previous</string>
     <string name="repeat">Repeat</string>
+    <string name="repeat_all_state">All songs</string>
+    <string name="repeat_one_state">One song</string>
     <string name="favorite_add">Add to favorites</string>
     <string name="favorite_remove">Remove from favorites</string>
     <string name="play_next">Play next</string>

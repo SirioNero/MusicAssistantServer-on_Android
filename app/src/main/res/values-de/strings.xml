@@ -170,6 +170,8 @@
     <string name="next">Weiter</string>
     <string name="previous">Zurück</string>
     <string name="repeat">Wiederholen</string>
+    <string name="repeat_all_state">Alle Titel</string>
+    <string name="repeat_one_state">Ein Titel</string>
     <string name="favorite_add">Zu Favoriten hinzufügen</string>
     <string name="favorite_remove">Aus Favoriten entfernen</string>
     <string name="play_next">Als Nächstes abspielen</string>

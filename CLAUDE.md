@@ -715,6 +715,15 @@ Da una caccia ai bug con più agenti (8 aree, un giudice avversario per area) e 
     lettore solo se si vede; "Riprova" con `phoneServerRetrying`; `forgetServer` solo se cambia l'indirizzo di casa,
     e tiene la pagina delle Impostazioni in qualsiasi scheda; `MaRepository.release()` mette Connecting (il prossimo
     Connected si vede); Ripeti dice a TalkBack quale modo (tutti i brani / un brano).
+- Auto (dal percorso in auto): Media3 taglia a 256 KB l'elenco per i browser legacy come Gearslip
+  (`truncateListBySize` in `MediaLibraryServiceLegacyStub`, `TRANSACTION_SIZE_LIMIT_IN_BYTES`): oltre 150 voci
+  (`Menu.PART`) un elenco diventa cartelle `part|<k>|<cartella>` ("1–150"...), con voci dagli stessi id dell'elenco
+  intero (`LongListCheckKt`: 2880 brani, 20 cartelle). La ricerca chiede sempre di nuovo (`fresh`). Nel lettore:
+  indietro con un salto in corso passa da `skip`; pausa durante un salto → stop dopo il salto (`pauseAfterSkip`);
+  `pauseFromSystem`/`resumeFromSystem` come pausa e play della persona; pausa o stop voluti tolgono la ripresa
+  automatica; pausa non arrivata per la rete → `onPauseLost` → `engine.silence()` (torna su solo con un play
+  USER_REQUEST); uscita esterna staccata mentre la musica parte → silenzio e pausa; i salti falliti vanno a
+  `onFailure`.
 - Proposte non fatte: PulseAudio senza shm né memfd (`rootfs.py`: `enable-shm = no`, `enable-memfd = no`) non apre lo
   srbchannel, e ogni pacchetto audio tra Soloist e PulseAudio passa da sendto/recvmsg, che proot intercetta: con memfd
   (che non usa /dev/shm) il peso di proot (14% sul telefono) potrebbe scendere. Da provare sul telefono prima di

@@ -20,6 +20,8 @@ import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.SettableFuture
 import it.xonos.ma.data.Connection
+import it.xonos.ma.data.Problem
+import it.xonos.ma.data.MaException
 import it.xonos.ma.data.MaImage
 import it.xonos.ma.data.MaRepository
 import it.xonos.ma.data.QueueItem
@@ -27,6 +29,7 @@ import it.xonos.ma.data.QueueState
 import it.xonos.ma.data.SkipSender
 import it.xonos.ma.data.SoloistUnlock
 import it.xonos.ma.data.objects
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -525,8 +528,11 @@ class MaPlayer(
                         delay(100)
                     }
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.w(TAG, "Non riesco a suonare ${item.mediaId}: ${e.message}")
+                onFailure?.invoke(e)
             } finally {
                 choosing--
                 if (choosing == 0 && pauseAfterChoice) {
@@ -635,9 +641,16 @@ class MaPlayer(
     }
 
     /** Aspetta che il telefono sia un lettore di Music Assistant: al primo avvio ci vuole un attimo. */
+    /**
+     * Un comando chiesto da chi comanda il lettore (l'auto, la notifica, il telefono) non è riuscito: il perché, da
+     * mostrare. Prima restava nel logcat, e in auto la scelta compariva un attimo e poi niente (per esempio "Qui non
+     * c'è niente da suonare: ..." di Music Assistant). Sul thread principale.
+     */
+    var onFailure: ((Exception) -> Unit)? = null
+
     private suspend fun awaitReady() {
         withTimeoutOrNull(READY_TIMEOUT_MS) { ready.first { it } }
-            ?: throw IllegalStateException("Music Assistant non è pronto")
+            ?: throw MaException("Music Assistant non è pronto", problem = Problem.NOT_CONNECTED)
     }
 
     /**
@@ -662,9 +675,12 @@ class MaPlayer(
                     }
                 }
                 checkExpectations()
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.w(TAG, "$name non riuscito: ${e.message}")
                 if (expectations.remove(expectation)) future.set(null)
+                onFailure?.invoke(e)
             }
         }
         return future

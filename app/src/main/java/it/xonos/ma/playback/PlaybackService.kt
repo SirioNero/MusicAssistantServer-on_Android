@@ -116,6 +116,12 @@ class PlaybackService : MediaLibraryService() {
         }
         tree = BrowseTree(Menu(app.library, ResourceLabels(this) { settings.language }) { settings.playerId }, artwork)
         player.onPlayRequest = { item -> tree.play(item) }
+        // Il perché di un play o di un comando non riuscito arriva anche all'auto (lo stato della sessione).
+        player.onFailure = { e ->
+            if (::session.isInitialized) {
+                session.sendError(SessionError(SessionError.ERROR_UNKNOWN, describe(settings.language.wrap(this), e)))
+            }
+        }
 
         // Toccando la notifica si apre il lettore sul telefono.
         val openPlayer = PendingIntent.getActivity(

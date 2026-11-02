@@ -496,7 +496,8 @@ di Xonos suona dal server sul telefono; la release ridotta con R8, da capo come 
     dall'argv[0] di /proc; gli zombie non contano), così dal registro di una persona si vede quanto pesa proot. Sul
     telefono dell'utente (0.1.50, Soloist che suona): soloist 16%, proot 14% (2 processi), pulseaudio 13%. Dal
     pacchetto 2.10.8-6 si guarda ogni 5 s (`CPU_SAMPLE_S`): con un'occhiata al minuto il Soloist di un brano finito
-    prima della riga non compariva; "(N processi)" è quanti ne giravano insieme al massimo. Il proot di Termux
+    prima della riga non compariva; "(N processi)" è quanti ne giravano insieme al massimo. Dal 2.10.8-6 ogni proot porta il
+    nome del programma che segue (`proot[soloist]`, `proot[pulseaudio]`, dopo `-w <cartella>` nella sua riga di comando). Il proot di Termux
     intercetta anche `sendto`, `recvfrom`, `sendmsg`, `recvmsg`, `close`, `ioctl`, `brk` (`proot_sysnums` in
     `syscall/seccomp.c`): la rete di Soloist e il protocollo di PulseAudio passano tutti da lui, da qui il suo peso.
     In CI la riga non compare (le prove con i programmi Linux durano 21 s, prima del primo minuto): provata in

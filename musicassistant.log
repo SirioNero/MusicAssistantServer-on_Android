@@ -1,0 +1,80 @@
+2026-11-02 03:53:38,956.956 INFO (music-assistant) [music_assistant] Starting Music Assistant Server (bf755d0990e44e0aab06f89cd9f3d8bc) version 0.0.0 - HA add-on: False - Safe mode: False
+2026-11-02 03:53:39,018.018 INFO (music-assistant) [music_assistant.cache] Initializing cache controller...
+2026-11-02 03:53:39,060.060 INFO (music-assistant) [ffmpeg] Detected ffmpeg version 7.1.5 
+2026-11-02 03:53:39,071.071 WARNING (music-assistant) [music_assistant.streams] 
+
+################################################################################
+Started streamserver on 127.0.0.1:8097
+This is the IP address that is communicated to players.
+If this is incorrect, audio will not play!
+See the documentation for how to configure the publish IP for the Streamserver
+in Settings --> System --> Streams
+################################################################################
+
+2026-11-02 03:53:39,281.281 INFO (music-assistant) [music_assistant.auth] Generated new JWT secret key
+2026-11-02 03:53:39,284.284 INFO (music-assistant) [music_assistant.auth] Authentication manager initialized (providers=1)
+2026-11-02 03:53:39,287.287 WARNING (music-assistant) [music_assistant.webserver] 
+
+################################################################################
+###                           SETUP REQUIRED                                 ###
+################################################################################
+
+Music Assistant is running in setup mode.
+Please complete the setup by visiting:
+
+    http://127.0.0.1:8095/setup
+
+################################################################################
+
+2026-11-02 03:53:39,314.314 INFO (music-assistant) [music_assistant] Loaded metadata provider Cover Art Archive
+2026-11-02 03:53:39,351.351 INFO (music-assistant) [music_assistant] Loaded metadata provider iTunes Artwork
+2026-11-02 03:53:39,359.359 INFO (music-assistant) [music_assistant] Loaded music provider Music Assistant
+2026-11-02 03:53:39,367.367 INFO (music-assistant) [music_assistant] Loaded audio_analysis provider Loudness Analysis
+2026-11-02 03:53:39,373.373 INFO (music-assistant) [music_assistant] Loaded metadata provider LRCLIB
+2026-11-02 03:53:39,400.400 INFO (music-assistant) [music_assistant] Loaded metadata provider Playlist Metadata
+2026-11-02 03:53:39,512.512 INFO (music-assistant) [music_assistant] Loaded metadata provider MusicBrainz
+2026-11-02 03:53:39,512.512 INFO (music-assistant) [music_assistant.musicbrainz] MusicBrainz recommendations: scanning 3 days before/after today
+2026-11-02 03:53:39,521.521 INFO (music-assistant) [music_assistant] Loaded plugin provider Endless Mix Playlists
+2026-11-02 03:53:39,523.523 INFO (music-assistant) [music_assistant] Loaded plugin provider Library Recommendations
+2026-11-02 03:53:39,525.525 INFO (music-assistant) [music_assistant] Loaded metadata provider Wikipedia
+2026-11-02 03:53:39,526.526 INFO (music-assistant) [music_assistant] Loaded player provider Sync Group Player
+2026-11-02 03:53:39,527.527 INFO (music-assistant) [music_assistant] Loaded player provider Universal Player
+2026-11-02 03:53:42,098.098 INFO (music-assistant) [music_assistant] Loaded player provider Sendspin
+2026-11-02 03:53:42,116.116 INFO (music-assistant) [music_assistant] Loaded music provider Ambient Sounds
+2026-11-02 03:53:42,118.118 INFO (music-assistant) [xonos] Music Assistant pronto sul telefono
+2026-11-02 03:53:44,296.296 INFO (music-assistant) [music_assistant.auth] Migrated existing playlog entries to first user: -8WmW62t3v8uZrrSPsZG9G_4RFhBBtmfASFfx6lTQm4
+2026-11-02 03:53:44,508.508 INFO (music-assistant) [music_assistant.webserver] First admin user created: xonos
+2026-11-02 03:53:44,569.569 INFO (music-assistant) [music_assistant.webserver] WebSocket client authenticated as xonos
+2026-11-02 03:53:44,574.574 INFO (music-assistant) [music_assistant.auth] Created long-lived token 'Xonos check' for user 'xonos'
+2026-11-02 03:53:44,582.582 INFO (music-assistant) [music_assistant.controllers.config.controller] Onboarding completed
+2026-11-02 03:53:45,435.435 INFO (music-assistant) [music_assistant] Loaded music provider Filesystem (local disk)
+2026-11-02 03:53:45,524.524 INFO (music-assistant) [music_assistant.Filesystem (local disk)] Found 2 changed/new items to process for Filesystem (local disk)
+2026-11-02 03:53:45,802.802 INFO (music-assistant) [music_assistant.Filesystem (local disk)] Found 0 changed/new items to process for Filesystem (local disk)
+2026-11-02 03:53:45,941.941 INFO (music-assistant) [music_assistant.music.genre] Genre mapping scan completed: 0 items mapped (0.1s)
+2026-11-02 03:53:47,635.635 WARNING (music-assistant) [aiosendspin.server.connection.unknown-127.0.0.1] non-compliant client Xonos check (Xonos Mobile Application, software check): connected unencrypted (transition mode)
+2026-11-02 03:53:47,635.635 WARNING (music-assistant) [aiosendspin.server.connection.xonos-check-8478ee67] non-compliant client Xonos check (Xonos Mobile Application, software check): client/hello declared player supported_commands, superseded by client/state
+2026-11-02 03:53:47,743.743 WARNING (music-assistant) [aiosendspin.server.client.xonos-check-8478ee67] non-compliant client Xonos check (Xonos Mobile Application, software check): client/state used the legacy top-level 'state' field
+2026-11-02 03:53:47,761.761 INFO (music-assistant) [music_assistant.players] Player (type player) registered: xonos-check-8478ee67/Xonos check
+2026-11-02 03:53:48,719.719 INFO (music-assistant) [music_assistant.player_queues] User xonos requested playback.
+2026-11-02 03:53:48,818.818 INFO (music-assistant) [music_assistant.Sendspin.xonos-check-8478ee67] Setting active output protocol on Xonos check to Native
+2026-11-02 03:53:48,964.964 INFO (music-assistant) [music_assistant.streams.audio] Start Queue Flow stream for Queue Xonos check - crossfade: disabled 
+2026-11-02 03:53:51,226.226 INFO (music-assistant) [music_assistant.streams.audio] Finished Queue Flow stream for Queue Xonos check
+2026-11-02 03:54:01,019.019 INFO (music-assistant) [music_assistant.Sendspin.xonos-check-8478ee67] Clearing active output protocol on Xonos check
+2026-11-02 03:54:01,028.028 INFO (music-assistant) [music_assistant.player_queues] User xonos requested playback.
+2026-11-02 03:54:01,031.031 WARNING (music-assistant) [music_assistant.player_queues] Skipping library://track/999999: track not found in library: 999999
+2026-11-02 03:54:01,031.031 WARNING (music-assistant) [music_assistant.webserver] player_queues/play_media: No playable items found: track not found in library: 999999
+2026-11-02 03:54:01,075.075 INFO (music-assistant) [music_assistant.players] Player unavailable: Xonos check
+2026-11-02 03:54:01,076.076 INFO (music-assistant) [aiohttp.access] 127.0.0.1 [02/Nov/2026:03:53:47 +0000] "GET /sendspin HTTP/1.1" 101 0 "-" "Music Assistant/0.0.0 aiohttp/3.14.3 Python/3.13"
+2026-11-02 03:54:04,691.691 INFO (music-assistant) [music_assistant.providers.spotify_connect.soloist] Installed soloist binary 1.3.10.32 (x86_64)
+2026-11-02 03:54:04,694.694 INFO (music-assistant) [xonos.selftest] XONOS_SELFTEST soloist-download ok /data/user/0/it.xonos.ma/files/music-assistant/soloist/soloist {'installed': True, 'sha256': '89e5b7e02e9d382ca8ce4117fbc58035baa838bc839f592c3b9a66cda6acf111', 'etag': '"8a3c0664d6027eaea64e7c9cbe81a96a"', 'version': '1.3.10.32', 'version_raw': 'soloist 1.3.10.32 build 1793577690 (20261102) (g19412df6ea) (linux/x86_64)', 'installed_at': 1793591644.6907399, 'build_timestamp': 1793577690.0, 'expires_at': 1801353690.0}
+2026-11-02 03:54:04,829.829 INFO (music-assistant) [xonos.selftest] XONOS_SELFTEST pulseaudio ok unix:/data/user/0/it.xonos.ma/cache/music-assistant/pulse_capture/native
+2026-11-02 03:54:04,914.914 INFO (music-assistant) [xonos.selftest] XONOS_SELFTEST pipe-sink ok /data/user/0/it.xonos.ma/cache/music-assistant/pulse_capture/xonos_selftest_e6142c31.pcm
+2026-11-02 03:54:08,977.977 INFO (music-assistant) [xonos.selftest] XONOS_SELFTEST audio-nel-tubo ok 516640 byte in 4 s
+2026-11-02 03:54:09,223.223 INFO (music-assistant) [xonos.selftest] XONOS_SELFTEST soloist-acceso ok 2026-11-02 03:54:09.013: soloist 1.3.10.32 build 1793577690 (20261102) (g19412df6ea) (linux/x86_64) | 2026-11-02 03:54:09.013: client expires in 89 days | 2026-11-02 03:54:09.052: ready, device_name=Xonos prova device_id=163afb6e-c96a-4d57-9854-335ac11e68eb | 2026-11-02 03:54:09.053: waiting for login — connect to "Xonos prova" from your Spotify app
+2026-11-02 03:54:09,223.223 INFO (music-assistant) [xonos.selftest] XONOS_SELFTEST soloist-mdns ok {'seen': ['10.0.2.16 PTR _spotify-connect._tcp.local 163afb6e-c96a-4d57-9854-335ac11._spotify-connect._tcp.local', '10.0.2.16 SRV 163afb6e-c96a-4d57-9854-335ac11._spotify-connect._tcp.local 53291', "10.0.2.16 TXT 163afb6e-c96a-4d57-9854-335ac11._spotify-connect._tcp.local ['CPath=/zc', 'VERSION=1.0', 'Stack=SP']", '10.0.2.16 A 163afb6e-c96a-4d57-9854-335ac11.local 10.0.2.16', '10.0.2.16 A 163afb6e-c96a-4d57-9854-335ac11.local 10.0.2.15'], 'local': '10.0.2.16', 'port': 53291, 'instance': '163afb6e-c96a-4d57-9854-335ac11._spotify-connect._tcp.local', 'from': '10.0.2.16', 'txt': ['CPath=/zc', 'VERSION=1.0', 'Stack=SP'], 'getinfo 127.0.0.1': '{"aliases":[],"authInfo":"CiRlMTY3NGVmNy1mYWQyLTRjYjQtODg5Yi0zZmI3ZGJlZTY5ZDQSIDMzNGQwMGZlZDI0ZjRlN2I5YWJiZTAyZWUyOGUwYjVmGlwKWgorOVRYd04tLVdsa0xxMU44TTFFM0RkNnFWZnBtVDRPbkRfR2lCRld5RDhUMBIrdzItb2lzTEZYWlZZbkk1cy1RdjZfV0piUHRPNGwxOUlkR0dFUVN0YWhUUQ==","availability":"","brandDisplayName":"Soloist","', 'getinfo 10.0.2.16': '{"aliases":[],"authInfo":"CiQ3MDU4YzE4Yy0yOTk4LTQzMzEtOTMxNC1jODYzMGQ1ZGM4Y2MSIDMzNGQwMGZlZDI0ZjRlN2I5YWJiZTAyZWUyOGUwYjVmGlwKWgordUd6ckNRdFZXbHEteThpSkdLN2tWcVFLNzJtYmczalZ0MWY3c3BfeVhGQRIrZmtXMUVBLUtzZndvV0ptSGd3dGN3NkdwOGpmSUVQLWpNWF9CRUxWRTFYZw==","availability":"","brandDisplayName":"Soloist","', 'getinfo': '{"aliases":[],"authInfo":"CiRlMTY3NGVmNy1mYWQyLTRjYjQtODg5Yi0zZmI3ZGJlZTY5ZDQSIDMzNGQwMGZlZDI0ZjRlN2I5YWJiZTAyZWUyOGUwYjVmGlwKWgorOVRYd04tLVdsa0xxMU44TTFFM0RkNnFWZnBtVDRPbkRfR2lCRld5RDhUMBIrdzItb2lzTEZYWlZZbkk1cy1RdjZfV0piUHRPNGwxOUlkR0dFUVN0YWhUUQ==","availability":"","brandDisplayName":"Soloist","'}
+2026-11-02 03:54:09,223.223 INFO (music-assistant) [xonos.selftest] XONOS_SELFTEST soloist-getinfo ok {"aliases":[],"authInfo":"CiRlMTY3NGVmNy1mYWQyLTRjYjQtODg5Yi0zZmI3ZGJlZTY5ZDQSIDMzNGQwMGZlZDI0ZjRlN2I5YWJiZTAyZWUyOGUwYjVmGlwKWgorOVRYd04tLVdsa0xxMU44TTFFM0RkNnFWZnBtVDRPbkRfR2lCRld5RDhUMBIrdzItb2lzTEZYWlZZbkk1cy1RdjZfV0piUHRPNGwxOUlkR0dFUVN0YWhUUQ==","availability":"","brandDisplayName":"Soloist","
+2026-11-02 03:54:12,815.815 INFO (music-assistant) [xonos.selftest] XONOS_SELFTEST proot-ignora-sigint ok SIGINT al solo proot: Soloist resta acceso
+2026-11-02 03:54:12,815.815 INFO (music-assistant) [xonos.selftest] XONOS_SELFTEST soloist-ferma ok close() in 0.0 s, codice 0, rimasti 0
+2026-11-02 03:54:23,848.848 INFO (music-assistant) [xonos.selftest] XONOS_SELFTEST cpu-audio ok proot 2%, pulseaudio 2%, pacat 1%; letti 3874345 byte su 3529593 in 10 s
+2026-11-02 03:54:23,907.907 INFO (music-assistant) [xonos.selftest] XONOS_SELFTEST pulseaudio-ferma ok processi rimasti: 0
+2026-11-02 03:54:23,907.907 INFO (music-assistant) [xonos.selftest] XONOS_SELFTEST fine 11/11

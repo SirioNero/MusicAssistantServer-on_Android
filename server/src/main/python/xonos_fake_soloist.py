@@ -5,19 +5,22 @@ Serve a provare la sessione che resta accesa tra un brano e l'altro (_soloist_li
 account Spotify. Parla lo stesso protocollo locale di Soloist: la WebSocket su 127.0.0.1, l'indirizzo e la porta nei
 file ws.addr e ws.port della cartella dei dati, gli eventi (auth_state, track_changed, playback_state,
 playback_changed, position_sync) e la conferma di ogni comando (command_result). Al posto della musica scrive nel tubo
-del pipe sink di Music Assistant un valore fisso per brano (marker): l'autotest riconosce di quale brano è l'audio
-che gli arriva. Come Soloist con --single-track suona un brano, accetta pausa, ripresa, seek e play di un altro brano,
-e a fine brano passa a un altro (autoplay) e si chiude.
+del pipe sink di Music Assistant un valore per brano e per secondo (sample_value): l'autotest riconosce di quale brano,
+e da quale secondo, è l'audio che gli arriva. Come Soloist con --single-track suona un brano, accetta pausa, ripresa,
+seek (anche in pausa) e play di un altro brano, e a fine brano passa a un altro (autoplay) e si chiude.
 
 Variabili d'ambiente: XONOS_FAKE_DURATION_MS (durata dei brani, 30 s di base), XONOS_FAKE_NO_JUMP=1 (il play di un
-altro brano non fa niente, come un Soloist che non accettasse salti), XONOS_FAKE_LEAK=1 (dopo la pausa scrive ancora
-0,2 s del brano nel tubo, come audio rimasto indietro).
+altro brano non fa niente, come un Soloist che non accettasse salti), XONOS_FAKE_LEAK=1 (alla pausa smette di
+suonare, 0,2 s dopo scrive ancora fino a 0,2 s del brano nel tubo, riga "finto soloist: resto N", e solo allora
+conferma: chi svuotasse il tubo prima di aspettare la conferma se lo ritroverebbe nel brano dopo), XONOS_FAKE_DELAY_PLAY=<ms> (il play
+di un altro brano parte dopo tanto, come un brano che si carica piano).
 """
 
 from __future__ import annotations
 
 import argparse
 import asyncio
+import fcntl
 import json
 import os
 import struct
@@ -32,11 +35,22 @@ FRAME = 8
 # 512 campioni sono 4096 byte: una scrittura in un tubo fino a 4096 byte è intera o niente, mai a metà di un campione
 CHUNK_FRAMES = 512
 AUTOPLAY = "spotify:track:xonosautoplay"
+# FIONREAD di Linux (x86_64 e arm64): quanti byte aspettano nel tubo
+FIONREAD = 0x541B
+# play_loop lascia posto nel tubo, come PulseAudio che rende al ritmo di chi legge: così il resto della pausa ci entra
+ROOM = 32768
+# alla pausa il resto arriva tanto dopo, poco prima della conferma
+LEAK_DELAY_S = 0.2
 
 
 def marker(uri: str) -> int:
     """Il valore dei campioni di un brano (lo stesso calcolo è nell'autotest)."""
     return (sum(uri.encode()) % 900 + 100) * 1_000_000
+
+
+def sample_value(uri: str, position_ms: float) -> int:
+    """Il valore di un campione: il brano nei milioni, il secondo del brano nelle migliaia."""
+    return marker(uri) + int(position_ms // 1000) % 1000 * 1000
 
 
 class FakeSoloist:
@@ -47,6 +61,7 @@ class FakeSoloist:
         self.duration_ms = int(os.environ.get("XONOS_FAKE_DURATION_MS", "30000"))
         self.no_jump = os.environ.get("XONOS_FAKE_NO_JUMP") == "1"
         self.leak = os.environ.get("XONOS_FAKE_LEAK") == "1"
+        self.delay_play_s = int(os.environ.get("XONOS_FAKE_DELAY_PLAY", "0")) / 1000
         self.playing = True
         self.position_ms = 0.0
         self.sockets: set[web.WebSocketResponse] = set()
@@ -101,17 +116,22 @@ class FakeSoloist:
     async def command(self, cmd: dict) -> None:
         name = str(cmd.get("command") or "")
         print(f"finto soloist: comando {name} {cmd.get('uri') or cmd.get('position_ms') or ''}", flush=True)
+        if name == "pause" and self.leak:
+            # Soloist si ferma, ma un po' del brano arriva nel tubo poco prima della conferma
+            self.playing = False
+            await asyncio.sleep(LEAK_DELAY_S)
+            print(f"finto soloist: resto {self.write(int(RATE * 0.2))}", flush=True)
         await self.send({"type": "command_result", "command": name})
         if name == "pause":
             self.playing = False
             await self.state()
-            if self.leak:
-                self.write(int(RATE * 0.2))
         elif name == "play":
             uri = cmd.get("uri")
             if uri and uri != self.uri:
                 if self.no_jump:
                     return
+                if self.delay_play_s:
+                    await asyncio.sleep(self.delay_play_s)
                 self.uri = str(uri)
                 self.position_ms = 0.0
                 self.playing = True
@@ -122,6 +142,15 @@ class FakeSoloist:
             self.position_ms = float(cmd.get("position_ms") or 0)
             await self.send({"type": "position_sync", "position": self.position()})
 
+    def queued(self) -> int:
+        """Quanti byte del brano aspettano nel tubo."""
+        if self.fd is None:
+            return 0
+        try:
+            return struct.unpack("i", fcntl.ioctl(self.fd, FIONREAD, b"\0\0\0\0"))[0]
+        except OSError:
+            return 0
+
     def write(self, frames: int) -> int:
         """Fino a frames campioni del brano nel tubo; quanti ne sono entrati (il tubo può essere pieno)."""
         if self.fd is None:
@@ -129,7 +158,8 @@ class FakeSoloist:
                 self.fd = os.open(self.fifo, os.O_WRONLY | os.O_NONBLOCK)
             except OSError:
                 return 0
-        sample = struct.pack("<ii", marker(self.uri), marker(self.uri))
+        value = sample_value(self.uri, self.position_ms)
+        sample = struct.pack("<ii", value, value)
         written = 0
         while written < frames:
             count = min(CHUNK_FRAMES, frames - written)
@@ -143,7 +173,7 @@ class FakeSoloist:
     async def play_loop(self) -> None:
         last_sync = 0.0
         while True:
-            if not self.playing or not self.sockets:
+            if not self.playing or not self.sockets or self.queued() >= ROOM:
                 await asyncio.sleep(0.02)
                 continue
             frames = self.write(CHUNK_FRAMES)

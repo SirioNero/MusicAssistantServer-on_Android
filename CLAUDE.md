@@ -67,7 +67,7 @@ prima di cominciare: le cose scritte qui sono già state verificate, non vanno r
   (F-Droid rifiuta quel blocco). Build riproducibili: il workflow "Riproducibile" compila la release
   come F-Droid (la loro immagine `fdroidserver:buildserver-trixie`, OpenJDK 21, Gradle del wrapper,
   senza `tools/`) e la confronta byte per byte con l'APK della release tolta la firma: per la 0.1.38, la
-  0.1.42, la 0.1.49 e la 0.1.50 identici. Così la ricetta ha `Binaries` e `AllowedAPKSigningKeys` (SHA-256 del certificato
+  0.1.42, la 0.1.49, la 0.1.50 e la 0.1.52 identici. Così la ricetta ha `Binaries` e `AllowedAPKSigningKeys` (SHA-256 del certificato
   `18ef3fc3…2c836`): F-Droid pubblica l'APK con la nostra firma e si passa da GitHub/Obtainium a F-Droid
   senza disinstallare. Dopo ogni release va lanciato a mano "Riproducibile": una versione non identica
   F-Droid non la pubblica. Il modello delle richieste di fdroiddata vuole in `commit` l'hash completo e
@@ -130,7 +130,9 @@ prima di cominciare: le cose scritte qui sono già state verificate, non vanno r
 | `playback/Menu.kt` | Il menu e la ricerca, senza Media3 (si prova sulla JVM). Gli id dicono cosa fare: vedi il commento in testa |
 | `playback/BrowseTree.kt`, `ResourceLabels.kt` | Il menu come MediaItem; le sue scritte dalle risorse |
 | `playback/Artwork.kt` | Copertine servite a Gearslip, alla notifica e al lettore come `content://` firmati; i file li tiene `data/ArtCache.kt` (una copertina chiesta da più parti insieme si scarica una volta sola) |
-| `data/SkipSender.kt` | Avanti, indietro e "salta a" mandati a MA uno alla volta, sempre verso l'ultimo brano chiesto; raccolti per 400 ms solo con i servizi a un flusso (`QueueItem.singleStream`) |
+| `data/SkipSender.kt` | Avanti, indietro e "salta a" mandati a MA uno alla volta, sempre verso l'ultimo brano chiesto; raccolti solo con i servizi a un flusso (`QueueItem.singleStream`): 400 ms, 250 col server sul telefono (dalla 0.1.53) |
+| `playback/SkipPlan.kt` | Avanti e indietro: play_index sul brano noto (next/previous di MA aspettano 1 s), next/previous solo per ripeti, fine della coda e simili; il ritorno a capo della finestra con ripeti tutto; durante un salto in viaggio dal brano mostrato. Senza Media3 (`SkipCheckKt`) |
+| `data/SkipTrace.kt` | L'orologio di un salto per il registro: si azzera al tocco, le righe "Salto:", "Sendspin:" e "Uscita audio" dicono i ms dal tocco |
 | `data/PlaylistRemover.kt` | Toglie brani da una playlist: i tocchi vicini in un giro, il giro dopo solo quando il primo è applicato |
 | `data/SoloistUnlock.kt` | Spotify (Soloist) "già occupato" da un ascolto appeso: se nessun altro lettore lo suona, ricarica il servizio e riprova il comando (play, play_media, salti, ripresa dopo un calo di rete) |
 | `data/Lyrics.kt` | Il testo di un brano: lettore LRC (più tempi per riga, offset, tag, parole a tempo) e testo semplice |
@@ -554,6 +556,54 @@ di Xonos suona dal server sul telefono; la release ridotta con R8, da capo come 
     nel tubo; dopo ogni pausa lascia nel tubo un po' del brano di prima. Sull'emulatore, primo audio: da capo 0,58 s
     (il finto parte in fretta), salto 0,06 s, ripresa a 5 s 0,11 s, salto rifiutato 6,1 s (5 s di attesa più l'avvio);
     audio sempre e solo del brano chiesto, spegnimento dopo la pausa, fine naturale, 13 prove su 13.
+  - **Salti più stretti e tempi nel registro** (pacchetto 2.10.8-8, Xonos 0.1.53; l'utente con la 0.1.52: "circa 3/4
+    secondi passare da una canzone alla altra anche con skip"). Un'analisi del codice (5 tratti, verifica avversaria)
+    dà la catena di un salto: raccolta dei tocchi 0,4 s, play_index e la sorgente di prima fermata (con la pausa di
+    Soloist confermata attraverso proot), il cambio sulla sessione accesa (comando, Soloist che carica il brano), il
+    primo secondo intero di audio (Music Assistant fa partire il lettore solo con un pezzo da 1 s nel buffer, e
+    Soloist lo dà al ritmo a cui lo scarica), un secondo ffmpeg per il formato della sessione, Sendspin (150 ms), il
+    telefono (AudioTrack nuovo, primo tempo vero) e il Bluetooth. Il caricamento in Soloist e il primo secondo, i
+    pezzi più grossi, nessuno li ha misurati: servono le righe nuove del registro. Fatto: `xonos_park` sospende prima
+    il sink e manda la pausa senza aspettarne la conferma (la aspetta `xonos_switch` del brano dopo, prima di svuotare
+    il tubo; se è fallita la sessione non si riusa); drain da 20 ms, controllo ogni 10 ms; mentre cambia brano uno
+    stato "playing" del brano di prima non conta; la ripresa fa il seek con Soloist ancora in pausa e vale solo una
+    posizione arrivata dopo il seek e vicina al punto (`_observe_position`, `_XONOS_SEEK_AHEAD_MS`): Soloist in pausa
+    è avanti di quanto letto a 1,1x, e la sua posizione vecchia confermava subito un seek non fatto, così usciva un
+    pezzo dal punto sbagliato; se in pausa non dice la posizione, dopo 0,3 s riprende e rifà il seek come prima. Un
+    cambio annullato a metà spegne Soloist (prima restava acceso senza timer, o occupato); dopo due cambi falliti
+    di fila si riprova passati 15 minuti, e l'attesa raddoppia a ogni nuovo tentativo fallito fino a 16 ore
+    (`_XONOS_RETRY_S`, `_xonos_retry_after`; prima mai più); tutto il cambio ha 5 s (`_JUMP_TIMEOUT_S`, così se non va
+    resta il tempo di ripartire da capo nei 15 s che Music Assistant dà al buffer), 8 s (`_XONOS_SWITCH_S`) solo se
+    Soloist ha già detto il brano chiesto, cioè lo sta caricando; il drain non si ferma se i dati del tubo e il timeout
+    arrivano nello stesso giro del loop (restavano 64 KB del brano di prima); `_VERIFY_CACHE_SECONDS` di runtime.py da
+    60 s a 6 ore (il `soloist --version` in proot a ogni fine brano), con la scadenza della build guardata lo stesso
+    (`_installed_expired`). `_phone_chain`: senza filtri dopo il buffer (normalizzazione spenta o del servizio, come
+    Spotify, niente dissolvenza) il buffer di Music Assistant tiene già PCM 16 bit 48 kHz stereo (la sessione Sendspin
+    di Xonos e myCar, che annunciano solo 48 kHz), così `AudioBuffer.get_stream` non avvia un secondo ffmpeg a ogni
+    brano; con un filtro il buffer resta come prima (un guadagno su audio già a 16 bit lo riquantizzerebbe senza
+    dither). Nel registro: «Xonos tempi: play_index N ricevuto», «next (previous) ricevuto, play_index N fra 1 s», «X
+    ha aspettato N s un'altra azione sul lettore», «brano pronto in N s», «comando al lettore dato N s dopo play_index
+    (non è ancora audio)», «primo audio al lettore N s dopo l'inizio del flusso, da suonare fra N ms»; di Soloist
+    «parte da capo (controllo del programma N s)», «in pausa e acceso in N s», «salto sulla sessione accesa in N s
+    (pausa di prima, tubo, comando, il brano suona, posizione, sink)», «dal sink ripartito, primo audio in N s e primo
+    secondo intero in N s (silenzio tolto)», «la sessione accesa non si riusa (perché)», «brano finito, N s di audio in
+    N s dal sink ripartito (rapporto)» (sotto 1,1x Soloist non tiene il passo). Una revisione avversaria (4 angoli, un
+    verificatore per problema) ha trovato i guasti corretti qui sopra; nel finto Soloist il resto della pausa ora entra
+    davvero nel tubo (lascia posto, `FIONREAD`) e arriva 0,2 s prima della conferma. Scartate dopo la verifica: soglia del buffer sotto 1 s (il pezzo da 1 s è il minimo di Music Assistant),
+    `PULSE_LATENCY_MSEC` (taglia la fine dei brani), margine Sendspin più corto (il server butta i pacchetti in
+    ritardo), Soloist tenuto acceso a fine brano o la coda di Spotify Connect (con `--single-track` esce comunque).
+    Da decidere col registro: mandare subito il primo tocco (−0,4 s, ma un doppio tocco costa un cambio in più),
+    avvisare Soloist del salto già al tocco, l'uscita del telefono tenuta calda tra un brano e l'altro.
+    Nell'app (0.1.53): tocchi raccolti per 250 ms col server sul telefono (400 con gli altri); avanti e indietro senza
+    indice (fine della finestra, finestra ridotta) passano da play_index quando il brano è noto e ripeti è spento,
+    invece di next/previous che Music Assistant fa partire dopo 1 s (`SkipPlan`); corretti il ritorno a capo della
+    finestra con ripeti tutto (avanti andava al brano current-3, indietro ~50 brani avanti) e il lampo del brano
+    vecchio al secondo tocco (il futuro di prima si chiude dopo che c'è quello nuovo). Righe nel logcat (tag Xonos)
+    coi ms dal tocco: «Salto: tocco verso N», «mando N», «Music Assistant ha risposto», «Sendspin: stream/start,
+    stream/end, primo audio con N ms di anticipo», «Uscita audio aperta in N ms (Bluetooth A2DP...)», «primo tempo
+    vero», «Avvio a N ms», «musica fuori N ms dopo il tocco». "Condividi il registro del server sul telefono" ora
+    aggiunge in fondo «Registro di Xonos» (`logcat -d -s Xonos:V AndroidRuntime:E`, ultime 64 K). Le modifiche a
+    data/, sendspin/, playback/ vanno portate in myCar.
   - **PhoneServer**: XONOS_PROOT e XONOS_PROOT_LOADER dalla cartella delle librerie, XONOS_DNS_FILE
     (`<dati>/resolv.conf`: i DNS della rete in uso più 1.1.1.1 e 8.8.8.8, riscritto con un NetworkCallback), il
     MulticastLock del Wi-Fi solo tra `XONOS_MULTICAST on` e `off` (permesso CHANGE_WIFI_MULTICAST_STATE).
@@ -816,7 +866,7 @@ Nella sandbox: Docker Hub risponde 429, si usa `mirror.gcr.io` (vedi `tools/READ
 si riavvia, il demone Docker si ferma e i container `ma` e `pods` vanno riavviati (`docker start`).
 Altre prove del banco: `ServicesCheckKt` (con il servizio finto `tools/ma-test/xonos_test`),
 `PlayersCheckKt` (una cassa finta, anche la sua coda), `AccountCheckKt`, `PerfCheckKt`, `PlaylistCheckKt`,
-`SearchCheckKt`, `ArtCheckKt`, `StartCheckKt` (l'avvio dell'audio senza server).
+`SearchCheckKt`, `ArtCheckKt`, `StartCheckKt` (l'avvio dell'audio senza server), `SkipCheckKt` (raccolta dei salti, `SkipPlan`, `SkipTrace`).
 
 Le misure sull'emulatore: il workflow "Misure" parte con `[misure]` nel messaggio del commit (con
 `[profilo]` genera anche il Baseline Profile) o a mano; costruisce MA in Docker sul runner, l'app

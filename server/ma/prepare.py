@@ -392,6 +392,7 @@ def _patch(root: Path) -> None:
     _spotify(root)
     _soloist(root)
     _soloist_live(root)
+    _phone_chain(root)
     _texts(root)
 
 
@@ -1130,7 +1131,9 @@ def _soloist_live(root: Path) -> None:
         "        self._run_lock = asyncio.Lock()\n"
         "        # Xonos: il timer del Soloist in pausa (_xonos_arm_park) e i salti e le riprese falliti di fila (_xonos_reuse)\n"
         "        self._xonos_park_task: asyncio.Task[None] | None = None\n"
-        "        self._xonos_failures = {\"salto\": 0, \"ripresa\": 0}\n",
+        "        self._xonos_failures = {\"salto\": 0, \"ripresa\": 0}\n"
+        "        self._xonos_failed_at = {\"salto\": 0.0, \"ripresa\": 0.0}\n"
+        "        self._xonos_retries = {\"salto\": 0, \"ripresa\": 0}\n",
     )
     _replace(
         backend,
@@ -1161,7 +1164,38 @@ def _soloist_live(root: Path) -> None:
         "                        return parked\n"
         "                    await parked.stop()\n"
         "                    self._run = None\n"
-        "                if (run := self._run) is None:\n",
+        "                if (run := self._run) is None:\n"
+        "                    xonos_check = time.monotonic()  # Xonos: per il registro\n",
+    )
+    # Il controllo del programma di Soloist (un "soloist --version" attraverso proot, e dal 76° giorno della build una
+    # richiesta al CDN) si fa a ogni avvio da capo passato un minuto dall'ultimo: sul telefono, a ogni fine naturale
+    # di un brano. Ogni 6 ore basta (le build durano 90 giorni e si rinnovano dal 76°). Con una riga nel registro:
+    # quel tempo non compare in "Soloist: avvio in N s".
+    _replace(
+        runtime,
+        "_VERIFY_CACHE_SECONDS: Final[float] = 60.0\n",
+        "_VERIFY_CACHE_SECONDS: Final[float] = 6 * 3600.0  # Xonos: sul telefono passava da proot a ogni fine brano\n",
+    )
+    _replace(
+        runtime,
+        "                and self._binary_path.is_file()\n            ):\n                return self._binary_path\n",
+        "                and self._binary_path.is_file()\n"
+        "                # Xonos: con 6 ore di cache la scadenza della build (90 giorni) si guarda lo stesso: è solo la\n"
+        "                # lettura di soloist.meta.json, niente processi\n"
+        "                and not self._installed_expired()\n"
+        "            ):\n                return self._binary_path\n",
+    )
+    _replace(
+        backend,
+        "                    except SoloistError as err:\n"
+        '                        raise AudioError(f"Spotify Soloist binary unavailable: {err}") from err\n'
+        "                    fresh = _SingleTrackRun(self, spotify_uri, seek_position * 1000, streamdetails)\n",
+        "                    except SoloistError as err:\n"
+        '                        raise AudioError(f"Spotify Soloist binary unavailable: {err}") from err\n'
+        "                    self.logger.info(\n"
+        '                        "Soloist: parte da capo (controllo del programma %.2f s)", time.monotonic() - xonos_check\n'
+        "                    )\n"
+        "                    fresh = _SingleTrackRun(self, spotify_uri, seek_position * 1000, streamdetails)\n",
     )
     _replace(backend, "    async def _wait_run_released(", LIVE_BACKEND_METHODS + "    async def _wait_run_released(")
     _replace(
@@ -1172,7 +1206,86 @@ def _soloist_live(root: Path) -> None:
         "        self._xonos_parked = False\n"
         "        self._xonos_switching = False\n"
         "        self._xonos_previous_uri: str | None = None\n"
-        "        self._xonos_reader_task: asyncio.Task[None] | None = None\n",
+        "        self._xonos_reader_task: asyncio.Task[None] | None = None\n"
+        "        # la pausa mandata da xonos_park: la sua conferma la aspetta il cambio di brano dopo\n"
+        "        self._xonos_pause: asyncio.Future[None] | None = None\n"
+        "        # mentre cambia brano, il seek al punto chiesto è partito (vedi _observe_position)\n"
+        "        self._xonos_seek_sent = False\n"
+        "        # per il registro: quando è partito il brano (avvio o cambio) e quando il sink è ripartito\n"
+        "        self._xonos_started_at = time.monotonic()\n"
+        "        self._xonos_sink_at = self._xonos_started_at\n",
+    )
+    # Per il registro: dopo un avvio o un cambio di brano, quando arriva l'audio vero dal tubo e quando c'è il primo
+    # secondo intero (Music Assistant fa partire il lettore solo con un secondo di audio nel buffer).
+    _replace(
+        backend,
+        "        shaper = _CaptureShaper()\n",
+        "        shaper = _CaptureShaper()\n"
+        "        xonos_first: float | None = None  # Xonos: per il registro\n"
+        "        xonos_bytes = 0\n",
+    )
+    _replace(
+        backend,
+        "            if not (chunk := shaper.shape(chunk)):\n                continue\n",
+        "            if not (chunk := shaper.shape(chunk)):\n                continue\n"
+        "            if xonos_bytes >= 0:\n"
+        "                # Xonos: il primo audio vero e il primo secondo intero dopo che il sink è ripartito\n"
+        "                if xonos_first is None:\n"
+        "                    xonos_first = time.monotonic()\n"
+        "                xonos_bytes += len(chunk)\n"
+        "                if xonos_bytes >= _BYTES_PER_SECOND:\n"
+        "                    xonos_bytes = -1\n"
+        "                    self.logger.info(\n"
+        '                        "Soloist: dal sink ripartito, primo audio in %.2f s e primo secondo intero in %.2f s"\n'
+        '                        " (silenzio tolto all\'inizio %.2f s)",\n'
+        "                        xonos_first - self._xonos_sink_at,\n"
+        "                        time.monotonic() - self._xonos_sink_at,\n"
+        "                        shaper._lead_skipped / _BYTES_PER_SECOND,\n"
+        "                    )\n",
+    )
+    _replace(
+        backend,
+        "        self._spawn_task(self._read_capture())\n        await self._set_sink(running=True)\n",
+        "        self._spawn_task(self._read_capture())\n"
+        "        self._xonos_sink_at = time.monotonic()  # Xonos: per il registro\n"
+        "        await self._set_sink(running=True)\n",
+    )
+    # Mentre cambia brano, uno stato "playing" che parla ancora del brano di prima non dice che quello chiesto suona:
+    # senza, un "playing" vecchio insieme al track_changed del nuovo chiudeva l'attesa prima che il brano suonasse.
+    _replace(
+        backend,
+        '            playing = data.status == "playing"\n'
+        "            was_playing, self._engine_playing = self._engine_playing, playing\n",
+        '            playing = data.status == "playing"\n'
+        "            if (\n"
+        "                self._xonos_switching\n"
+        "                and data.item is not None\n"
+        "                and data.item.uri\n"
+        "                and data.item.uri != self.spotify_uri\n"
+        "            ):\n"
+        "                # Xonos: mentre cambia brano, lo stato del brano di prima non dice niente di quello chiesto\n"
+        "                playing = self._engine_playing\n"
+        "            was_playing, self._engine_playing = self._engine_playing, playing\n",
+    )
+    # Mentre cambia brano vale come conferma del seek solo una posizione arrivata dopo il seek e vicina al punto
+    # chiesto: Soloist in pausa è più avanti di quanto si è sentito (il tubo si legge a 1,1x), e alla ripresa la sua
+    # posizione di prima confermava subito un seek non ancora fatto, così usciva un pezzo dal punto sbagliato.
+    _replace(
+        backend,
+        "        self._position_ms = position_ms\n        if (\n",
+        "        self._position_ms = position_ms\n"
+        "        if self._xonos_switching:\n"
+        "            # Xonos: mentre cambia brano vale solo una posizione arrivata dopo il seek e vicina al punto chiesto:\n"
+        "            # Soloist in pausa è più avanti di quanto si è sentito, e la sua posizione di prima non conferma niente\n"
+        "            if (\n"
+        "                self._xonos_seek_sent\n"
+        "                and self._seek_target_ms - _SEEK_CONFIRM_GRACE_MS\n"
+        "                <= position_ms\n"
+        "                <= self._seek_target_ms + _XONOS_SEEK_AHEAD_MS\n"
+        "            ):\n"
+        "                self._seek_confirmed.set()\n"
+        "            return\n"
+        "        if (\n",
     )
     _replace(
         backend,
@@ -1234,15 +1347,158 @@ def _soloist_live(root: Path) -> None:
     _replace(backend, "    # ---- internals ----\n", LIVE_RUN_METHODS + "    # ---- internals ----\n")
 
 
+def _phone_chain(root: Path) -> None:
+    """
+    Il percorso dell'audio dal servizio al lettore del telefono: un passo in meno e i tempi nel registro.
+
+    Il buffer di Music Assistant tiene l'audio come arriva dal servizio (Soloist: 32 bit 44,1 kHz), e a ogni brano
+    un secondo ffmpeg lo converte nel formato della sessione Sendspin. Sul telefono la sessione è sempre PCM 16 bit
+    48 kHz stereo (il lettore è Xonos, o myCar, e senza PyAV Sendspin non codifica altro): il buffer tiene già quel
+    formato, lo converte il primo ffmpeg, e AudioBuffer.get_stream non avvia il secondo quando i formati sono uguali e
+    non ci sono filtri. A ogni play e a ogni salto si risparmia l'avvio di un ffmpeg (col linker del telefono),
+    tutto in serie dopo il buffer pronto. Con un filtro (dissolvenza, normalizzazione dinamica) il secondo ffmpeg
+    parte come prima.
+
+    Poi le righe "Xonos tempi:" nel registro: quando arriva play_index (e next o previous, che lo fanno partire dopo
+    1 s, e l'attesa di un'altra azione sullo stesso lettore), quando il brano è pronto, quando il comando arriva al
+    lettore (la sessione Sendspin parte: non è ancora audio) e quando il primo audio parte verso il lettore. Con quelle di Soloist e di Xonos (gli orari hanno i
+    millesimi) si vede dal registro di una persona dove va il tempo tra un tocco e il brano nuovo.
+    """
+    _replace(
+        root / "controllers" / "streams" / "audio_buffer.py",
+        "    arriving = arriving_audio_format(streamdetails)\n"
+        "    return AudioFormat(\n"
+        "        content_type=ContentType.from_bit_depth(arriving.bit_depth),\n"
+        "        sample_rate=arriving.sample_rate,\n"
+        "        bit_depth=pcm_container_bit_depth(arriving.bit_depth),\n"
+        "        # buffer the stereo fold of a surround source, so audio analysis measures\n"
+        "        # the same audio that is played back rather than the untouched surround mix\n"
+        "        channels=min(arriving.channels, 2),\n"
+        "    )\n",
+        "    # Xonos: sul telefono la sessione Sendspin è sempre PCM 16 bit 48 kHz stereo. Se dopo il buffer non c'è un\n"
+        "    # filtro (normalizzazione spenta o del servizio, come Spotify, niente dissolvenza) il buffer tiene già quel\n"
+        "    # formato: lo converte il primo ffmpeg, anche da mono o surround, e per il brano non serve un secondo ffmpeg\n"
+        "    # (_phone_chain in prepare.py). Con un filtro il secondo ffmpeg c'è comunque: il buffer resta come prima, così\n"
+        "    # il guadagno lavora su tutti i bit e il passaggio a 16 bit si fa una volta sola, con il dither\n"
+        "    if (\n"
+        "        streamdetails.volume_normalization_mode\n"
+        "        in (VolumeNormalizationMode.DISABLED, VolumeNormalizationMode.SOURCE)\n"
+        "        and not streamdetails.fade_in\n"
+        "    ):\n"
+        "        return AudioFormat(content_type=ContentType.PCM_S16LE, sample_rate=48000, bit_depth=16, channels=2)\n"
+        "    arriving = arriving_audio_format(streamdetails)\n"
+        "    return AudioFormat(\n"
+        "        content_type=ContentType.from_bit_depth(arriving.bit_depth),\n"
+        "        sample_rate=arriving.sample_rate,\n"
+        "        bit_depth=pcm_container_bit_depth(arriving.bit_depth),\n"
+        "        # buffer the stereo fold of a surround source, so audio analysis measures\n"
+        "        # the same audio that is played back rather than the untouched surround mix\n"
+        "        channels=min(arriving.channels, 2),\n"
+        "    )\n",
+    )
+    controller = root / "controllers" / "player_queues" / "controller.py"
+    _replace(
+        controller,
+        '        """Play item at index (or item_id) X in queue."""\n'
+        "        self._check_player_permission(queue_id)\n",
+        '        """Play item at index (or item_id) X in queue."""\n'
+        "        self._check_player_permission(queue_id)\n"
+        "        # Xonos: i tempi di un play o di un salto, per il registro\n"
+        "        xonos_t0 = time.monotonic()\n"
+        '        self.logger.info("Xonos tempi: play_index %s ricevuto", index)\n',
+    )
+    _replace(
+        controller,
+        "            # Reset flow_mode - the streams controller will set it if flow mode is used.\n"
+        "            queue.flow_mode = False\n",
+        '            self.logger.info("Xonos tempi: brano pronto in %.2f s", time.monotonic() - xonos_t0)\n'
+        "            # Reset flow_mode - the streams controller will set it if flow mode is used.\n"
+        "            queue.flow_mode = False\n",
+    )
+    _replace(
+        controller,
+        "                await self.mass.players.play_media(queue_id, player_media)\n"
+        "                queue.current_index = index\n"
+        "                queue.current_item = queue_item\n"
+        "                self.signal_update(queue_id)\n",
+        "                await self.mass.players.play_media(queue_id, player_media)\n"
+        "                queue.current_index = index\n"
+        "                queue.current_item = queue_item\n"
+        "                self.signal_update(queue_id)\n"
+        "            self.logger.info(\n"
+        '                "Xonos tempi: comando al lettore dato %.2f s dopo play_index (non è ancora audio)",\n'
+        "                time.monotonic() - xonos_t0,\n"
+        "            )\n",
+    )
+    # L'attesa del lucchetto del lettore (un'altra azione di play in corso) e il secondo di next e previous prima di
+    # play_index: senza queste righe sembrerebbero tempo del brano nuovo.
+    helpers = root / "controllers" / "player_queues" / "helpers.py"
+    _replace(helpers, "import functools\nimport random\n", "import functools\nimport random\nimport time\n")
+    _replace(
+        helpers,
+        "        async with self.mass.players.get_group_and_player_lock(queue_id):\n",
+        "        xonos_t0 = time.monotonic()  # Xonos: l'attesa di un'altra azione sullo stesso lettore, per il registro\n"
+        "        async with self.mass.players.get_group_and_player_lock(queue_id):\n"
+        "            if (xonos_wait := time.monotonic() - xonos_t0) >= 0.05:\n"
+        "                self.logger.info(  # type: ignore[attr-defined]\n"
+        '                    "Xonos tempi: %s ha aspettato %.2f s un\'altra azione sul lettore", func.__name__, xonos_wait\n'
+        "                )\n",
+    )
+    for command, index in (("next", "next_index"), ("previous", "prev_index")):
+        _replace(
+            controller,
+            f"        # debounce rapid {command} button presses using call_later\n",
+            f'        self.logger.info("Xonos tempi: {command} ricevuto, play_index %s fra 1 s", {index})\n'
+            f"        # debounce rapid {command} button presses using call_later\n",
+        )
+    playback = root / "providers" / "sendspin" / "playback.py"
+    _replace(
+        playback,
+        '        await import_module_in_thread("av")\n        push_stream: PushStream | None = None\n',
+        "        self._xonos_session_t0 = time.monotonic()  # Xonos: per il registro\n"
+        '        await import_module_in_thread("av")\n        push_stream: PushStream | None = None\n',
+    )
+    _replace(
+        playback,
+        "                    if self._first_commit_monotonic_us is None:\n"
+        "                        self._first_commit_monotonic_us = commit_now_us\n",
+        "                    if self._first_commit_monotonic_us is None:\n"
+        "                        self._first_commit_monotonic_us = commit_now_us\n"
+        "                        # Xonos: quando parte il primo audio verso il lettore, e con quanto anticipo\n"
+        "                        self.player.logger.info(\n"
+        '                            "Xonos tempi: primo audio al lettore %.2f s dopo l\'inizio del flusso,"\n'
+        '                            " da suonare fra %d ms",\n'
+        "                            time.monotonic() - self._xonos_session_t0,\n"
+        "                            (commit_start_us - commit_now_us) / 1000,\n"
+        "                        )\n",
+    )
+
+
 # Xonos: le costanti della sessione che resta accesa (_soloist_live).
 LIVE_CONSTANTS = '''# Xonos: quanto resta acceso e in pausa Soloist senza brani, pronto per il prossimo (SoloistBackend._xonos_release)
 _XONOS_PARK_S: Final[float] = 600.0
 # Xonos: salti (o riprese) falliti di fila dopo cui non si provano più: questo Soloist non li accetterebbe, e ognuno
 # costa l'attesa (_JUMP_TIMEOUT_S) prima di ripartire da capo
 _XONOS_TRIES: Final[int] = 2
-# Xonos: quanto si aspetta la conferma di un comando a Soloist, e la pausa che chiude la lettura del tubo
+# Xonos: dopo quanto si riprovano i salti (o le riprese) sulla sessione accesa, dopo _XONOS_TRIES falliti di fila
+# (per esempio in galleria): senza, si ripartiva da capo per tutta la vita del servizio
+_XONOS_RETRY_S: Final[float] = 900.0
+# Xonos: quanto si aspetta la conferma di un comando a Soloist, e la pausa che chiude la lettura del tubo (il sink è
+# sospeso: quello che c'è nel tubo si legge subito)
 _XONOS_COMMAND_S: Final[float] = 5.0
-_XONOS_DRAIN_S: Final[float] = 0.05
+_XONOS_DRAIN_S: Final[float] = 0.02
+# Xonos: un salto o una ripresa sulla sessione accesa ha _JUMP_TIMEOUT_S (5 s) in tutto, così se non va restano i
+# secondi per ripartire da capo nei 15 s che Music Assistant dà al buffer; fino a _XONOS_SWITCH_S solo se Soloist ha
+# già detto di avere il brano chiesto (sul telefono, in rete mobile, un Soloist che carica piano conviene aspettarlo:
+# ripartire da capo costa 5-7 s e deve caricare lo stesso brano)
+_XONOS_SWITCH_S: Final[float] = 8.0
+# Xonos: ogni quanto si guarda se Soloist suona il brano chiesto
+_XONOS_POLL_S: Final[float] = 0.01
+# Xonos: alla ripresa il seek parte con Soloist ancora in pausa; quanto si aspetta che dica la posizione nuova prima
+# di riprendere (se in pausa non la dice, il seek si riprova dopo la ripresa)
+_XONOS_SEEK_PAUSED_S: Final[float] = 0.3
+# Xonos: mentre cambia brano, quanto oltre il punto chiesto può stare la posizione che conferma il seek
+_XONOS_SEEK_AHEAD_MS: Final[int] = 1000
 '''
 
 # Xonos: i metodi di SoloistBackend per la sessione che resta accesa (_soloist_live).
@@ -1264,6 +1520,17 @@ LIVE_BACKEND_METHODS = '''    async def _xonos_release(self, run: _SingleTrackRu
                 else:
                     self._xonos_arm_park(run)
                     return
+            if run._item_over and run._delivered:
+                # per il registro: a fine brano, quanto audio in quanto tempo dal sink ripartito (l'avvio ha la sua
+                # riga). Il tubo si legge a 1,1x dopo un primo secondo senza freno: se Soloist tiene il passo il
+                # rapporto è 1,1x o poco più; più basso, non tiene il passo e ai cambi di brano naturali c'è un buco
+                spent = time.monotonic() - run._xonos_sink_at
+                self.logger.info(
+                    "Soloist: brano finito, %.1f s di audio in %.1f s dal sink ripartito (%.2fx)",
+                    run._delivered / _BYTES_PER_SECOND,
+                    spent,
+                    run._delivered / _BYTES_PER_SECOND / max(spent, 0.001),
+                )
             await run.stop()
             if self._run is run:
                 self._run = None
@@ -1279,28 +1546,59 @@ LIVE_BACKEND_METHODS = '''    async def _xonos_release(self, run: _SingleTrackRu
         Xonos: il Soloist in pausa suona il brano chiesto, senza un processo nuovo né un altro accesso a Spotify.
 
         Lo stesso brano è una ripresa (alla posizione chiesta), un altro è un salto. Falso se non si può o non va:
-        allora si riparte da capo, come prima. Dopo _XONOS_TRIES salti (o riprese) falliti di fila non si provano più.
+        allora si riparte da capo, come prima. Dopo _XONOS_TRIES salti (o riprese) falliti di fila non si provano più
+        per _XONOS_RETRY_S.
         """
         same = spotify_uri == run.spotify_uri
         what = "ripresa" if same else "salto"
         if self._xonos_failures[what] >= _XONOS_TRIES:
-            return False
-        if not run.xonos_reusable(streamdetails):
+            if time.monotonic() - self._xonos_failed_at[what] < self._xonos_retry_after(what):
+                return False
+            # passato un po' di tempo (la galleria è finita): un altro tentativo
+            self._xonos_failures[what] = _XONOS_TRIES - 1
+            self._xonos_retries[what] += 1
+            self.logger.info("Soloist: riprovo il %s sulla sessione accesa", what)
+        if (why := run.xonos_unusable(streamdetails)) is not None:
+            self.logger.info("Soloist: la sessione accesa non si riusa (%s), riparte da capo", why)
             return False
         started = time.monotonic()
         try:
-            await run.xonos_switch(spotify_uri, seek_position * 1000, streamdetails)
+            steps = await run.xonos_switch(spotify_uri, seek_position * 1000, streamdetails)
+        except asyncio.CancelledError:
+            # Lo stream nuovo è stato annullato a metà del cambio: quale brano ha Soloist non è più sicuro, il timer
+            # di spegnimento è già tolto e nessuno legge il suo audio. Si spegne: il brano dopo riparte da capo.
+            await asyncio.shield(self._xonos_drop(run))
+            raise
         except Exception as err:  # noqa: BLE001 - si riparte da capo, come prima
             self._xonos_failures[what] += 1
+            self._xonos_failed_at[what] = time.monotonic()
             if self._xonos_failures[what] >= _XONOS_TRIES:
                 self.logger.warning(
-                    "Soloist: %s sulla sessione accesa non riesce, d'ora in poi si riparte da capo", what
+                    "Soloist: %s sulla sessione accesa non riesce, per %.0f minuti si riparte da capo",
+                    what,
+                    self._xonos_retry_after(what) / 60,
                 )
             self.logger.info("Soloist: %s sulla sessione accesa non riuscito (%s), riparte da capo", what, err)
             return False
         self._xonos_failures[what] = 0
-        self.logger.info("Soloist: %s sulla sessione accesa in %.2f s", what, time.monotonic() - started)
+        self._xonos_retries[what] = 0
+        self.logger.info("Soloist: %s sulla sessione accesa in %.2f s (%s)", what, time.monotonic() - started, steps)
         return True
+
+    def _xonos_retry_after(self, what: str) -> float:
+        """
+        Xonos: dopo quanto si riprova il salto (o la ripresa) sulla sessione accesa, dopo _XONOS_TRIES falliti di fila.
+
+        _XONOS_RETRY_S, raddoppiato a ogni nuovo tentativo fallito (15, 30, 60 minuti... fino a 16 ore): un Soloist
+        che non accetta salti non costa un'attesa ogni quarto d'ora per tutta la vita del servizio.
+        """
+        return _XONOS_RETRY_S * 2 ** min(self._xonos_retries[what], 6)
+
+    async def _xonos_drop(self, run: _SingleTrackRun) -> None:
+        """Xonos: spegne un Soloist che non si può più riusare (un cambio di brano annullato a metà)."""
+        await run.stop()
+        if self._run is run:
+            self._run = None
 
     def _xonos_arm_park(self, run: _SingleTrackRun) -> None:
         """Xonos: dopo _XONOS_PARK_S senza brani il Soloist in pausa si spegne."""
@@ -1348,12 +1646,21 @@ LIVE_RUN_METHODS = '''    # ---- Xonos: la sessione che resta accesa tra un bran
         )
 
     async def xonos_park(self) -> None:
-        """Pause the engine and the sink and let go of the consumer: the run waits for the next item."""
+        """Suspend the sink, pause the engine and let go of the consumer: the run waits for the next item."""
         client = self._client
         assert client is not None
+        started = time.monotonic()
         self._xonos_parked = True
-        await asyncio.wait_for(client.pause(await_result=True), _XONOS_COMMAND_S)
+        # Prima il sink: da qui nel tubo non entra più niente. La conferma della pausa è un giro attraverso proot: non
+        # si aspetta qui, dove ferma il salto, ma al cambio di brano dopo (xonos_switch), che di solito la trova già
+        # arrivata. Se non arriva, la sessione non si riusa.
         await self._set_sink(running=False)
+        pause = asyncio.ensure_future(asyncio.wait_for(client.pause(await_result=True), _XONOS_COMMAND_S))
+        # un errore lo guarda xonos_unusable o xonos_switch; qui solo perché asyncio non lo segnali come perso
+        pause.add_done_callback(lambda task: task.cancelled() or task.exception())
+        self._xonos_pause = pause
+        # stop() la annulla, se Soloist si spegne prima
+        self._tasks.append(pause)
         if (task := self._xonos_reader_task) is not None:
             self._xonos_reader_task = None
             await _cancel_and_join([task])
@@ -1361,22 +1668,25 @@ LIVE_RUN_METHODS = '''    # ---- Xonos: la sessione che resta accesa tra un bran
                 self._tasks.remove(task)
         if self._error is not None:
             raise AudioError(self._error)
-        self.logger.info("Soloist: in pausa e acceso, pronto per il prossimo brano")
+        self.logger.info(
+            "Soloist: in pausa e acceso in %.2f s, pronto per il prossimo brano", time.monotonic() - started
+        )
 
-    def xonos_reusable(self, streamdetails: StreamDetails | None) -> bool:
-        """Whether the paused engine can play the next item: still alive and signed in, same loudness setting."""
-        if not (
-            self._xonos_parked
-            and not self._stopped
-            and self._error is None
-            and not self._engine_exited
-            and proc_running(self._proc)
-            and self._client is not None
-            and self._client.connected
-            and self._logged_in is not False
-            and self._reader is not None
-        ):
-            return False
+    def xonos_unusable(self, streamdetails: StreamDetails | None) -> str | None:
+        """Why the paused engine cannot play the next item (None: it can): it must be alive, signed in, and so on."""
+        if not self._xonos_parked:
+            return "non in pausa"
+        if self._stopped or self._error is not None:
+            return self._error or "fermato"
+        if self._engine_exited or not proc_running(self._proc):
+            return "Soloist uscito"
+        if self._client is None or not self._client.connected or self._reader is None:
+            return "collegamento perso"
+        if self._logged_in is False:
+            return "accesso a Spotify perso"
+        pause = self._xonos_pause
+        if pause is not None and pause.done() and (pause.cancelled() or pause.exception() is not None):
+            return "pausa non confermata"
         # the engine reads its loudness setting only when it starts
         saved = self.queue_id
         self.queue_id = streamdetails.queue_id if streamdetails is not None else None
@@ -1384,21 +1694,30 @@ LIVE_RUN_METHODS = '''    # ---- Xonos: la sessione che resta accesa tra un bran
             wanted = self._engine_normalization_enabled()
         finally:
             self.queue_id = saved
-        return wanted == self.engine_normalizes
+        if wanted != self.engine_normalizes:
+            return "normalizzazione cambiata"
+        return None
+
+    def xonos_reusable(self, streamdetails: StreamDetails | None) -> bool:
+        """Whether the paused engine can play the next item (see xonos_unusable)."""
+        return self.xonos_unusable(streamdetails) is None
 
     async def xonos_switch(
         self, spotify_uri: str, seek_position_ms: int, streamdetails: StreamDetails | None
-    ) -> None:
+    ) -> str:
         """
         Play the next item on the paused engine: the same one (a resume) or another one (a jump).
 
         As at a fresh start the sink stays suspended until the engine plays the asked item at the asked position, so
         no audio of the item before reaches the new consumer; what that item left in the FIFO is read away first.
+        Return how long each step took, for the log.
         """
         client = self._client
         assert client is not None
         same = spotify_uri == self.spotify_uri
+        marks = [time.monotonic()]
         self._xonos_switching = True
+        self._xonos_seek_sent = False
         self._xonos_previous_uri = self.spotify_uri
         self.spotify_uri = spotify_uri
         self.media_key = streamdetails.uri if streamdetails is not None else None
@@ -1422,37 +1741,67 @@ LIVE_RUN_METHODS = '''    # ---- Xonos: la sessione che resta accesa tra un bran
         self._read_bytes = 0
         self._tail_zeros = 0
         self._chunks = asyncio.Queue(maxsize=self._chunks.maxsize)
-        self._xonos_started_at = time.monotonic()
+        self._xonos_started_at = marks[0]
+        # la pausa mandata da xonos_park, di solito confermata da un pezzo: si aspetta qui, prima di svuotare il tubo,
+        # così quello che Soloist ha reso ancora del brano di prima ci è già arrivato
+        if (pause := self._xonos_pause) is not None:
+            self._xonos_pause = None
+            with suppress(ValueError):
+                self._tasks.remove(pause)
+            await pause
+        marks.append(time.monotonic())
         await self._xonos_drain()
+        marks.append(time.monotonic())
         if same:
+            # Soloist in pausa è più avanti di quanto si è sentito (il tubo si legge a 1,1x): il seek al punto chiesto
+            # parte prima di riprendere, così non rende audio dal punto sbagliato. Lo conferma solo una posizione
+            # arrivata dopo il seek e vicina al punto (_observe_position); se in pausa non la dice, il seek si rifà
+            # dopo la ripresa.
+            self._xonos_seek_sent = True
+            await asyncio.wait_for(client.seek(seek_position_ms, await_result=True), _XONOS_COMMAND_S)
+            with suppress(TimeoutError):
+                await asyncio.wait_for(self._seek_confirmed.wait(), _XONOS_SEEK_PAUSED_S)
             await asyncio.wait_for(client.resume(await_result=True), _XONOS_COMMAND_S)
         else:
             await asyncio.wait_for(client.play(spotify_uri, await_result=True), _XONOS_COMMAND_S)
-        await self._xonos_await_playing()
-        if seek_position_ms:
+        marks.append(time.monotonic())
+        await self._xonos_await_playing(same, marks[0])
+        marks.append(time.monotonic())
+        if (seek_position_ms or same) and not self._seek_confirmed.is_set():
+            self._xonos_seek_sent = True
             await self._cold_seek(client, seek_position_ms)
-        elif same:
-            # back to the start of the same item
-            await asyncio.wait_for(client.seek(0, await_result=True), _XONOS_COMMAND_S)
         if self._error is not None:
             raise AudioError(self._error)
+        marks.append(time.monotonic())
         self._xonos_parked = False
         self._xonos_switching = False
         self._xonos_reader_task = self._spawn_task(self._read_capture())
+        self._xonos_sink_at = time.monotonic()
         await self._set_sink(running=True)
         if self._error is not None:
             raise AudioError(self._error)
+        marks.append(time.monotonic())
+        return (
+            "pausa di prima %.2f s, tubo %.2f s, comando %.2f s, il brano suona %.2f s, posizione %.2f s, sink %.2f s"
+            % tuple(b - a for a, b in zip(marks, marks[1:]))
+        )
 
-    async def _xonos_await_playing(self) -> None:
-        """Wait (briefly) for the engine to report that it plays the asked item."""
-        loop = asyncio.get_running_loop()
-        deadline = loop.time() + _JUMP_TIMEOUT_S
+    async def _xonos_await_playing(self, same: bool, begun: float) -> None:
+        """
+        Wait for the engine to report that it plays the asked item.
+
+        :param same: Whether the item is the one the engine paused on (a resume).
+        :param begun: When the switch began (time.monotonic()).
+        """
         while not (self._started.is_set() and self._engine_playing):
             if self._error is not None or self._engine_exited or not proc_running(self._proc):
                 raise AudioError(self._error or "Spotify Soloist stopped while changing item")
-            if loop.time() >= deadline:
+            # tutto il cambio ha _JUMP_TIMEOUT_S; _XONOS_SWITCH_S quando Soloist ha già detto il brano chiesto (salto)
+            # o il punto chiesto (ripresa), cioè mentre lo carica
+            loaded = self._seek_confirmed.is_set() if same else self._started.is_set()
+            if time.monotonic() - begun >= (_XONOS_SWITCH_S if loaded else _JUMP_TIMEOUT_S):
                 raise AudioError("Spotify Soloist did not start the asked item in time")
-            await asyncio.sleep(_CONNECT_POLL_S)
+            await asyncio.sleep(_XONOS_POLL_S)
 
     async def _xonos_drain(self) -> None:
         """Read away what the item before left in the FIFO (the sink is suspended: nothing new arrives)."""
@@ -1462,6 +1811,10 @@ LIVE_RUN_METHODS = '''    # ---- Xonos: la sessione che resta accesa tra un bran
             try:
                 chunk = await asyncio.wait_for(reader.read(_READ_CHUNK_SIZE), _XONOS_DRAIN_S)
             except TimeoutError:
+                # col loop fermo più dell'attesa, i dati del tubo e il timeout arrivano nello stesso giro: i dati sono
+                # nel buffer ma non presi. Il sink è sospeso: col buffer vuoto non resta niente
+                if reader._buffer:
+                    continue
                 return
             if not chunk:
                 raise AudioError("Spotify playback was interrupted")

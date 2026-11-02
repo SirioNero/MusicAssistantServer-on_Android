@@ -45,6 +45,7 @@ import it.xonos.ma.R
 import it.xonos.ma.data.Connection
 import it.xonos.ma.data.Problem
 import it.xonos.ma.data.MaException
+import it.xonos.ma.data.SkipTrace
 import it.xonos.ma.phone.MainActivity
 import it.xonos.ma.phone.model.PhoneServerControl
 import it.xonos.ma.sendspin.AndroidAudio
@@ -111,7 +112,16 @@ class PlaybackService : MediaLibraryService() {
             settings.volume = volume
             settings.muted = muted
         }
-        player = MaPlayer(mainLooper, app.repo, settings.playerId, app.playerReady, engine.outputting, artwork::uriFor, { engine.lateMs }) { connection ->
+        player = MaPlayer(
+            mainLooper,
+            app.repo,
+            settings.playerId,
+            app.playerReady,
+            engine.outputting,
+            artwork::uriFor,
+            { engine.lateMs },
+            { onPhoneServer },
+        ) { connection ->
             val context = settings.language.wrap(this)
             phoneServerProblem(context, connection) ?: describe(context, connection)
         }
@@ -314,6 +324,9 @@ class PlaybackService : MediaLibraryService() {
     private fun onOutputting(on: Boolean) {
         outputting = on
         if (on) {
+            // Dopo un salto: quanto ci ha messo la musica a uscire di nuovo (gli altri passi li scrivono SkipSender,
+            // SendspinClient e AudioEngine).
+            SkipTrace.musicOut()?.let { Log.i(TAG, "Salto: musica fuori $it ms dopo il tocco") }
             main.removeCallbacks(abandonFocus)
             updateLocks()
             setNoisyReceiver(true)

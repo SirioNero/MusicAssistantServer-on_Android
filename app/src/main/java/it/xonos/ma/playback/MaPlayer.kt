@@ -27,6 +27,7 @@ import it.xonos.ma.data.MaRepository
 import it.xonos.ma.data.QueueItem
 import it.xonos.ma.data.QueueState
 import it.xonos.ma.data.SkipSender
+import it.xonos.ma.data.SkipTrace
 import it.xonos.ma.data.SoloistUnlock
 import it.xonos.ma.data.objects
 import kotlinx.coroutines.CancellationException
@@ -67,6 +68,8 @@ class MaPlayer(
     private val artwork: (MaImage?, Int) -> Uri?,
     /** Di quanto ciò che si sente è indietro rispetto alla posizione di Music Assistant (vedi AudioEngine.lateMs). */
     private val lateMs: () -> Long = { 0L },
+    /** Vero se Music Assistant è quello sul telefono stesso: i salti si raccolgono per meno tempo (vedi [SkipSender]). */
+    private val phoneServer: () -> Boolean = { false },
     /** Cosa dire in auto di una connessione che non va, nella lingua scelta sul telefono. */
     private val describe: (Connection) -> String?,
 ) : SimpleBasePlayer(looper) {
@@ -124,7 +127,7 @@ class MaPlayer(
 
     // Il salto in attesa (vedi [skip]): uno per volta, verso l'ultimo brano chiesto.
     private var pendingSkip: SettableFuture<Void?>? = null
-    private val skips = SkipSender(scope) { index ->
+    private val skips = SkipSender(scope, trace = true) { index ->
         try {
             unlock.retrying(queueId) {
                 repo.command("player_queues/play_index") {
@@ -516,28 +519,62 @@ class MaPlayer(
         val index = q.currentIndex
         val target = stateStart + mediaItemIndex
         return when (seekCommand) {
-            Player.COMMAND_SEEK_TO_NEXT, Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM ->
-                if (mediaItemIndex == C.INDEX_UNSET) command("player_queues/next") { it?.currentIndex != index } else skip(q, target)
-            Player.COMMAND_SEEK_TO_PREVIOUS, Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM ->
-                when {
-                    // Avanti appena premuto (con Soloist il brano nuovo ci mette 7 s) e poi indietro: per Music Assistant
-                    // si è ancora sul brano di prima, ma il salto è in viaggio. Si passa dallo stesso giro dei salti,
-                    // che manda solo l'ultimo brano chiesto.
-                    pendingSkip?.isDone == false && mediaItemIndex != C.INDEX_UNSET -> skip(q, target)
-                    target == index -> seekWithin(0)
-                    mediaItemIndex == C.INDEX_UNSET -> command("player_queues/previous") { it?.currentIndex != index }
-                    else -> skip(q, target)
+            Player.COMMAND_SEEK_TO_NEXT, Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
+            Player.COMMAND_SEEK_TO_PREVIOUS, Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM -> {
+                // Il brano mostrato è quello di Media3 (durante un salto è già quello chiesto), sulla finestra
+                // dell'ultimo stato pubblicato: Media3 ha calcolato lì il brano dopo o quello prima (vedi [SkipPlan]).
+                // Senza brani mostrati (niente in corso) decide Music Assistant.
+                val view = SkipPlan.Queue(
+                    shown = currentMediaItemIndex,
+                    start = stateStart,
+                    size = q.items,
+                    current = index?.takeIf { q.current != null && stateItems.isNotEmpty() },
+                    repeat = q.repeat,
+                    skipping = pendingSkip?.isDone == false,
+                )
+                val requested = mediaItemIndex.takeUnless { it == C.INDEX_UNSET }
+                val forward = seekCommand == Player.COMMAND_SEEK_TO_NEXT || seekCommand == Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM
+                val step = if (forward) {
+                    SkipPlan.next(requested, view)
+                } else {
+                    SkipPlan.previous(requested, positionMs == C.TIME_UNSET, currentPosition <= maxSeekToPreviousPosition, view)
                 }
+                go(q, step, known = requested != null)
+            }
             Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM -> seekWithin(positionMs)
             else ->
                 if (target == index) {
                     seekWithin(if (positionMs == C.TIME_UNSET) 0 else positionMs)
                 } else {
+                    SkipTrace.touch()
+                    Log.i(TAG, "Salto: tocco verso $target (dalla coda)")
                     command("player_queues/play_index", args = {
                         put("index", target)
                         if (positionMs != C.TIME_UNSET && positionMs > 0) put("seek_position", positionMs / 1000)
                     }) { it?.currentIndex == target }
                 }
+        }
+    }
+
+    /** Fa quello che ha scelto [SkipPlan], con una riga nel registro; l'orologio del salto riparte (vedi [SkipTrace]). */
+    private fun go(q: QueueState, step: SkipPlan.Step, known: Boolean): ListenableFuture<*> {
+        val index = q.currentIndex
+        if (step != SkipPlan.Stay) SkipTrace.touch()
+        val where = when (step) {
+            is SkipPlan.Jump -> "${step.index}"
+            SkipPlan.Next -> "il brano dopo, deciso da Music Assistant"
+            SkipPlan.Previous -> "il brano prima, deciso da Music Assistant"
+            SkipPlan.Restart -> "l'inizio del brano"
+            SkipPlan.Stay -> "niente, è l'ultimo brano"
+        }
+        val gathered = step is SkipPlan.Jump && gatherMs(q) > 0
+        Log.i(TAG, "Salto: tocco verso $where (indice noto ${yesNo(known)}, raccolto ${yesNo(gathered)})")
+        return when (step) {
+            is SkipPlan.Jump -> skip(q, step.index)
+            SkipPlan.Next -> command("player_queues/next") { it?.currentIndex != index }
+            SkipPlan.Previous -> command("player_queues/previous") { it?.currentIndex != index }
+            SkipPlan.Restart -> seekWithin(0)
+            SkipPlan.Stay -> Futures.immediateVoidFuture()
         }
     }
 
@@ -547,11 +584,13 @@ class MaPlayer(
      * si aspetta che i tocchi si fermino (vedi [SkipSender]). Intanto Media3 mostra già il brano scelto.
      */
     private fun skip(q: QueueState, target: Int): ListenableFuture<*> {
-        // Il salto di prima confluisce in questo.
-        pendingSkip?.set(null)
+        // Il salto di prima confluisce in questo, ma il suo futuro si chiude solo dopo, quando SimpleBasePlayer ha già
+        // quello nuovo: chiuso subito, per un attimo non ci sarebbe niente in attesa e pubblicherebbe lo stato di Music
+        // Assistant, cioè il brano di prima, e in auto e nella notifica titolo e copertina tornerebbero indietro.
+        val previous = pendingSkip
         val future = SettableFuture.create<Void?>()
         pendingSkip = future
-        skips.request(target, gather = q.current?.singleStream != false) {
+        skips.request(target, gatherMs(q)) {
             handler.post {
                 if (pauseAfterSkip) {
                     pauseAfterSkip = false
@@ -565,7 +604,16 @@ class MaPlayer(
                 checkExpectations()
             }
         }
+        // Il callback del salto di prima, se arriva dopo, trova il suo futuro chiuso e non fa niente.
+        if (previous != null && !previous.isDone) handler.post { previous.set(null) }
         return future
+    }
+
+    /** Quanto [SkipSender] aspetta altri tocchi: niente se il brano non viene da un servizio a un flusso alla volta. */
+    private fun gatherMs(q: QueueState): Long = when {
+        q.current?.singleStream == false -> 0L
+        phoneServer() -> SkipSender.GATHER_PHONE_MS
+        else -> SkipSender.GATHER_MS
     }
 
     private fun seekWithin(positionMs: Long): ListenableFuture<*> {
@@ -812,6 +860,9 @@ class MaPlayer(
         const val EXTRA_ARTIST = "xonos.artist"
 
         private const val TAG = "Xonos"
+
+        private fun yesNo(value: Boolean) = if (value) "sì" else "no"
+
         private const val BEHIND = 3
         private const val AHEAD = 50
         private const val AHEAD_MARGIN = 5

@@ -235,7 +235,7 @@ class RemoteLink internal constructor(
     }
 
     private fun jumpTo(target: Int, gather: Boolean) {
-        skips.request(target, gather) {
+        skips.request(target, if (gather) SkipSender.GATHER_MS else 0L) {
             // Se Music Assistant non ci arriva, lo schermo torna a quello che dice lui.
             scope.launch {
                 delay(PENDING_TIMEOUT_MS)

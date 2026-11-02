@@ -1,6 +1,7 @@
 package it.xonos.ma.sendspin
 
 import android.media.AudioAttributes
+import android.media.AudioDeviceInfo
 import android.media.AudioFormat
 import android.media.AudioTimestamp
 import android.media.AudioTrack
@@ -93,6 +94,14 @@ private class AudioTrackOutput(override val sampleRate: Int, override val channe
     override val startFrames: Int
         get() = threshold
 
+    // Dove Android manda il suono adesso: vale solo mentre l'AudioTrack suona (prima dice null).
+    override val route: String?
+        get() = try {
+            track.routedDevice?.let { describe(it.type) }
+        } catch (e: Exception) {
+            null
+        }
+
     override val latencyUs: Long
         get() = bufferFrames * 1_000_000L / sampleRate + EXTRA_LATENCY_US
 
@@ -160,6 +169,21 @@ private class AudioTrackOutput(override val sampleRate: Int, override val channe
 
         /** Quanto audio vuole l'uscita prima di partire, da Android 12 (prima: il buffer intero). */
         const val START_MS = 40
+
+        /** Il tipo di uscita per il registro. */
+        fun describe(type: Int): String = when (type) {
+            AudioDeviceInfo.TYPE_BLUETOOTH_A2DP -> "Bluetooth A2DP"
+            AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> "Bluetooth SCO"
+            AudioDeviceInfo.TYPE_BLE_HEADSET, AudioDeviceInfo.TYPE_BLE_SPEAKER, AudioDeviceInfo.TYPE_BLE_BROADCAST -> "Bluetooth LE"
+            AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> "altoparlante"
+            AudioDeviceInfo.TYPE_BUILTIN_EARPIECE -> "capsula del telefono"
+            AudioDeviceInfo.TYPE_WIRED_HEADSET, AudioDeviceInfo.TYPE_WIRED_HEADPHONES -> "cuffie con il filo"
+            AudioDeviceInfo.TYPE_USB_DEVICE, AudioDeviceInfo.TYPE_USB_HEADSET, AudioDeviceInfo.TYPE_USB_ACCESSORY -> "USB"
+            AudioDeviceInfo.TYPE_HDMI -> "HDMI"
+            AudioDeviceInfo.TYPE_REMOTE_SUBMIX -> "remote submix"
+            AudioDeviceInfo.TYPE_BUS -> "bus dell'auto"
+            else -> "uscita di tipo $type"
+        }
     }
 }
 

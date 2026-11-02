@@ -110,6 +110,12 @@ class MaPlayer(
     /** Quando si è staccata l'ultima uscita esterna (Bluetooth, cuffie): vedi [forgetDrop]. */
     private var outputGoneAt = Long.MIN_VALUE
 
+    /**
+     * Il Music Assistant dell'ultima connessione (server_id): lo stesso da casa e da fuori, così dopo un calo la musica
+     * riprende anche se ci si ricollega dall'indirizzo remoto, ma non su un altro server.
+     */
+    private var serverId: String? = null
+
     private class Expectation(val test: (QueueState?) -> Boolean, val future: SettableFuture<Void?>)
     private val expectations = mutableListOf<Expectation>()
 
@@ -135,6 +141,7 @@ class MaPlayer(
         repo.addEventListener(listener)
         scope.launch {
             repo.connection.collect { connection ->
+                if (connection is Connection.Connected) serverId = connection.server.id
                 // Mentre si ricollega resta il problema di prima, se c'era.
                 problem = if (connection is Connection.Connecting) problem else describe(connection)
                 invalidateState()
@@ -374,7 +381,7 @@ class MaPlayer(
         val q = queue ?: return
         val now = SystemClock.elapsedRealtime()
         val index = q.currentIndex ?: return
-        if (q.playing || now - lastPlayingAt < RECENT_PLAY_MS) drop = Drop(index, currentPositionMs(), now, repo.baseUrl)
+        if (q.playing || now - lastPlayingAt < RECENT_PLAY_MS) drop = Drop(index, currentPositionMs(), now, serverId)
     }
 
     /**
@@ -389,7 +396,7 @@ class MaPlayer(
         if (away > RESUME_WINDOW_MS || q.playing || q.currentIndex != d.index) return
         // Un'uscita esterna si è staccata dopo l'ultima volta che si suonava (anche prima che Xonos vedesse il calo,
         // che col ping arriva 20-40 s dopo): la musica uscirebbe dall'altoparlante. E un altro server non è il calo.
-        if (outputGoneAt > lastPlayingAt || (d.server != null && repo.baseUrl != d.server)) return
+        if (outputGoneAt > lastPlayingAt || (d.server != null && serverId != d.server)) return
         val target = d.positionMs + min(away, BUFFER_GUESS_MS)
         val duration = (q.current?.durationSec ?: 0) * 1000L
         Log.i(TAG, "Riprendo dopo ${away / 1000} s senza rete")

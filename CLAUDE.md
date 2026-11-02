@@ -522,7 +522,10 @@ di Xonos suona dal server sul telefono; la release ridotta con R8, da capo come 
     `list-modules`). Il modulo e le sue `libcli.so`/`libprotocol-cli.so` sono nel sistema Linux (`rootfs.py`).
     Provato in locale col PulseAudio 16.1 del pacchetto in un chroot (`scratchpad`, non nel repository): 0,8 ms per
     brano invece di 31 ms con `pactl` (senza proot), errori veri riconosciuti, la connessione si riapre. In CI la
-    prova `pulse-comandi` dell'autotest fa lo stesso col codice di MA, col socket e con `pactl` in proot. Nel registro,
+    prova `pulse-comandi` dell'autotest fa lo stesso col codice di MA: sull'emulatore 5 ms per brano col socket, 134 ms
+    con `pactl` in proot (12 prove su 12). `audio-nel-tubo` ora legge 55 MB in 4 s invece di 0,5 MB: la prova legge
+    il tubo senza freni e PulseAudio rende al ritmo di chi legge; in locale socket e pactl danno lo stesso tubo, e
+    `cpu-audio` (letto a 1,1 volte il tempo reale, come MA) è uguale a prima. Nel registro,
     a ogni brano: «Soloist: avvio in N s (PulseAudio, processo, collegato e dentro Spotify, il brano suona, posizione e
     tubo)», «primo audio N s dopo l'avvio», «fermato in N s»: dal registro della persona si vede cosa resta lento.
     Non toccati: il buffer di MA (1–2 s, scelto da loro con prove d'ascolto) e `SkipSender` (400 ms per raccogliere i

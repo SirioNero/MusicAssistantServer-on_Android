@@ -55,7 +55,8 @@ interface MenuLabels {
  * - `top|<artista>` e `tracks|<artista o genere>` sono i suoi brani: si aprono, o si suonano tutti;
  * - `play|<uri>` si suona da solo;
  * - `in|<album o playlist>|<brano>` suona l'album o la playlist a partire da quel brano;
- * - `list|<cartella>|<n>` suona i brani di una cartella a partire dall'n-esimo.
+ * - `list|<cartella>|<n>` suona i brani di una cartella a partire dall'n-esimo;
+ * - `part|<k>|<cartella>` è il k-esimo pezzo (da [PART] voci) di un elenco troppo lungo per l'auto.
  */
 class Menu(
     private val library: Library,
@@ -113,6 +114,7 @@ class Menu(
         parentId.startsWith("find|") -> entries(parentId, found(parentId))
         parentId.startsWith("open|") -> open(parentId)
         parentId.startsWith("top|") || parentId.startsWith("tracks|") -> entries(parentId, tracksOf(parentId))
+        parentId.startsWith("part|") -> part(parentId)
         else -> emptyList()
     }
 
@@ -321,7 +323,38 @@ class Menu(
     private fun entries(parentId: String, list: List<MaItem>, contextUri: String? = null): List<MenuNode> {
         lists.put(parentId, list)
         list.forEach { items.put(it.uri, it) }
-        return list.mapIndexedNotNull { index, item ->
+        // Media3 taglia l'elenco che manda all'auto a 256 KB (truncateListBySize, per i browser come Gearslip): oltre
+        // qualche centinaio di voci il resto spariva senza dirlo. Un elenco lungo diventa cartelle da [PART] voci.
+        if (list.size > PART) {
+            return list.indices.step(PART).mapIndexed { k, start ->
+                val end = minOf(start + PART, list.size)
+                folder("part|$k|$parentId", "${start + 1}–$end", list[start].name, "browse")
+            }.onEach { known.put(it.id, it) }
+        }
+        return entryNodes(parentId, list, 0, contextUri)
+    }
+
+    /** Il pezzo di un elenco lungo: le voci hanno gli stessi identificativi che avrebbero nell'elenco intero. */
+    private suspend fun part(id: String): List<MenuNode> {
+        val rest = id.removePrefix("part|")
+        val k = rest.substringBefore('|').toIntOrNull() ?: return emptyList()
+        val parent = rest.substringAfter('|')
+        val list = lists.get(parent) ?: run {
+            children(parent)
+            lists.get(parent)
+        } ?: return emptyList()
+        val start = k * PART
+        if (start >= list.size) return emptyList()
+        // Dentro un album o una playlist un brano suona tutto da lì, come nell'elenco intero.
+        val context = parent.removePrefix("open|").takeIf { parent.startsWith("open|") }?.takeIf { uri ->
+            items.get(uri)?.mediaType.let { it == "album" || it == "playlist" }
+        }
+        return entryNodes(parent, list.subList(start, minOf(start + PART, list.size)), start, context)
+    }
+
+    private fun entryNodes(parentId: String, list: List<MaItem>, first: Int, contextUri: String?): List<MenuNode> {
+        return list.mapIndexedNotNull { offset, item ->
+            val index = first + offset
             when {
                 item.mediaType == "folder" -> {
                     val path = item.path ?: return@mapIndexedNotNull null
@@ -358,6 +391,12 @@ class Menu(
 
         /** Oltre questi elementi una voce della libreria si divide per iniziale. */
         private const val INITIALS_FROM = 150
+
+        /**
+         * Le voci di un pezzo di elenco ([entries]): con copertina, titolo e sottotitolo una voce pesa meno di 1 KB, e
+         * 150 stanno sotto i 256 KB che Media3 lascia passare verso l'auto.
+         */
+        const val PART = 150
 
         /** Tra quanti primi risultati di un tipo si sceglie il migliore. */
         private const val PICK_FROM = 5

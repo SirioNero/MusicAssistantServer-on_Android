@@ -442,7 +442,7 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
         run_d = backend._run
         first_e, values, _ = await take(e, "e", seconds=1.0)
         check("da capo dopo un salto rifiutato", backend._run is not run_d and values == {mark(e)}, values)
-        check("salto rifiutato contato", backend._xonos_jump_failures == 1, backend._xonos_jump_failures)
+        check("salto rifiutato contato", backend._xonos_failures["salto"] == 1, backend._xonos_failures)
     except Exception as err:  # noqa: BLE001 - nel risultato, con le ultime righe del motore
         failed.append(repr(err))
     finally:

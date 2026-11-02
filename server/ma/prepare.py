@@ -1111,8 +1111,8 @@ def _soloist_live(root: Path) -> None:
     Sul telefono, attraverso proot, sono secondi a ogni play, salto e ripresa. Qui, quando lo stream di un brano
     finisce prima della fine del brano (salto, pausa, un altro brano), Soloist va in pausa col sink sospeso e resta
     acceso per _XONOS_PARK_S; al brano dopo si riusa: lo stesso brano riprende (resume e seek), un altro parte con
-    play(uri). Se non si può o non va, si riparte da capo come prima; dopo _XONOS_JUMP_TRIES salti falliti di fila
-    i salti non si provano più. Si appoggia a cose che Music Assistant usa già: una pausa a metà brano non chiude
+    play(uri). Se non si può o non va, si riparte da capo come prima; dopo _XONOS_TRIES salti (o riprese) falliti
+    di fila non si provano più. Si appoggia a cose che Music Assistant usa già: una pausa a metà brano non chiude
     Soloist, il seek su Soloist acceso (_cold_seek) e play(uri) su Soloist acceso (il suo Spotify Connect).
     Provato in CI con un finto Soloist (xonos_fake_soloist.py, prova soloist-sessione dell'autotest).
     """
@@ -1128,9 +1128,9 @@ def _soloist_live(root: Path) -> None:
         backend,
         "        self._run_lock = asyncio.Lock()\n",
         "        self._run_lock = asyncio.Lock()\n"
-        "        # Xonos: il timer del Soloist in pausa (_xonos_arm_park) e i salti falliti di fila (_xonos_reuse)\n"
+        "        # Xonos: il timer del Soloist in pausa (_xonos_arm_park) e i salti e le riprese falliti di fila (_xonos_reuse)\n"
         "        self._xonos_park_task: asyncio.Task[None] | None = None\n"
-        "        self._xonos_jump_failures = 0\n",
+        "        self._xonos_failures = {\"salto\": 0, \"ripresa\": 0}\n",
     )
     _replace(
         backend,
@@ -1237,8 +1237,9 @@ def _soloist_live(root: Path) -> None:
 # Xonos: le costanti della sessione che resta accesa (_soloist_live).
 LIVE_CONSTANTS = '''# Xonos: quanto resta acceso e in pausa Soloist senza brani, pronto per il prossimo (SoloistBackend._xonos_release)
 _XONOS_PARK_S: Final[float] = 600.0
-# Xonos: salti falliti di fila dopo cui non si provano più (questo Soloist non li accetterebbe)
-_XONOS_JUMP_TRIES: Final[int] = 2
+# Xonos: salti (o riprese) falliti di fila dopo cui non si provano più: questo Soloist non li accetterebbe, e ognuno
+# costa l'attesa (_JUMP_TIMEOUT_S) prima di ripartire da capo
+_XONOS_TRIES: Final[int] = 2
 # Xonos: quanto si aspetta la conferma di un comando a Soloist, e la pausa che chiude la lettura del tubo
 _XONOS_COMMAND_S: Final[float] = 5.0
 _XONOS_DRAIN_S: Final[float] = 0.05
@@ -1278,28 +1279,26 @@ LIVE_BACKEND_METHODS = '''    async def _xonos_release(self, run: _SingleTrackRu
         Xonos: il Soloist in pausa suona il brano chiesto, senza un processo nuovo né un altro accesso a Spotify.
 
         Lo stesso brano è una ripresa (alla posizione chiesta), un altro è un salto. Falso se non si può o non va:
-        allora si riparte da capo, come prima. Dopo _XONOS_JUMP_TRIES salti falliti di fila non si provano più.
+        allora si riparte da capo, come prima. Dopo _XONOS_TRIES salti (o riprese) falliti di fila non si provano più.
         """
         same = spotify_uri == run.spotify_uri
-        if not same and self._xonos_jump_failures >= _XONOS_JUMP_TRIES:
+        what = "ripresa" if same else "salto"
+        if self._xonos_failures[what] >= _XONOS_TRIES:
             return False
         if not run.xonos_reusable(streamdetails):
             return False
-        what = "ripresa" if same else "salto"
         started = time.monotonic()
         try:
             await run.xonos_switch(spotify_uri, seek_position * 1000, streamdetails)
         except Exception as err:  # noqa: BLE001 - si riparte da capo, come prima
-            if not same:
-                self._xonos_jump_failures += 1
-                if self._xonos_jump_failures >= _XONOS_JUMP_TRIES:
-                    self.logger.warning(
-                        "Soloist: i salti sulla sessione accesa non riescono, d'ora in poi un brano nuovo riparte da capo"
-                    )
+            self._xonos_failures[what] += 1
+            if self._xonos_failures[what] >= _XONOS_TRIES:
+                self.logger.warning(
+                    "Soloist: %s sulla sessione accesa non riesce, d'ora in poi si riparte da capo", what
+                )
             self.logger.info("Soloist: %s sulla sessione accesa non riuscito (%s), riparte da capo", what, err)
             return False
-        if not same:
-            self._xonos_jump_failures = 0
+        self._xonos_failures[what] = 0
         self.logger.info("Soloist: %s sulla sessione accesa in %.2f s", what, time.monotonic() - started)
         return True
 

@@ -185,14 +185,16 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
         val last = ArrayDeque<String>()
         runCatching {
             running.inputStream.bufferedReader().forEachLine { line ->
+                // Con i startsWith anche una riga a cui si è attaccata una riga del registro (pacchetti fino al 2.10.8-5,
+                // che scrivevano testo e a capo in due volte): "XONOS_STATE running2026-11-01 ...".
                 if (line.startsWith(MULTICAST_PREFIX)) {
-                    multicast(line.removePrefix(MULTICAST_PREFIX).trim() == "on")
+                    multicast(line.removePrefix(MULTICAST_PREFIX).trim().startsWith("on"))
                 } else if (line.startsWith(STATE_PREFIX)) {
                     val said = line.removePrefix(STATE_PREFIX).trim()
                     when {
-                        said == "running" -> state = State.RUNNING
-                        said == "starting" -> state = State.STARTING
-                        said == "stopped" -> state = State.STOPPED
+                        said.startsWith("running") -> state = State.RUNNING
+                        said.startsWith("starting") -> state = State.STARTING
+                        said.startsWith("stopped") -> state = State.STOPPED
                         said.startsWith("failed") -> {
                             error = said.removePrefix("failed").trim()
                             state = State.FAILED

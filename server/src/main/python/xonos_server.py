@@ -117,7 +117,17 @@ def stop(timeout: float = 15.0) -> None:
 
 
 def _say(what: str) -> None:
-    print(f"{STATE_PREFIX} {what}", flush=True)
+    _line(f"{STATE_PREFIX} {what}")
+
+
+def _line(text: str) -> None:
+    """
+    Una riga per Xonos con una write sola, che in un tubo (sotto i 4096 byte) è atomica. Con print() il testo e l'a
+    capo erano due write, e una riga del registro di Music Assistant, scritta da un altro thread nello stesso tubo,
+    poteva finire in mezzo: "XONOS_STATE running2026-11-01 ...", e Xonos non vedeva mai che il server era partito.
+    """
+    sys.stdout.write(text.replace("\r", " ").replace("\n", " ") + "\n")
+    sys.stdout.flush()
 
 
 def _tools_through_linker() -> None:
@@ -455,7 +465,7 @@ def _rootfs(package: Path) -> Path | None:
 
 
 def _say_multicast(on: bool) -> None:
-    print(f"{MULTICAST_PREFIX} {'on' if on else 'off'}", flush=True)
+    _line(f"{MULTICAST_PREFIX} {'on' if on else 'off'}")
 
 
 def _multicast_off_at_exit(pid: int) -> None:

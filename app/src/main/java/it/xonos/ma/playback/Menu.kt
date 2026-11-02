@@ -8,6 +8,9 @@ import it.xonos.ma.data.MaItem
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import java.text.Normalizer
+import it.xonos.ma.data.MaException
+import it.xonos.ma.data.Problem
+import kotlinx.coroutines.CancellationException
 
 /** Una voce del menu dell'auto, prima che [BrowseTree] la trasformi in un MediaItem. */
 data class MenuNode(
@@ -200,8 +203,17 @@ class Menu(
     }
 
     private suspend fun count(category: Category, kind: String): Int = when (category) {
-        // Music Assistant conta anche i generi senza musica, e prima della 2.10 non li ha.
-        Category.GENRES -> runCatching { if (library.hasGenres()) 1 else 0 }.getOrDefault(0)
+        // Music Assistant conta anche i generi senza musica, e prima della 2.10 non li ha (rifiuta il comando). Senza
+        // collegamento non si sa: la cartella resta, come le altre, invece di sparire dalla radice che l'auto tiene.
+        Category.GENRES -> try {
+            if (library.hasGenres()) 1 else 0
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: MaException) {
+            if (e.problem == Problem.REFUSED) 0 else -1
+        } catch (e: Exception) {
+            -1
+        }
         else -> runCatching { library.count(kind, category.favoriteOnly) }.getOrDefault(-1)
     }
 

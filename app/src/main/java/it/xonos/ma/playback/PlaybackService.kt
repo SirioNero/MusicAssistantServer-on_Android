@@ -43,6 +43,7 @@ import it.xonos.ma.wrap
 import it.xonos.ma.BuildConfig
 import it.xonos.ma.R
 import it.xonos.ma.data.Connection
+import it.xonos.ma.data.Problem
 import it.xonos.ma.data.MaException
 import it.xonos.ma.phone.MainActivity
 import it.xonos.ma.phone.model.PhoneServerControl
@@ -256,8 +257,14 @@ class PlaybackService : MediaLibraryService() {
      * invece di rispondere con cartelle in errore e voci vuote che l'auto poi non richiede.
      */
     private suspend fun awaitConnected() {
-        // Senza un Music Assistant scelto non c'è niente da aspettare.
-        if (app.repo.connection.value == Connection.NotConfigured) return
+        val now = app.repo.connection.value
+        // Niente da aspettare: senza un Music Assistant scelto, con un problema che non passa da solo (token, versione,
+        // indirizzo), col server sul telefono da aggiornare o fermo, o dopo un'attesa già andata a vuoto (ogni cartella
+        // aspetterebbe altri 20 s; quando arriva, browsedOffline torna falso).
+        if (now == Connection.NotConfigured || now is Connection.Connected || browsedOffline) return
+        if (now is Connection.Failed && now.problem in LASTING) return
+        val server = app.phoneServer
+        if (server != null && onPhoneServer && (!server.installed || server.state == PhoneServerControl.State.FAILED)) return
         val ok = withTimeoutOrNull(BROWSE_WAIT_MS) { app.repo.connection.first { it is Connection.Connected } } != null
         if (!ok) browsedOffline = true
     }
@@ -287,7 +294,12 @@ class PlaybackService : MediaLibraryService() {
     private fun updateLocks() {
         when {
             outputting -> acquireLocks()
-            player.playWhenReady -> acquireCpu(PREPARE_LOCK_MS)
+            player.playWhenReady -> {
+                // Solo il processore, al massimo 2 minuti: il Wi-Fi a piena potenza serve mentre l'audio esce (prima
+                // restava tenuto senza limite anche con Music Assistant sparito e la coda vecchia "in riproduzione").
+                wifiLock?.takeIf { it.isHeld }?.release()
+                acquireCpu(PREPARE_LOCK_MS)
+            }
             else -> releaseLocks()
         }
     }
@@ -486,7 +498,8 @@ class PlaybackService : MediaLibraryService() {
             pageSize: Int,
             params: LibraryParams?,
         ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> = scope.future {
-            awaitConnected()
+            // onSearch ha già aspettato e messo i risultati.
+            if (searches[query] == null) awaitConnected()
             try {
                 val results = searches[query] ?: tree.search(query)
                 LibraryResult.ofItemList(results.page(page, pageSize), params)
@@ -566,6 +579,16 @@ class PlaybackService : MediaLibraryService() {
 
         /** Quanto aspetta il menu dell'auto che Xonos si colleghi a Music Assistant (vedi [awaitConnected]). */
         const val BROWSE_WAIT_MS = 20_000L
+
+        /** I problemi di connessione che non passano da soli: il menu dell'auto non li aspetta. */
+        val LASTING = setOf(
+            Problem.BAD_TOKEN,
+            Problem.TOO_OLD,
+            Problem.DENIED,
+            Problem.NOT_MUSIC_ASSISTANT,
+            Problem.SETUP_REQUIRED,
+            Problem.BAD_ADDRESS,
+        )
         const val QUEUE_WAIT_MS = 10_000L
         const val QUEUE_POLL_MS = 200L
 

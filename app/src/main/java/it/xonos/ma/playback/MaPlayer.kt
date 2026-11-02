@@ -103,9 +103,12 @@ class MaPlayer(
     private val windowExpectations = mutableListOf<WindowExpectation>()
 
     /** Quando la rete cade a metà di un brano: per riprendere lì appena torna. */
-    private class Drop(val index: Int, val positionMs: Long, val at: Long)
+    private class Drop(val index: Int, val positionMs: Long, val at: Long, val server: String?)
     private var drop: Drop? = null
     private var lastPlayingAt = 0L
+
+    /** Quando si è staccata l'ultima uscita esterna (Bluetooth, cuffie): vedi [forgetDrop]. */
+    private var outputGoneAt = Long.MIN_VALUE
 
     private class Expectation(val test: (QueueState?) -> Boolean, val future: SettableFuture<Void?>)
     private val expectations = mutableListOf<Expectation>()
@@ -371,7 +374,7 @@ class MaPlayer(
         val q = queue ?: return
         val now = SystemClock.elapsedRealtime()
         val index = q.currentIndex ?: return
-        if (q.playing || now - lastPlayingAt < RECENT_PLAY_MS) drop = Drop(index, currentPositionMs(), now)
+        if (q.playing || now - lastPlayingAt < RECENT_PLAY_MS) drop = Drop(index, currentPositionMs(), now, repo.baseUrl)
     }
 
     /**
@@ -384,6 +387,9 @@ class MaPlayer(
         val q = queue ?: return
         val away = SystemClock.elapsedRealtime() - d.at
         if (away > RESUME_WINDOW_MS || q.playing || q.currentIndex != d.index) return
+        // Un'uscita esterna si è staccata dopo l'ultima volta che si suonava (anche prima che Xonos vedesse il calo,
+        // che col ping arriva 20-40 s dopo): la musica uscirebbe dall'altoparlante. E un altro server non è il calo.
+        if (outputGoneAt > lastPlayingAt || (d.server != null && repo.baseUrl != d.server)) return
         val target = d.positionMs + min(away, BUFFER_GUESS_MS)
         val duration = (q.current?.durationSec ?: 0) * 1000L
         Log.i(TAG, "Riprendo dopo ${away / 1000} s senza rete")
@@ -415,6 +421,9 @@ class MaPlayer(
     /** Pausa toccata mentre Music Assistant preparava una scelta: si mette appena la musica parte. */
     private var pauseAfterChoice = false
 
+    /** Il play mandato a Music Assistant finché la musica non parte (con Soloist circa 7 s). */
+    private var pendingPlay: ListenableFuture<*>? = null
+
     override fun handleSetPlayWhenReady(playWhenReady: Boolean): ListenableFuture<*> {
         if (choosing > 0) {
             // Dall'auto arrivano insieme la scelta e "play": il play_media della scelta fa già partire la musica, e
@@ -422,10 +431,36 @@ class MaPlayer(
             pauseAfterChoice = !playWhenReady
             return Futures.immediateVoidFuture()
         }
+        val pending = pendingPlay?.takeUnless { it.isDone }
+        if (pending != null) {
+            // Un secondo play (cuffie, auto) mentre la musica parte: per Music Assistant sarebbe un resume, che con la
+            // coda già in partenza fa ripartire il brano da capo. Niente di nuovo.
+            if (playWhenReady) return pending
+            // Una pausa adesso: "pause" arriverebbe prima dell'avvio e Music Assistant lo ignorerebbe (la musica
+            // partirebbe lo stesso); "stop" aspetta che l'avvio finisca e poi ferma.
+            pendingPlay = null
+            return command("player_queues/stop") { it?.playing != true }
+        }
         val q = queue ?: return Futures.immediateVoidFuture()
         if (q.playing == playWhenReady) return Futures.immediateVoidFuture()
-        return command(if (playWhenReady) "player_queues/play" else "player_queues/pause") { it?.playing == playWhenReady }
+        val future = command(if (playWhenReady) "player_queues/play" else "player_queues/pause") { it?.playing == playWhenReady }
+        if (playWhenReady) pendingPlay = future
+        return future
     }
+
+    /**
+     * Mentre un play aspetta Music Assistant, chi guarda (auto, notifica, telefono) vede la rotella: il segnaposto
+     * di Media3 cambierebbe solo playWhenReady, cioè "sta suonando" senza suono.
+     */
+    override fun getPlaceholderState(suggestedPlaceholderState: State): State =
+        if (suggestedPlaceholderState.playWhenReady &&
+            suggestedPlaceholderState.playbackState == Player.STATE_READY &&
+            queue?.playing != true
+        ) {
+            suggestedPlaceholderState.buildUpon().setPlaybackState(Player.STATE_BUFFERING).build()
+        } else {
+            suggestedPlaceholderState
+        }
 
     override fun handlePrepare(): ListenableFuture<*> {
         // Solo se il collegamento è fallito: mentre si collega, ricominciare da capo a ogni play (Media3 chiama
@@ -616,6 +651,7 @@ class MaPlayer(
     fun forgetDrop() {
         if (drop != null) Log.i(TAG, "Uscita audio staccata: dopo il calo di rete non riprendo da solo")
         drop = null
+        outputGoneAt = SystemClock.elapsedRealtime()
     }
 
     /** Lo stesso play o pausa, ma deciso dal telefono (chiamata in arrivo, cuffie staccate). */
@@ -665,7 +701,8 @@ class MaPlayer(
         val future = SettableFuture.create<Void?>()
         val expectation = Expectation(until, future)
         expectations += expectation
-        handler.postDelayed({ if (expectations.remove(expectation)) future.set(null) }, EXPECT_TIMEOUT_MS)
+        // Un limite in ogni caso, se la risposta non arriva mai.
+        handler.postDelayed({ if (expectations.remove(expectation)) future.set(null) }, COMMAND_CAP_MS)
         scope.launch {
             try {
                 unlock.retrying(queueId) {
@@ -675,6 +712,10 @@ class MaPlayer(
                     }
                 }
                 checkExpectations()
+                // Il tempo per vedere l'effetto conta dalla risposta: player_queues/play risponde solo quando la musica
+                // parte (con Soloist circa 7 s). Contato dall'invio, dopo 3 s l'auto e il telefono tornavano a "play"
+                // mentre la musica stava ancora partendo, e un secondo tocco la faceva ripartire da capo.
+                handler.postDelayed({ if (expectations.remove(expectation)) future.set(null) }, EXPECT_TIMEOUT_MS)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -714,6 +755,7 @@ class MaPlayer(
         private const val POSITION_TOLERANCE_MS = 1_500L
         private const val WINDOW_DEBOUNCE_MS = 150L
         private const val EXPECT_TIMEOUT_MS = 3_000L
+        private const val COMMAND_CAP_MS = 60_000L
 
         private const val PLAY_SETTLE_MS = 4_000L
         private const val READY_TIMEOUT_MS = 20_000L

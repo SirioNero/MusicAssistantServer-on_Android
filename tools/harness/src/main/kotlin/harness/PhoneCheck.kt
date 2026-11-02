@@ -17,6 +17,7 @@ import it.xonos.ma.phone.model.LibraryPage
 import it.xonos.ma.phone.model.ListPage
 import it.xonos.ma.phone.model.Load
 import it.xonos.ma.phone.model.ORDER_ADDED
+import it.xonos.ma.phone.model.FoundServer
 import it.xonos.ma.phone.model.PhoneModel
 import it.xonos.ma.phone.model.SearchPage
 import it.xonos.ma.phone.model.SettingsPage
@@ -345,6 +346,18 @@ fun main(): Unit = runBlocking {
     settingsPage.remote = ""
     model.save(settingsPage)
     withTimeout(15_000) { repo.connection.first { it is Connection.Connected } }
+
+    // ---------- Un server trovato in rete: il token di quello salvato non gli si manda ----------
+    val chooser = model.settingsPage()
+    val savedUrl = settings.load().homeUrl
+    model.choose(chooser, FoundServer("altro", "Altro", "2.10.8", "http://192.0.2.77:8095", null))
+    check(
+        "Server trovato: un altro non riceve il token",
+        chooser.token.isEmpty() && chooser.signedIn == null && chooser.remote.isEmpty() && chooser.home == "http://192.0.2.77:8095",
+    )
+    val same = model.settingsPage()
+    model.choose(same, FoundServer("stesso", "Stesso", "2.10.8", "$savedUrl/", null))
+    check("Server trovato: lo stesso tiene il token", same.token == settings.load().token && same.token.isNotEmpty())
 
     // ---------- Accesso con nome utente e password ----------
     val login = model.settingsPage()

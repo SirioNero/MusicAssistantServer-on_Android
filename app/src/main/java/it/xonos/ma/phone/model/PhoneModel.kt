@@ -186,8 +186,19 @@ class PhoneModel(
 
     /** Un server trovato nella rete: i suoi indirizzi vanno nel modulo. */
     fun choose(page: SettingsPage, server: FoundServer) {
+        val saved = settings.load().urls.map { Settings.normalizeUrl(it) }
+        if (Settings.normalizeUrl(server.url) !in saved) {
+            // Un altro server: il token (e l'accesso) di quello salvato non gli vanno mandati. Qualsiasi apparecchio
+            // della rete può annunciarsi come Music Assistant, e il token (spesso di un amministratore) viaggerebbe
+            // in chiaro. Anche l'indirizzo remoto era di quell'altro.
+            page.token = ""
+            page.signedIn = null
+            page.useToken = false
+            page.remote = server.remoteUrl.orEmpty()
+        } else {
+            server.remoteUrl?.let { page.remote = it }
+        }
         page.home = server.url
-        server.remoteUrl?.let { page.remote = it }
         page.setupNeeded = false
     }
 

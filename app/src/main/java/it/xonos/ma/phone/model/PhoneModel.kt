@@ -1336,6 +1336,10 @@ class PhoneModel(
     private fun forgetServer(settings: SettingsPage) {
         remote?.stop()
         remote = null
+        // Anche i testi (per uri, che tra due server può essere lo stesso) e gli elenchi aperti di casse e playlist.
+        lyrics.clear()
+        picker = null
+        playlistPicker = null
         for ((t, stack) in stacks) {
             val keep = settings.takeIf { t == tab && it in stack }
             stack.clear()

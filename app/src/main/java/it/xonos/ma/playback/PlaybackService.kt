@@ -152,7 +152,11 @@ class PlaybackService : MediaLibraryService() {
         }
         scope.launch { engine.outputting.collect(::onOutputting) }
         player.addListener(object : Player.Listener {
-            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) = updateLocks()
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                // Di nuovo play (dalla persona o da Music Assistant): il silenzio dopo lo stacco dell'uscita finisce.
+                if (playWhenReady) engine.unsilence()
+                updateLocks()
+            }
         })
         connectivity.registerDefaultNetworkCallback(networkCallback)
         getSystemService(AudioManager::class.java).registerAudioDeviceCallback(outputs, main)
@@ -341,7 +345,11 @@ class PlaybackService : MediaLibraryService() {
     /** Il Bluetooth dell'auto si stacca: la musica si ferma invece di passare all'altoparlante del telefono. */
     private val noisy = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            if (intent.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY) player.pauseFromSystem()
+            if (intent.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY) {
+                // Si è staccata l'uscita in uso: zitti subito, anche se la pausa non arriva a Music Assistant.
+                engine.silence()
+                player.pauseFromSystem()
+            }
         }
     }
 

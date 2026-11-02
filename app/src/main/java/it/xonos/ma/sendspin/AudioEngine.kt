@@ -149,6 +149,9 @@ class AudioEngine(
     @Volatile private var released = false
     @Volatile private var gain = 1f
     @Volatile private var duck = 1f
+
+    // Zitto dopo lo stacco dell'uscita in uso (vedi [silence]), fino al prossimo play o al prossimo stream.
+    @Volatile private var silenced = false
     private var thread: Thread? = null
 
     // Lo stato del protocollo, visto dal thread della rete.
@@ -189,7 +192,10 @@ class AudioEngine(
     /** Inizia uno stream, o ne cambia il formato senza interromperlo. */
     fun startStream(format: StreamFormat) {
         val fresh = !streamOpen || freshNeeded
-        if (fresh) interrupt()
+        if (fresh) {
+            interrupt()
+            unsilence()
+        }
         streamOpen = true
         freshNeeded = false
         post(Start(format, fresh))
@@ -235,6 +241,22 @@ class AudioEngine(
         applyGain()
     }
 
+    /**
+     * Si è staccata l'uscita in uso (Bluetooth, cuffie): l'audio già ricevuto non deve uscire dall'altoparlante.
+     * Di solito la pausa arriva subito a Music Assistant, ma senza rete (l'auto spenta in garage) il buffer ne ha fino
+     * a 30 s. Torna su con il prossimo play ([unsilence]) o con lo stream di un brano nuovo.
+     */
+    fun silence() {
+        silenced = true
+        applyGain()
+    }
+
+    fun unsilence() {
+        if (!silenced) return
+        silenced = false
+        applyGain()
+    }
+
     fun release() {
         released = true
         interrupt()
@@ -245,8 +267,10 @@ class AudioEngine(
     }
 
     private fun applyGain() {
-        synchronized(outputLock) { output?.setGain(gain * duck) }
+        synchronized(outputLock) { output?.setGain(currentGain()) }
     }
+
+    private fun currentGain(): Float = if (silenced) 0f else gain * duck
 
     private fun interrupt() {
         generation++
@@ -369,7 +393,7 @@ class AudioEngine(
         val created = outputs(format.sampleRate, format.channels) ?: return null
         synchronized(outputLock) {
             output = created
-            created.setGain(gain * duck)
+            created.setGain(currentGain())
         }
         framesWritten = 0
         smoothedErrorUs = 0.0

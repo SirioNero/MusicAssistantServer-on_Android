@@ -46,7 +46,19 @@ fun main(): Unit = runBlocking {
     val busy = MaException("Spotify [Francesco] is already playing something else", key = "soloist_session_busy", args = listOf("Spotify [Francesco]"))
     check("Riconosce soloist_session_busy", SoloistUnlock.busy(busy))
     check("Riconosce il testo inglese", SoloistUnlock.busy(MaException("Spotify is already playing something else. Spotify Soloist plays one thing at a time, so stop the other player first.")))
+    // Music Assistant 2.10 manda gli errori già tradotti, senza translation_key: i testi delle sue traduzioni e di
+    // quella italiana del server sul telefono (server/ma/ma-strings.json), con {0} = il nome del servizio.
+    val translated = mapOf(
+        "it" to "Spotify sta già suonando qualcos'altro. Spotify Soloist suona una cosa alla volta: ferma prima l'altro lettore.",
+        "de" to "Spotify spielt bereits etwas anderes ab. Spotify Soloist spielt jeweils nur einen Titel ab. Beende daher zunächst das andere Wiedergabegerät.",
+        "es" to "Spotify ya está reproduciendo otra cosa. Spotify Soloist solo puede reproducir una cosa a la vez, así que detén primero el otro reproductor.",
+        "nl" to "Spotify speelt al iets anders af. Spotify Soloist speelt slechts één stream tegelijk af, dus stop eerst de andere speler.",
+        "ru" to "Spotify уже воспроизводит что-то другое. Spotify Soloist воспроизводит только один трек за раз, поэтому сначала остановите другой плеер.",
+        "sr" to "Spotify već reprodukuje nešto drugo. Spotify Soloist reprodukuje samo jednu stvar istovremeno, pa prvo zaustavite drugi plejer.",
+    )
+    for ((lang, text) in translated) check("Riconosce il testo tradotto ($lang)", SoloistUnlock.busy(MaException(text)))
     check("Non scambia altri errori", !SoloistUnlock.busy(MaException("No playable items found")) && !SoloistUnlock.busy(IllegalStateException("x")))
+    check("Non scambia altri errori di Soloist", !SoloistUnlock.busy(MaException("The Spotify Soloist daemon could not be stopped")))
 
     // 2. Un lettore suona davvero un brano dei file.
     val engine = AudioEngine({ r, c -> FakeOutput(r, c) }, { f -> PcmDecoder(f.channels, f.bitDepth) }, TimeFilter())

@@ -225,6 +225,25 @@ private fun checks(): Unit = runBlocking {
     delay(1_000)
     check("Modello: «Interrompi» chiude il flusso anche in Music Assistant", model.page === page && runCatching { services.current(halfId) }.isFailure, "${model.page}")
 
+    // Finito mentre si chiede se lasciarlo: la domanda si chiude, e "Interrompi" toccato proprio allora esce come dalla fine.
+    model.services.add(kind)
+    val racing = model.page as FlowPage
+    model.start(racing)
+    until { racing.step.value?.type == "form" }
+    racing.values["account"] = "prova"
+    racing.values["secret"] = "x"
+    model.services.submit(racing)
+    until { racing.step.value?.type == "external" }
+    model.back()
+    check("Modello: un altro flusso a metà, chiede", racing.confirmLeave)
+    browser.newCall(Request.Builder().url(racing.step.value!!.url!!).build()).execute().close()
+    until { racing.step.value?.type == "finish" }
+    check("Modello: finito mentre si chiedeva, la domanda si chiude", !racing.confirmLeave && racing.step.value?.type == "finish", "${racing.step.value?.type}")
+    val raced = racing.step.value?.instanceId
+    model.leaveFlow(racing)
+    check("Modello: «Interrompi» su un flusso appena finito esce come dalla fine", model.page === page, "${model.page}")
+    if (raced != null) services.remove(raced)
+
     // Tornati dal browser con l'evento perso (la connessione era chiusa): il flusso è già finito.
     model.services.add(kind)
     val lost = model.page as FlowPage

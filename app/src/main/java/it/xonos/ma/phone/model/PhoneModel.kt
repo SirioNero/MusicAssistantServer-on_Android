@@ -166,6 +166,8 @@ class PhoneModel(
     /** Confermato: si lascia il flusso a metà, come con indietro (Music Assistant lo chiude). */
     fun leaveFlow(page: FlowPage) {
         page.confirmLeave = false
+        // Finito proprio adesso (il servizio c'è già): si esce come dalla sua fine, con l'elenco ricaricato.
+        if (page.step.value?.done == true) return services.close(page)
         val stack = stacks.getValue(tab)
         if (stack.size > 1 && stack.last() === page) removed(stack.removeAt(stack.lastIndex))
     }

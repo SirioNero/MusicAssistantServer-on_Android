@@ -142,7 +142,7 @@ MA_STRINGS = Path(__file__).with_name("ma-strings.json")
 
 
 def _fingerprint(version: str) -> str:
-    changed = f"{Path(__file__).stat().st_mtime_ns} {STRINGS.stat().st_mtime_ns}"
+    changed = f"{Path(__file__).stat().st_mtime_ns} {STRINGS.stat().st_mtime_ns} {MA_STRINGS.stat().st_mtime_ns}"
     return f"{version} {' '.join(PROVIDERS + LIBRARIES)} {changed}"
 
 

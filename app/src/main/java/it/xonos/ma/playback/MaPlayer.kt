@@ -450,6 +450,8 @@ class MaPlayer(
             // Dall'auto arrivano insieme la scelta e "play": il play_media della scelta fa già partire la musica, e
             // un player_queues/play adesso (la coda non è in pausa) la farebbe ripartire da capo (Soloist: 7 s).
             pauseAfterChoice = !playWhenReady
+            // Dopo una pausa voluta la stessa voce toccata di nuovo deve suonare: non si aspetta la scelta di prima.
+            if (!playWhenReady) lastChoice = null
             return Futures.immediateVoidFuture()
         }
         if (!playWhenReady) {
@@ -505,6 +507,8 @@ class MaPlayer(
         // Uno stop voluto: dopo un calo di rete non si riprende da soli.
         drop = null
         lastPlayingAt = 0L
+        // e la stessa voce toccata dopo deve ripartire, non aspettare la scelta di prima (che poi si ferma)
+        lastChoice = null
         return command("player_queues/stop") { it?.playing != true }
     }
 
@@ -594,9 +598,11 @@ class MaPlayer(
         if (item == null || request == null) return Futures.immediateVoidFuture()
         // La stessa voce toccata di nuovo mentre Music Assistant la prepara (con Soloist circa 7 s, senza niente che
         // si muova sullo schermo dell'auto): un secondo play_media rifarebbe tutto da capo. Si aspetta il primo.
-        lastChoice?.let { (id, waiting) -> if (id == item.mediaId && !waiting.isDone) return waiting }
+        // Le ricerche a voce hanno tutte l'id vuoto: per loro conta la frase detta.
+        val choice = item.mediaId.ifEmpty { item.requestMetadata.searchQuery?.let { "search|$it" }.orEmpty() }
+        lastChoice?.let { (id, waiting) -> if (choice.isNotEmpty() && id == choice && !waiting.isDone) return waiting }
         val done = SettableFuture.create<Void?>()
-        lastChoice = item.mediaId to done
+        lastChoice = choice to done
         val before = queue
         choosing++
         pauseAfterChoice = false

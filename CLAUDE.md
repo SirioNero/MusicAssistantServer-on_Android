@@ -257,8 +257,12 @@ prima di cominciare: le cose scritte qui sono già state verificate, non vanno r
   un'esecuzione sola per volta (`SoloistBackend._acquire_run`); se ne è in corso una per un altro brano, ogni
   play riceve `soloist_session_busy` ("… is already playing something else. Spotify Soloist plays one thing at a
   time, so stop the other player first"), con `translation_args` il nome del servizio. Un flusso che nessuno
-  ritira (il telefono scollegato a metà brano) tiene l'esecuzione finché il servizio non si ricarica. Gli errori
-  di MA portano `translation_key` e `translation_args` (in `MaException.key`/`args`). `SoloistUnlock`: se nessun
+  ritira (il telefono scollegato a metà brano) tiene l'esecuzione finché il servizio non si ricarica. Attraverso
+  `/ws` gli errori di MA 2.10 arrivano già tradotti nella lingua della connessione e senza `translation_key` e
+  `translation_args` (`ErrorResultMessage.__post_serialize__` li toglie: il traduttore è sempre legato in
+  `websocket_client`), quindi `MaException.key`/`args` restano vuoti e `SoloistUnlock.busy` riconosce il testo in
+  ogni lingua in cui MA lo traduce (de, es, nl, ru_RU, sr_Latn; le altre restano in inglese) e in quella italiana di
+  `server/ma/ma-strings.json` (da tenere uguali; `SoloistCheckKt` usa i testi veri). `SoloistUnlock`: se nessun
   altro lettore suona Spotify (`player_queues/all`: `state` playing, `available`, brano con fonte spotify)
   ricarica il servizio (`config/providers/reload`, solo admin) e riprova una volta; più errori entro 15 s, una
   ricarica sola. `SoloistCheckKt` lo prova col servizio dei file al posto di Spotify (errore finto). In
@@ -718,7 +722,8 @@ Da una caccia ai bug con più agenti (8 aree, un giudice avversario per area) e 
     I testi di Soloist che Music Assistant non traduce in italiano (35) sono in `server/ma/ma-strings.json`: `_texts`
     li unisce solo per voci che Music Assistant ha in inglese (sennò si ferma).
     Indietro o "Annulla" in un flusso andato oltre il primo passo prima chiede conferma (`FlowPage.confirmLeave`,
-    `ServicesModel.asksBeforeLeaving`; un secondo indietro lo lascia): con Spotify buttava Client ID e accessi.
+    `ServicesModel.asksBeforeLeaving`; un secondo indietro lo lascia): con Spotify buttava Client ID e accessi. Se
+    il flusso finisce mentre si chiede, la domanda si chiude e "Interrompi" esce come dalla fine (`close`).
     `ServicesCheckKt`, scena `flow-leave` di `tools/screens`.
   - Correzioni alle correzioni: tornando al server salvato in `choose` tornano token e accesso; avvisi sopra il
     lettore solo se si vede; "Riprova" con `phoneServerRetrying`; `forgetServer` solo se cambia l'indirizzo di casa,
@@ -728,7 +733,8 @@ Da una caccia ai bug con più agenti (8 aree, un giudice avversario per area) e 
   (`truncateListBySize` in `MediaLibraryServiceLegacyStub`, `TRANSACTION_SIZE_LIMIT_IN_BYTES`): oltre 150 voci
   (`Menu.PART`) un elenco diventa cartelle `part|<k>|<cartella>` ("1–150"...), con voci dagli stessi id dell'elenco
   intero (`LongListCheckKt`: 2880 brani, 20 cartelle). La ricerca chiede sempre di nuovo (`fresh`). La stessa voce
-  toccata di nuovo mentre parte non manda un secondo play_media (`lastChoice`: aspetta il primo). Nel lettore:
+  toccata di nuovo mentre parte non manda un secondo play_media (`lastChoice`: aspetta il primo; per le ricerche a
+  voce conta la frase, perché l'id è vuoto; uno stop o una pausa voluti lo azzerano). Nel lettore:
   indietro con un salto in corso passa da `skip`; pausa durante un salto → stop dopo il salto (`pauseAfterSkip`);
   `pauseFromSystem`/`resumeFromSystem` come pausa e play della persona; pausa o stop voluti tolgono la ripresa
   automatica; pausa non arrivata per la rete → `onPauseLost` → `engine.silence()` (torna su solo con un play

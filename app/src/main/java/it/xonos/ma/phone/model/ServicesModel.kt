@@ -110,6 +110,8 @@ class ServicesModel internal constructor(
         val previous = page.step.value
         previous?.flowId?.takeIf { it != step.flowId }?.let(flows::remove)
         if (previous != null && (previous.stepId != step.stepId || previous.type != step.type)) page.advanced = true
+        // Finito mentre si chiedeva se lasciarlo: non c'è più niente da perdere, la domanda si chiude.
+        if (step.done) page.confirmLeave = false
         if (step.done) flows.remove(step.flowId) else flows[step.flowId] = page
         if (step.type == "finish") step.instanceId?.let(services::changed)
         // Un modulo nuovo parte dai suoi valori; lo stesso modulo con gli errori tiene ciò che si è scritto.

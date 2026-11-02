@@ -50,6 +50,7 @@ WANTED = [
     "usr/bin/pactl",
     "usr/bin/pacat",
     "usr/lib/pulse-*/modules/module-native-protocol-unix.so",
+    "usr/lib/pulse-*/modules/module-cli-protocol-unix.so",  # i comandi a righe di testo (niente pactl)
     "usr/lib/pulse-*/modules/module-pipe-sink.so",
     "usr/lib/pulse-*/modules/module-null-sink.so",
 ]

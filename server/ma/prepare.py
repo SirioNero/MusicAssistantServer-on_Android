@@ -804,18 +804,101 @@ def _soloist(root: Path) -> None:
         sys.exit(f"{capture}: non trovo la classe PAVolumeController da cambiare")
     head, rest = text.split(start)
     _, tail = rest.split(end)
-    capture.write_text(head + PACTL_CONTROLLER + "\n\n" + end + tail)
+    capture.write_text(head + PULSE_CONTROLLER + "\n\n" + end + tail)
+    _replace(capture, "import shutil\nimport threading\n", "import shutil\nimport socket\nimport threading\n")
+    # Il socket a righe di testo per i comandi (vedi PULSE_CONTROLLER), accanto a quello nativo. Con .nofail
+    # PulseAudio parte anche se il modulo manca, e allora i comandi passano ancora da pactl.
+    _replace(
+        capture,
+        '            f"load-module module-native-protocol-unix socket={self._socket_path} auth-anonymous=1\\n"\n',
+        '            f"load-module module-native-protocol-unix socket={self._socket_path} auth-anonymous=1\\n"\n'
+        "            # Xonos: anche il socket dei comandi a righe di testo, così niente pactl (un processo in proot)\n"
+        '            ".nofail\\n"\n'
+        '            f"load-module module-cli-protocol-unix socket={self._socket_path.parent}/cli\\n"\n',
+    )
+    _replace(
+        capture,
+        '            LOGGER.debug("Ignoring suspend toggle for stale sink %s", self._sink_name)\n'
+        "            return\n"
+        "        returncode, output = await check_output(\n",
+        '            LOGGER.debug("Ignoring suspend toggle for stale sink %s", self._sink_name)\n'
+        "            return\n"
+        "        # Xonos: dal socket di PulseAudio (vedi PAVolumeController), senza un pactl in proot a ogni brano\n"
+        "        if (controller := self._server._controller) is not None:\n"
+        "            if not await asyncio.to_thread(controller.suspend_sink, self._sink_name, suspended):\n"
+        '                LOGGER.warning("suspend-sink %s %d failed", self._sink_name, int(suspended))\n'
+        "            return\n"
+        "        returncode, output = await check_output(\n",
+    )
+    # Dove va il tempo quando un brano di Soloist parte o si ferma: sul telefono ogni passo passa da proot. Tre
+    # righe nel registro per brano, per capire dal registro di una persona cosa rende lenti play e salti.
+    backend = root / "providers" / "spotify" / "backends" / "soloist.py"
+    _replace(backend, "import asyncio\nimport os\nimport shutil\n", "import asyncio\nimport os\nimport shutil\nimport time\n")
+    _replace(
+        backend,
+        '    async def start(self) -> None:\n        """Spawn the engine on this run\'s URI and get its audio flowing."""\n',
+        '    async def start(self) -> None:\n        """Spawn the engine on this run\'s URI and get its audio flowing."""\n'
+        "        # Xonos: i tempi dell'avvio, per il registro\n"
+        "        xonos_marks = [time.monotonic()]\n"
+        "        self._xonos_started_at = xonos_marks[0]\n",
+    )
+    for anchor in (
+        "        await sink.set_volume(100)\n        await sink.suspend()\n",
+        "        await proc.start()\n",
+        '            self._raise_startup_error("did not start up correctly")\n',
+        "        await self._await_playback_started(proc)\n",
+    ):
+        _replace(backend, anchor, anchor + "        xonos_marks.append(time.monotonic())\n")
+    _replace(
+        backend,
+        "        self._spawn_task(self._read_capture())\n        await self._set_sink(running=True)\n",
+        "        self._spawn_task(self._read_capture())\n        await self._set_sink(running=True)\n"
+        "        xonos_marks.append(time.monotonic())\n"
+        "        self.logger.info(\n"
+        '            "Soloist: avvio in %.1f s (PulseAudio %.2f s, processo %.2f s, collegato e dentro Spotify %.2f s,"\n'
+        '            " il brano suona %.2f s, posizione e tubo %.2f s)",\n'
+        "            xonos_marks[-1] - xonos_marks[0],\n"
+        "            *(b - a for a, b in zip(xonos_marks, xonos_marks[1:])),\n"
+        "        )\n",
+    )
+    _replace(
+        backend,
+        "            self._delivered += len(chunk)\n",
+        "            if not self._delivered:\n"
+        "                started = getattr(self, \"_xonos_started_at\", None)\n"
+        "                if started is not None:\n"
+        '                    self.logger.info("Soloist: primo audio %.2f s dopo l\'avvio", time.monotonic() - started)\n'
+        "            self._delivered += len(chunk)\n",
+    )
+    _replace(
+        backend,
+        "        if self._teardown_done:\n            return\n        self._stopped = True\n",
+        "        if self._teardown_done:\n            return\n"
+        "        xonos_stop = time.monotonic()  # Xonos: il tempo per fermarlo, per il registro\n"
+        "        self._stopped = True\n",
+    )
+    _replace(
+        backend,
+        "        self._teardown_done = True\n",
+        '        self.logger.info("Soloist: fermato in %.2f s", time.monotonic() - xonos_stop)\n'
+        "        self._teardown_done = True\n",
+    )
 
 
 # Xonos: al posto della classe di Music Assistant, che usa libpulse con ctypes.
-PACTL_CONTROLLER = '''class PAVolumeController:
+PULSE_CONTROLLER = '''class PAVolumeController:
     """
-    Xonos: PulseAudio comandato con pactl invece che con libpulse.
+    Xonos: PulseAudio comandato dal suo socket a righe di testo, o con pactl.
 
     Sul telefono PulseAudio e libpulse sono programmi glibc dentro proot: il Python di Music Assistant (bionic) non
-    può caricare libpulse con ctypes. pactl fa le stesse cose da fuori e xonos_server lo fa passare da proot come
-    PulseAudio. Stessa interfaccia di prima: chiamate bloccanti, da un thread.
+    può caricare libpulse con ctypes. Il modulo module-cli-protocol-unix (caricato all'avvio, vedi _launch_daemon)
+    prende i comandi come righe di testo su un socket: niente processi nuovi. Un pactl invece è un processo che passa
+    da proot, e a ogni brano di Soloist ne servivano cinque (carica, volume, sospendi, riprendi, togli). Se il socket
+    non risponde si usa pactl. Stessa interfaccia di prima: chiamate bloccanti, da un thread.
     """
+
+    _PROMPT = b">>> "
+    _TIMEOUT = 5.0
 
     def __init__(self, server: str | None = None) -> None:
         """
@@ -825,8 +908,18 @@ PACTL_CONTROLLER = '''class PAVolumeController:
         """
         self._server = server or get_default_pulse_server()
         self._closed = False
-        if self._pactl("info") is None:
+        self._lock = threading.Lock()
+        self._cli: socket.socket | None = None
+        native = self._server[len("unix:"):] if self._server.startswith("unix:") else ""
+        # il socket dei comandi sta accanto a quello nativo (vedi _launch_daemon)
+        self._cli_path = os.path.join(os.path.dirname(native), "cli") if native else None
+        if self._cli_send("stat") is None and self._pactl("info") is None:
             raise OSError("Timed out connecting to PulseAudio for volume control")
+
+    @property
+    def uses_socket(self) -> bool:
+        """Xonos: whether the command socket is open (for the self test)."""
+        return self._cli is not None
 
     def set_sink_volume(self, sink_name: str, volume_pct: int, channels: int = 2) -> bool:
         """
@@ -834,11 +927,11 @@ PACTL_CONTROLLER = '''class PAVolumeController:
 
         :param sink_name: PA sink name.
         :param volume_pct: Volume level 0-100, mapped through an exponential audio taper curve.
-        :param channels: Unused: pactl sets every channel.
+        :param channels: Unused: every channel gets the same volume.
         """
         amplitude = volume_pct_to_amplitude(volume_pct)
         pa_vol = round(PA_VOLUME_NORM * amplitude ** (1.0 / 3.0))
-        return self._pactl("set-sink-volume", sink_name, str(pa_vol)) is not None
+        return self._run("set-sink-volume", sink_name, str(pa_vol))
 
     def set_sink_volume_raw(self, sink_name: str, volume_pct: float, channels: int = 2) -> bool:
         """
@@ -846,11 +939,19 @@ PACTL_CONTROLLER = '''class PAVolumeController:
 
         :param sink_name: PA sink name.
         :param volume_pct: Linear percentage where 100 maps exactly onto PA_VOLUME_NORM (0 dB).
-        :param channels: Unused: pactl sets every channel.
+        :param channels: Unused: every channel gets the same volume.
         """
         volume_pct = min(max(volume_pct, 0.0), MAX_RAW_VOLUME_PCT)
         pa_vol = round(PA_VOLUME_NORM * volume_pct / 100.0)
-        return self._pactl("set-sink-volume", sink_name, str(pa_vol)) is not None
+        return self._run("set-sink-volume", sink_name, str(pa_vol))
+
+    def suspend_sink(self, sink_name: str, suspended: bool) -> bool:
+        """
+        Xonos: suspend or resume a sink (Music Assistant spawned pactl for this every time).
+
+        :returns: True if PA reported success.
+        """
+        return self._run("suspend-sink", sink_name, "1" if suspended else "0")
 
     def load_module(self, module_name: str, argument: str) -> int | None:
         """
@@ -860,6 +961,14 @@ PACTL_CONTROLLER = '''class PAVolumeController:
         :param argument: Module argument string (no spaces inside values).
         :returns: The loaded module's index, or None on failure/timeout.
         """
+        reply = self._cli_send(f"load-module {module_name} {argument}")
+        if reply is not None:
+            if reply.strip():
+                LOGGER.debug("PulseAudio load-module %s: %s", module_name, reply.strip())
+                return None
+            # il socket non dice l'indice del modulo, e nemmeno se non si è caricato (PulseAudio 16.1 lo scrive solo
+            # nel suo registro): lo si cerca nell'elenco, dal nome e dagli argomenti
+            return self._cli_module_index(module_name, argument)
         output = self._pactl("load-module", module_name, *argument.split())
         try:
             return int(output.strip()) if output is not None else None
@@ -872,11 +981,100 @@ PACTL_CONTROLLER = '''class PAVolumeController:
 
         :returns: True if PA reported success.
         """
-        return self._pactl("unload-module", str(module_index)) is not None
+        return self._run("unload-module", str(module_index))
 
     def close(self) -> None:
-        """Nothing to tear down: every call is its own pactl."""
+        """Close the command socket."""
         self._closed = True
+        with self._lock:
+            self._cli_drop()
+
+    def _run(self, *args: str) -> bool:
+        """A command that prints nothing when it works: from the socket, or with pactl if the socket is not there."""
+        reply = self._cli_send(" ".join(args))
+        if reply is None:
+            return self._pactl(*args) is not None
+        if reply.strip():
+            LOGGER.debug("PulseAudio %s: %s", args[0], reply.strip())
+            return False
+        return True
+
+    def _cli_send(self, line: str) -> str | None:
+        """
+        One command line on PulseAudio's command socket: what it printed, or None when the socket did not work.
+
+        A reply that does not arrive is not retried (the command may have run already): the connection is dropped
+        and the next command opens a new one.
+        """
+        if self._closed or self._cli_path is None:
+            return None
+        with self._lock:
+            try:
+                if self._cli is None:
+                    self._cli_connect()
+                assert self._cli is not None
+                self._cli.sendall(line.encode() + b"\\n")
+                return self._cli_read()
+            except OSError as err:
+                LOGGER.debug("PulseAudio socket, %s: %s", line.split(" ", 1)[0], err)
+                self._cli_drop()
+                return None
+
+    def _cli_connect(self) -> None:
+        """Open the command socket; "hello" turns on the prompt that closes every reply."""
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        try:
+            sock.settimeout(self._TIMEOUT)
+            sock.connect(self._cli_path)
+            self._cli = sock
+            sock.sendall(b"hello\\n")
+            self._cli_read()
+        except OSError:
+            self._cli_drop()
+            sock.close()
+            raise
+
+    def _cli_read(self) -> str:
+        """Read up to the next prompt: the reply of the last command."""
+        assert self._cli is not None
+        data = b""
+        while not data.endswith(self._PROMPT):
+            chunk = self._cli.recv(65536)
+            if not chunk:
+                raise ConnectionError("PulseAudio closed the command socket")
+            data += chunk
+        return data[: -len(self._PROMPT)].decode(errors="replace")
+
+    def _cli_drop(self) -> None:
+        """Forget the command socket (closed if it was open)."""
+        if (sock := self._cli) is not None:
+            self._cli = None
+            with suppress(OSError):
+                sock.close()
+
+    def _cli_module_index(self, module_name: str, argument: str) -> int | None:
+        """The index of the loaded module with this name and these exact arguments (the newest if more)."""
+        listing = self._cli_send("list-modules")
+        if listing is None:
+            return None
+        found: int | None = None
+        index: int | None = None
+        named = False
+        for raw in listing.splitlines():
+            line = raw.strip()
+            if line.startswith("index:"):
+                try:
+                    index = int(line.split(":", 1)[1])
+                except ValueError:
+                    index = None
+                named = False
+            elif line == f"name: <{module_name}>":
+                named = True
+            elif named and index is not None and line == f"argument: <{argument}>":
+                found = index
+        if found is None:
+            LOGGER.debug("PulseAudio: %s is not in the module list after loading it (it did not load)", module_name)
+        return found
 
     def _pactl(self, *args: str, timeout: float = 10.0) -> str | None:
         """pactl on the private daemon: its output, or None when it failed."""

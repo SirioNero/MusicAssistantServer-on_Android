@@ -507,9 +507,26 @@ di Xonos suona dal server sul telefono; la release ridotta con R8, da capo come 
     In CI la riga non compare (le prove con i programmi Linux durano 21 s, prima del primo minuto): provata in
     locale; `_processes` e `SC_CLK_TCK` sull'emulatore li usa anche `cpu-audio`.
   - **prepare.py** (`_soloist`): `_resolve_architecture` accetta Android quando c'è XONOS_PROOT; il flusso di Spotify
-    mostra la scelta del motore solo allora (sennò librespot); `PAVolumeController` comanda PulseAudio con `pactl`
-    (stessa interfaccia: load/unload-module, set-sink-volume) perché la libpulse del sistema Linux è di glibc e il
-    Python del pacchetto no.
+    mostra la scelta del motore solo allora (sennò librespot); `PAVolumeController` (`PULSE_CONTROLLER`) comanda
+    PulseAudio senza libpulse (quella del sistema Linux è di glibc, il Python del pacchetto no): fino al 2.10.8-6 con
+    `pactl`, dal 2.10.8-7 dal socket a righe di testo di `module-cli-protocol-unix` (sotto), con `pactl` se non risponde.
+  - **Tempi di play, salti e ripresa** (pacchetto 2.10.8-7, Xonos 0.1.52; l'utente: "premendo play ci mette un po,
+    skip ci mette anche li un po"). In MA 2.10.8 Soloist suona un brano per processo (`--single-track`,
+    `_SingleTrackRun`): ogni play e ogni salto fermano il Soloist di prima e ne avviano uno nuovo, che rifà l'accesso a
+    Spotify; il lettore Sendspin non ha `PlayerFeature.PAUSE`, quindi la pausa ferma il flusso e la ripresa riparte da
+    capo con un seek (`_cold_seek`). Poi MA aspetta 1 s di audio (2 con la normalizzazione dinamica) prima di far
+    partire il lettore. Sul telefono ogni processo passa da proot, anche i 5 comandi a PulseAudio di ogni brano
+    (`PipeSink.create`, volume, sospendi, riprendi, togli). Ora PulseAudio parte anche con `module-cli-protocol-unix`
+    (`<cartella>/cli`, dopo `.nofail`: se manca parte lo stesso) e i comandi vanno lì (`hello` accende il prompt
+    `>>> ` che chiude ogni risposta; `load-module` non dice né l'indice né se non si è caricato: lo si cerca in
+    `list-modules`). Il modulo e le sue `libcli.so`/`libprotocol-cli.so` sono nel sistema Linux (`rootfs.py`).
+    Provato in locale col PulseAudio 16.1 del pacchetto in un chroot (`scratchpad`, non nel repository): 0,8 ms per
+    brano invece di 31 ms con `pactl` (senza proot), errori veri riconosciuti, la connessione si riapre. In CI la
+    prova `pulse-comandi` dell'autotest fa lo stesso col codice di MA, col socket e con `pactl` in proot. Nel registro,
+    a ogni brano: «Soloist: avvio in N s (PulseAudio, processo, collegato e dentro Spotify, il brano suona, posizione e
+    tubo)», «primo audio N s dopo l'avvio», «fermato in N s»: dal registro della persona si vede cosa resta lento.
+    Non toccati: il buffer di MA (1–2 s, scelto da loro con prove d'ascolto) e `SkipSender` (400 ms per raccogliere i
+    salti veloci: con Soloist un salto in più costa un avvio intero).
   - **PhoneServer**: XONOS_PROOT e XONOS_PROOT_LOADER dalla cartella delle librerie, XONOS_DNS_FILE
     (`<dati>/resolv.conf`: i DNS della rete in uso più 1.1.1.1 e 8.8.8.8, riscritto con un NetworkCallback), il
     MulticastLock del Wi-Fi solo tra `XONOS_MULTICAST on` e `off` (permesso CHANGE_WIFI_MULTICAST_STATE).

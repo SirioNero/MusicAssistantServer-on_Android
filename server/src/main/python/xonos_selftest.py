@@ -18,6 +18,7 @@ import logging
 import os
 import signal
 import sys
+import time
 from contextlib import suppress
 from pathlib import Path
 from typing import Any
@@ -73,6 +74,10 @@ async def run(mass: Any) -> None:
         say("pipe-sink", True, str(sink.fifo_path))
         received = await _play_into(server, sink)
         say("audio-nel-tubo", received > 0, f"{received} byte in {FIFO_READ_S} s")
+        # I passi di PulseAudio di ogni brano di Soloist: col socket dei comandi (dal pacchetto 2.10.8-7) e con
+        # pactl dentro proot, come prima.
+        commands_ok, detail = await _pulse_commands(server)
+        say("pulse-comandi", commands_ok, detail)
     except Exception as err:  # noqa: BLE001
         say("pulseaudio", False, f"{err!r}; {await _pulseaudio_alone(Path(mass.cache_path))}")
 
@@ -260,6 +265,47 @@ async def _cpu_with_audio(server: Any, sink: Any) -> tuple[bool, str]:
     ranked = sorted(used.items(), key=lambda item: -item[1])
     parts = ", ".join(f"{name} {100 * value / seconds:.0f}%" for name, value in ranked)
     return received >= expected // 2, f"{parts}; letti {received} byte su {expected} in {seconds:.0f} s"
+
+
+async def _pulse_commands(server: Any, rounds: int = 5) -> tuple[bool, str]:
+    """
+    I passi di PulseAudio di un brano di Soloist (carica il pipe sink, volume, sospendi, riprendi, togli) con il codice
+    di Music Assistant: prima col socket dei comandi, poi con pactl (un processo in proot a passo, come fino al
+    pacchetto 2.10.8-6). Riesce se il socket è stato usato ed è più veloce; nei dettagli i tempi per brano.
+    """
+    from music_assistant.helpers.pulse_capture import PipeSink  # noqa: PLC0415
+
+    controller = server._controller
+
+    async def one(prefix: str) -> float:
+        start = time.monotonic()
+        sink = await PipeSink.create(server, prefix)
+        await sink.set_volume(100)
+        await sink.suspend()
+        await sink.resume()
+        await sink.unload()
+        return time.monotonic() - start
+
+    with_socket = sorted([await one("xonos_socket") for _ in range(rounds)])
+    used_socket = bool(getattr(controller, "uses_socket", False))
+    saved = getattr(controller, "_cli_path", None)
+    lock = getattr(controller, "_lock", None)
+    if lock is not None:
+        with lock:
+            controller._cli_path = None
+            controller._cli_drop()
+    try:
+        with_pactl = sorted([await one("xonos_pactl") for _ in range(rounds)])
+    finally:
+        if lock is not None:
+            controller._cli_path = saved
+    socket_ms = with_socket[rounds // 2] * 1000
+    pactl_ms = with_pactl[rounds // 2] * 1000
+    detail = (
+        f"per brano (mediana di {rounds}): col socket {socket_ms:.0f} ms, con pactl in proot {pactl_ms:.0f} ms"
+        f" (socket usato: {used_socket})"
+    )
+    return used_socket and socket_ms < pactl_ms, detail
 
 
 async def _pulseaudio_alone(cache: Path) -> str:

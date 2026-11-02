@@ -77,7 +77,9 @@ class XonosApp : Application(), SingletonImageLoader.Factory {
                 // Appena risponde ci si collega, senza aspettare il prossimo tentativo (che dopo qualche errore tarda).
                 scope.launch {
                     if (server.start()) {
-                        repo.reconnect()
+                        // Il ciclo di MaRepository può essersi già collegato mentre i servizi si caricavano: quella
+                        // connessione è buona, ricollegarsi fermerebbe la coda.
+                        if (repo.connection.value !is Connection.Connected) repo.reconnect()
                     } else {
                         failedStarts++
                         Log.w("Xonos", "Music Assistant sul telefono non è partito ($failedStarts): ${server.error}")

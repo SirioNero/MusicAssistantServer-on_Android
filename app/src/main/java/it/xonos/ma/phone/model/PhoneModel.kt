@@ -1301,6 +1301,10 @@ class PhoneModel(
         if (config.urls != settings.load().urls) {
             scope.launch(Dispatchers.IO) { cache.clear() }
             forgetServer(page)
+            // Lasciato il Music Assistant sul telefono, non serve più che giri (processore e batteria): lo si
+            // riaccende con "Usa Music Assistant su questo telefono".
+            val server = phoneServer
+            if (server != null && onPhoneServer && config.homeUrl != server.url) scope.launch(Dispatchers.IO) { server.stop() }
         }
         settings.save(config)
         repo.reconnect()

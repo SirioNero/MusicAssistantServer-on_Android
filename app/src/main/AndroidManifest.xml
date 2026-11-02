@@ -26,7 +26,10 @@
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.Xonos"
+        android:requestLegacyExternalStorage="true"
         android:usesCleartextTraffic="true">
+        <!-- requestLegacyExternalStorage conta solo su Android 10: lì, senza, Music Assistant sul telefono non
+             potrebbe leggere la cartella Music per percorso (lo spazio condiviso si apre a tutti solo da Android 11). -->
 
         <!-- Gearslip elenca tra le app musicali chi ha un MediaBrowserService e questo descrittore. -->
         <meta-data

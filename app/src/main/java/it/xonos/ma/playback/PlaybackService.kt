@@ -45,6 +45,7 @@ import it.xonos.ma.R
 import it.xonos.ma.data.Connection
 import it.xonos.ma.data.MaException
 import it.xonos.ma.phone.MainActivity
+import it.xonos.ma.phone.model.PhoneServerControl
 import it.xonos.ma.sendspin.AndroidAudio
 import it.xonos.ma.sendspin.AudioEngine
 import it.xonos.ma.sendspin.SendspinClient
@@ -55,6 +56,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.guava.future
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -109,7 +111,8 @@ class PlaybackService : MediaLibraryService() {
             settings.muted = muted
         }
         player = MaPlayer(mainLooper, app.repo, settings.playerId, app.playerReady, engine.outputting, artwork::uriFor, { engine.lateMs }) { connection ->
-            describe(settings.language.wrap(this), connection)
+            val context = settings.language.wrap(this)
+            phoneServerProblem(context, connection) ?: describe(context, connection)
         }
         tree = BrowseTree(Menu(app.library, ResourceLabels(this) { settings.language }) { settings.playerId }, artwork)
         player.onPlayRequest = { item -> tree.play(item) }
@@ -212,6 +215,11 @@ class PlaybackService : MediaLibraryService() {
     private fun onConnection(connection: Connection) {
         when (connection) {
             is Connection.Connected -> {
+                // L'auto ha avuto il menu senza Music Assistant (aspettato invano): lo richieda, ora c'è tutto.
+                if (browsedOffline) {
+                    browsedOffline = false
+                    session.notifyChildrenChanged(Menu.ROOT, Int.MAX_VALUE, null)
+                }
                 // Prima l'API, poi l'audio: così Music Assistant lega il lettore a questa sessione.
                 // Si riapre anche l'audio se è cambiata la rete o il nome del lettore.
                 val name = app.settings.playerName
@@ -228,6 +236,36 @@ class PlaybackService : MediaLibraryService() {
 
     /** L'audio esce adesso dal telefono. */
     private var outputting = false
+
+    /** L'auto ha sfogliato il menu mentre Music Assistant non era collegato (vedi [awaitConnected]). */
+    @Volatile private var browsedOffline = false
+
+    /**
+     * Gearslip e myCar chiedono il menu appena si collegano, spesso prima che Xonos sia collegato a Music Assistant
+     * (all'avvio, o col server sul telefono che parte): si aspetta il collegamento, al massimo [BROWSE_WAIT_MS],
+     * invece di rispondere con cartelle in errore e voci vuote che l'auto poi non richiede.
+     */
+    private suspend fun awaitConnected() {
+        val ok = withTimeoutOrNull(BROWSE_WAIT_MS) { app.repo.connection.first { it is Connection.Connected } } != null
+        if (!ok) browsedOffline = true
+    }
+
+    /**
+     * Col Music Assistant sul telefono, perché non risponde detto per quello che è (parte, va aggiornato, non è
+     * partito) invece di "Errore di rete: Failed to connect to /127.0.0.1:8095". null: non è quello, o risponde.
+     */
+    private fun phoneServerProblem(context: Context, connection: Connection): String? {
+        if (connection is Connection.Connected) return null
+        val server = app.phoneServer ?: return null
+        if (app.settings.load().homeUrl != server.url) return null
+        return when {
+            !server.installed -> context.getString(R.string.phone_server_outdated)
+            server.state == PhoneServerControl.State.STARTING -> context.getString(R.string.phone_server_starting)
+            server.state == PhoneServerControl.State.FAILED ->
+                context.getString(R.string.phone_server_failed, server.error.ifBlank { server.state.name })
+            else -> null
+        }
+    }
 
     /**
      * Sveglio (processore e Wi-Fi) mentre esce l'audio, e per al massimo [PREPARE_LOCK_MS] (solo il processore) anche
@@ -397,6 +435,7 @@ class PlaybackService : MediaLibraryService() {
             pageSize: Int,
             params: LibraryParams?,
         ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> = scope.future {
+            awaitConnected()
             try {
                 LibraryResult.ofItemList(tree.children(parentId).page(page, pageSize), params)
             } catch (e: Exception) {
@@ -411,6 +450,7 @@ class PlaybackService : MediaLibraryService() {
             query: String,
             params: LibraryParams?,
         ): ListenableFuture<LibraryResult<Void>> = scope.future {
+            awaitConnected()
             val results = try {
                 tree.search(query)
             } catch (e: Exception) {
@@ -430,6 +470,7 @@ class PlaybackService : MediaLibraryService() {
             pageSize: Int,
             params: LibraryParams?,
         ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> = scope.future {
+            awaitConnected()
             try {
                 val results = searches[query] ?: tree.search(query)
                 LibraryResult.ofItemList(results.page(page, pageSize), params)
@@ -506,6 +547,9 @@ class PlaybackService : MediaLibraryService() {
         const val FOCUS_GRACE_MS = 30_000L
         const val LOCK_TIMEOUT_MS = 6 * 60 * 60 * 1000L
         const val PREPARE_LOCK_MS = 2 * 60 * 1000L
+
+        /** Quanto aspetta il menu dell'auto che Xonos si colleghi a Music Assistant (vedi [awaitConnected]). */
+        const val BROWSE_WAIT_MS = 20_000L
         const val QUEUE_WAIT_MS = 10_000L
         const val QUEUE_POLL_MS = 200L
 

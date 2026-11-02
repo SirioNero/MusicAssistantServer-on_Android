@@ -33,6 +33,7 @@ import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -90,8 +91,9 @@ import kotlinx.coroutines.delay
  */
 @Composable
 private fun rememberPosition(player: PlayerLink, now: NowPlaying): State<Long> {
-    val position = remember { mutableLongStateOf(player.positionMs()) }
-    LaunchedEffect(now.playing, now.buffering, now.uri) {
+    // Anche [player] fra le chiavi: con "Suona su" lo schermo passa dal telefono alla cassa (stesso brano).
+    val position = remember(player) { mutableLongStateOf(player.positionMs()) }
+    LaunchedEffect(player, now.playing, now.buffering, now.uri) {
         while (true) {
             position.longValue = player.positionMs()
             delay(if (now.playing && !now.buffering) 200 else 1_000)
@@ -206,7 +208,9 @@ internal fun PlayerScreen(now: NowPlaying, player: PlayerLink, model: PhoneModel
             Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { model.playerOpen = false }) { Icon(XIcons.Down, stringResource(R.string.close_player), Modifier.size(30.dp)) }
                 // Dove suona: toccandolo si sceglie un altro lettore ("Suona su").
-                Box(Modifier.weight(1f).padding(horizontal = 8.dp), contentAlignment = Alignment.Center) { PlayOnButton(model) }
+                Box(Modifier.weight(1f).padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
+                    if (model.canPlayElsewhere) PlayOnButton(model)
+                }
                 NowPlayingMenu(now, model)
             }
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -314,7 +318,8 @@ private fun Controls(now: NowPlaying, player: PlayerLink, busy: Boolean) {
     val accent = MaterialTheme.colorScheme.primary
     val normal = MaterialTheme.colorScheme.onSurface
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-        IconButton(onClick = { player.setShuffle(!now.shuffle) }) {
+        // Tasti a due stati (IconToggleButton): chi usa TalkBack sente se sono accesi, non solo il nome.
+        IconToggleButton(checked = now.shuffle, onCheckedChange = { player.setShuffle(it) }) {
             Icon(XIcons.Shuffle, stringResource(R.string.shuffle), tint = if (now.shuffle) accent else normal.copy(alpha = 0.7f))
         }
         IconButton(onClick = player::previous, modifier = Modifier.size(56.dp)) {
@@ -345,8 +350,9 @@ private fun Controls(now: NowPlaying, player: PlayerLink, busy: Boolean) {
         IconButton(onClick = player::next, modifier = Modifier.size(56.dp)) {
             Icon(XIcons.Next, stringResource(R.string.next), Modifier.size(36.dp))
         }
-        IconButton(
-            onClick = {
+        IconToggleButton(
+            checked = now.repeat != Repeat.OFF,
+            onCheckedChange = {
                 player.setRepeat(
                     when (now.repeat) {
                         Repeat.OFF -> Repeat.ALL
@@ -368,8 +374,9 @@ private fun Controls(now: NowPlaying, player: PlayerLink, busy: Boolean) {
 @Composable
 private fun PanelButton(icon: ImageVector, label: Int, model: PhoneModel, panel: PlayerPanel) {
     val selected = model.playerPanel == panel
-    IconButton(
-        onClick = { model.playerPanel = if (selected) PlayerPanel.COVER else panel },
+    IconToggleButton(
+        checked = selected,
+        onCheckedChange = { model.playerPanel = if (selected) PlayerPanel.COVER else panel },
         modifier = Modifier.clip(CircleShape).background(if (selected) Color.White.copy(alpha = 0.16f) else Color.Transparent),
     ) {
         Icon(icon, stringResource(label), tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f))

@@ -66,12 +66,23 @@ class XonosApp : Application(), SingletonImageLoader.Factory {
         // si ferma (Android lo ha chiuso per fare spazio), la connessione non riesce e lo si fa ripartire.
         val server = phoneServer ?: return
         val scope = MainScope()
+        // Un server che non riesce a partire (sempre lo stesso errore) si riavviava a ogni connessione fallita, cioè
+        // ogni 20 s per sempre, e ogni avvio di Music Assistant pesa sulla batteria: dopo tre di fila Xonos smette e
+        // la Home dice perché, con "Riprova". Si ricomincia a contare quando Xonos si collega.
+        var failedStarts = 0
         fun startIfUsed() {
-            if (settings.load().homeUrl == server.url && server.installed &&
+            if (settings.load().homeUrl == server.url && server.installed && failedStarts < AUTO_STARTS &&
                 server.state != State.STARTING && server.state != State.RUNNING
             ) {
                 // Appena risponde ci si collega, senza aspettare il prossimo tentativo (che dopo qualche errore tarda).
-                scope.launch { if (server.start()) repo.reconnect() }
+                scope.launch {
+                    if (server.start()) {
+                        repo.reconnect()
+                    } else {
+                        failedStarts++
+                        Log.w("Xonos", "Music Assistant sul telefono non è partito ($failedStarts): ${server.error}")
+                    }
+                }
             }
         }
         // Il server sul telefono non accetta più il token (scaduto: dalla 2.10 durano un anno, e di solito
@@ -101,6 +112,7 @@ class XonosApp : Application(), SingletonImageLoader.Factory {
         startIfUsed()
         scope.launch {
             repo.connection.collect { connection ->
+                if (connection is Connection.Connected) failedStarts = 0
                 if (connection is Connection.Failed) {
                     startIfUsed()
                     if (connection.problem == Problem.BAD_TOKEN) signInAgain()
@@ -120,5 +132,10 @@ class XonosApp : Application(), SingletonImageLoader.Factory {
             }
             .crossfade(true)
             .build()
+    }
+
+    private companion object {
+        /** Quante volte di fila Xonos prova da solo a far partire il server sul telefono (vedi onCreate). */
+        const val AUTO_STARTS = 3
     }
 }

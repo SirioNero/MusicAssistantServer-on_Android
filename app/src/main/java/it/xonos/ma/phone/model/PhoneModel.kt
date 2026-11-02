@@ -167,6 +167,7 @@ class PhoneModel(
         val config = settings.load()
         return SettingsPage(config.homeUrl, config.remoteUrl, config.token, settings.playerName, settings.username).also {
             it.phoneServerInstalled = phoneServer?.installed == true
+            it.phoneServerError = phoneServerFailure
         }
     }
 
@@ -1039,11 +1040,28 @@ class PhoneModel(
     /** Xonos usa il Music Assistant sul telefono e quello sta ancora partendo (all'apertura dell'app ci vuole un po'). */
     val phoneServerStarting: Boolean get() = onPhoneServer && phoneServer?.state == PhoneServerControl.State.STARTING
 
+    /** Xonos usa il Music Assistant sul telefono e quello non è partito o si è fermato: il perché. */
+    val phoneServerFailure: String?
+        get() = phoneServer?.takeIf { onPhoneServer && it.state == PhoneServerControl.State.FAILED }
+            ?.let { it.error.ifBlank { it.state.name } }
+
+    /** "Riprova" quando il server sul telefono non è partito (dopo qualche tentativo Xonos smette da solo). */
+    fun retryPhoneServer() {
+        val server = phoneServer ?: return
+        scope.launch { if (server.start()) repo.reconnect() }
+    }
+
     /** Il modulo indica il Music Assistant sul telefono. */
     fun usesPhoneServer(page: SettingsPage): Boolean = phoneServer != null && page.home == phoneServer.url
 
     /** Xonos è collegato al Music Assistant sul telefono (quello salvato, non il modulo). */
     val onPhoneServer: Boolean get() = phoneServer != null && settings.load().homeUrl == phoneServer.url
+
+    /**
+     * Ha senso "Suona su": il Music Assistant sul telefono non vede casse né TV (niente servizi di casse, risponde
+     * solo al telefono), e l'elenco sarebbe sempre vuoto con l'invito ad aggiungere Chromecast e AirPlay.
+     */
+    val canPlayElsewhere: Boolean get() = remote != null || !onPhoneServer
 
     /** Passa a [share] (la condivisione di Android) il registro di Music Assistant sul telefono, per chi aiuta. */
     fun sharePhoneServerLog(share: (String) -> Unit) {

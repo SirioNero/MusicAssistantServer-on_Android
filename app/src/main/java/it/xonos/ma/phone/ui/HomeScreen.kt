@@ -65,7 +65,9 @@ internal fun HomeScreen(page: HomePage, model: PhoneModel, host: Host) {
             item(key = "header", contentType = "header") {
                 Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
-                    IconButton(onClick = model::openDevices, modifier = Modifier.testTag("home_play_on")) { Icon(XIcons.Cast, stringResource(R.string.play_on)) }
+                    if (model.canPlayElsewhere) {
+                        IconButton(onClick = model::openDevices, modifier = Modifier.testTag("home_play_on")) { Icon(XIcons.Cast, stringResource(R.string.play_on)) }
+                    }
                     IconButton(onClick = model::openSettings) { Icon(XIcons.Settings, stringResource(R.string.settings)) }
                 }
                 ConnectionBanner(model, host)
@@ -103,10 +105,13 @@ internal fun ConnectionBanner(model: PhoneModel, host: Host) {
     val serverOld = connection !is Connection.Connected && model.onPhoneServer && model.phoneServerOutdated
     // Mentre il server sul telefono parte la connessione non riesce: non è un errore di rete, è l'avvio.
     val starting = connection !is Connection.Connected && !serverOld && model.phoneServerStarting
+    // Non è partito, o si è fermato: il perché (non solo "non raggiungibile"), con il tasto per riprovare.
+    val failure = if (connection !is Connection.Connected && !serverOld && !starting) model.phoneServerFailure else null
     val text = when {
         serverOld -> stringResource(R.string.phone_server_outdated)
         connection is Connection.Connected -> return
         starting -> stringResource(R.string.phone_server_starting)
+        failure != null -> stringResource(R.string.phone_server_failed, failure)
         connection is Connection.Connecting -> stringResource(R.string.connecting)
         else -> host.describe(connection) ?: return
     }
@@ -127,6 +132,10 @@ internal fun ConnectionBanner(model: PhoneModel, host: Host) {
             if (serverOld) {
                 TextButton(onClick = { model.openSettings() }, modifier = Modifier.align(Alignment.End).testTag("update_phone_server")) {
                     Text(stringResource(R.string.phone_server_update))
+                }
+            } else if (failure != null) {
+                TextButton(onClick = { model.retryPhoneServer() }, modifier = Modifier.align(Alignment.End).testTag("retry_phone_server")) {
+                    Text(stringResource(R.string.retry))
                 }
             }
         }

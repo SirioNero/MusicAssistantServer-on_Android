@@ -486,8 +486,18 @@ def _spotify(root: Path) -> None:
         "            # Xonos: la chiave è già quella della persona, il passo per aggiungerne una sua non serve\n"
         "            setup_data[CONF_CLIENT_ID] = None\n"
         "            setup_data[CONF_REFRESH_TOKEN_DEV] = None\n"
-        "            await session.finish(setup_data)\n"
-        "            return\n"
+        "            # Se il servizio non parte con questi valori (la rete un attimo assente, PulseAudio lento) il\n"
+        "            # passo si ripete con l'errore, come fa Music Assistant: chiudere il flusso butterebbe anche\n"
+        "            # l'abbinamento di Soloist appena fatto\n"
+        "            xonos_errors = None\n"
+        "            while True:\n"
+        "                if xonos_errors is not None:\n"
+        '                    await session.form([], step_id="xonos_finish_retry", errors=xonos_errors, last_step=True)\n'
+        "                try:\n"
+        "                    await session.finish(setup_data)\n"
+        "                    return\n"
+        "                except SetupFlowError as err:\n"
+        '                    xonos_errors = {"base": err.translation_key or str(err)}\n'
         '        client_id_default = str(session.context.setup_data.get(CONF_CLIENT_ID) or "")\n',
     )
     _replace(

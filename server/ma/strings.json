@@ -13,7 +13,9 @@
     "common.errors.xonos_no_playable_items": "There is nothing to play here: {0}",
     "common.errors.xonos_not_available": "There is nothing to play here: the service gave no songs that can be played (for example, they aren't available in your country).",
     "provider.spotify.errors.xonos_playlist_not_yours": "Spotify gives your own app only the songs of your playlists, not of the ones you follow or of Spotify's own (such as Daily Mix). In Spotify, copy the songs into a playlist of yours and play that one.",
-    "common.errors.xonos_service_down": "There is nothing to play here: {0} isn't working right now. Music Assistant services say why."
+    "common.errors.xonos_service_down": "There is nothing to play here: {0} isn't working right now. Music Assistant services say why.",
+    "provider.spotify.setup_flow.xonos_finish_retry.title": "Spotify didn't start",
+    "provider.spotify.setup_flow.xonos_finish_retry.description": "Music Assistant couldn't start Spotify with these settings, for example because the network dropped for a moment. Your sign-in and pairing are kept: press Finish to try again."
   },
   "it": {
     "provider.spotify.setup_flow.xonos_client_id.title": "Il Client ID della tua app Spotify",
@@ -29,7 +31,9 @@
     "common.errors.xonos_no_playable_items": "Qui non c'è niente da suonare: {0}",
     "common.errors.xonos_not_available": "Qui non c'è niente da suonare: il servizio non ha dato brani che si possano suonare (per esempio non sono disponibili nel tuo paese).",
     "provider.spotify.errors.xonos_playlist_not_yours": "Spotify dà alla tua app solo i brani delle tue playlist, non quelli delle playlist che segui né di quelle di Spotify (come Daily Mix). In Spotify copia i brani in una tua playlist e suona quella.",
-    "common.errors.xonos_service_down": "Qui non c'è niente da suonare: {0} in questo momento non funziona. Nei Servizi di Music Assistant c'è il perché."
+    "common.errors.xonos_service_down": "Qui non c'è niente da suonare: {0} in questo momento non funziona. Nei Servizi di Music Assistant c'è il perché.",
+    "provider.spotify.setup_flow.xonos_finish_retry.title": "Spotify non è partito",
+    "provider.spotify.setup_flow.xonos_finish_retry.description": "Music Assistant non è riuscito ad avviare Spotify con queste impostazioni, per esempio perché la rete è mancata un attimo. Accesso e abbinamento restano: tocca Fine per riprovare."
   },
   "es": {
     "provider.spotify.setup_flow.xonos_client_id.title": "El Client ID de tu app de Spotify",
@@ -45,7 +49,9 @@
     "common.errors.xonos_no_playable_items": "Aquí no hay nada que reproducir: {0}",
     "common.errors.xonos_not_available": "Aquí no hay nada que reproducir: el servicio no dio canciones que se puedan reproducir (por ejemplo, no están disponibles en tu país).",
     "provider.spotify.errors.xonos_playlist_not_yours": "Spotify solo le da a tu app las canciones de tus playlists, no las de las que sigues ni las del propio Spotify (como Daily Mix). En Spotify, copia las canciones a una playlist tuya y reproduce esa.",
-    "common.errors.xonos_service_down": "Aquí no hay nada que reproducir: {0} no funciona ahora mismo. En Servicios de Music Assistant se ve por qué."
+    "common.errors.xonos_service_down": "Aquí no hay nada que reproducir: {0} no funciona ahora mismo. En Servicios de Music Assistant se ve por qué.",
+    "provider.spotify.setup_flow.xonos_finish_retry.title": "Spotify no se ha iniciado",
+    "provider.spotify.setup_flow.xonos_finish_retry.description": "Music Assistant no ha podido iniciar Spotify con estos ajustes, por ejemplo porque la red se cortó un momento. El acceso y la vinculación se conservan: pulsa Terminar para volver a intentarlo."
   },
   "de": {
     "provider.spotify.setup_flow.xonos_client_id.title": "Die Client ID deiner Spotify-App",
@@ -61,7 +67,9 @@
     "common.errors.xonos_no_playable_items": "Hier gibt es nichts abzuspielen: {0}",
     "common.errors.xonos_not_available": "Hier gibt es nichts abzuspielen: Der Dienst hat keine abspielbaren Titel geliefert (zum Beispiel, weil sie in deinem Land nicht verfügbar sind).",
     "provider.spotify.errors.xonos_playlist_not_yours": "Spotify gibt deiner eigenen App nur die Titel deiner Playlists, nicht die der Playlists, denen du folgst, oder die von Spotify selbst (wie Daily Mix). Kopiere die Titel in Spotify in eine eigene Playlist und spiele diese ab.",
-    "common.errors.xonos_service_down": "Hier gibt es nichts abzuspielen: {0} funktioniert gerade nicht. Unter Music-Assistant-Dienste steht, warum."
+    "common.errors.xonos_service_down": "Hier gibt es nichts abzuspielen: {0} funktioniert gerade nicht. Unter Music-Assistant-Dienste steht, warum.",
+    "provider.spotify.setup_flow.xonos_finish_retry.title": "Spotify ist nicht gestartet",
+    "provider.spotify.setup_flow.xonos_finish_retry.description": "Music Assistant konnte Spotify mit diesen Einstellungen nicht starten, zum Beispiel weil das Netzwerk kurz weg war. Anmeldung und Kopplung bleiben erhalten: Tippe auf Fertigstellen, um es erneut zu versuchen."
   },
   "fr": {
     "provider.spotify.setup_flow.xonos_client_id.title": "Le Client ID de votre app Spotify",
@@ -77,7 +85,9 @@
     "common.errors.xonos_no_playable_items": "Il n'y a rien à lire ici : {0}",
     "common.errors.xonos_not_available": "Il n'y a rien à lire ici : le service n'a fourni aucun titre lisible (par exemple, ils ne sont pas disponibles dans votre pays).",
     "provider.spotify.errors.xonos_playlist_not_yours": "Spotify ne donne à votre propre app que les titres de vos playlists, pas ceux des playlists que vous suivez ni de celles de Spotify lui-même (comme Daily Mix). Dans Spotify, copiez les titres dans une playlist à vous et lisez celle-ci.",
-    "common.errors.xonos_service_down": "Il n'y a rien à lire ici : {0} ne fonctionne pas pour le moment. Les Services de Music Assistant indiquent pourquoi."
+    "common.errors.xonos_service_down": "Il n'y a rien à lire ici : {0} ne fonctionne pas pour le moment. Les Services de Music Assistant indiquent pourquoi.",
+    "provider.spotify.setup_flow.xonos_finish_retry.title": "Spotify n'a pas démarré",
+    "provider.spotify.setup_flow.xonos_finish_retry.description": "Music Assistant n'a pas pu démarrer Spotify avec ces réglages, par exemple parce que le réseau a été coupé un instant. La connexion et l'association sont conservées : appuie sur Terminer pour réessayer."
   },
   "pt_PT": {
     "provider.spotify.setup_flow.xonos_client_id.title": "O Client ID do seu app do Spotify",
@@ -93,7 +103,9 @@
     "common.errors.xonos_no_playable_items": "Não há nada para tocar aqui: {0}",
     "common.errors.xonos_not_available": "Não há nada para tocar aqui: o serviço não deu músicas que possam ser tocadas (por exemplo, não estão disponíveis no seu país).",
     "provider.spotify.errors.xonos_playlist_not_yours": "O Spotify só dá ao seu app as músicas das suas playlists, não das que você segue nem das do próprio Spotify (como Daily Mix). No Spotify, copie as músicas para uma playlist sua e toque essa.",
-    "common.errors.xonos_service_down": "Não há nada para tocar aqui: {0} não está funcionando agora. Em Serviços do Music Assistant aparece o motivo."
+    "common.errors.xonos_service_down": "Não há nada para tocar aqui: {0} não está funcionando agora. Em Serviços do Music Assistant aparece o motivo.",
+    "provider.spotify.setup_flow.xonos_finish_retry.title": "O Spotify não arrancou",
+    "provider.spotify.setup_flow.xonos_finish_retry.description": "O Music Assistant não conseguiu iniciar o Spotify com estas definições, por exemplo porque a rede falhou por um momento. O acesso e o emparelhamento mantêm-se: toca em Concluir para tentar de novo."
   },
   "el_GR": {
     "provider.spotify.setup_flow.xonos_client_id.title": "Το Client ID της εφαρμογής σας Spotify",
@@ -109,7 +121,9 @@
     "common.errors.xonos_no_playable_items": "Δεν υπάρχει τίποτα για αναπαραγωγή εδώ: {0}",
     "common.errors.xonos_not_available": "Δεν υπάρχει τίποτα για αναπαραγωγή εδώ: η υπηρεσία δεν έδωσε τραγούδια που μπορούν να παιχτούν (για παράδειγμα, δεν είναι διαθέσιμα στη χώρα σας).",
     "provider.spotify.errors.xonos_playlist_not_yours": "Το Spotify δίνει στη δική σας εφαρμογή μόνο τα τραγούδια των δικών σας playlist, όχι αυτών που ακολουθείτε ούτε του ίδιου του Spotify (όπως το Daily Mix). Στο Spotify αντιγράψτε τα τραγούδια σε μια δική σας playlist και παίξτε αυτήν.",
-    "common.errors.xonos_service_down": "Δεν υπάρχει τίποτα για αναπαραγωγή εδώ: το {0} δεν λειτουργεί αυτή τη στιγμή. Στις Υπηρεσίες του Music Assistant φαίνεται το γιατί."
+    "common.errors.xonos_service_down": "Δεν υπάρχει τίποτα για αναπαραγωγή εδώ: το {0} δεν λειτουργεί αυτή τη στιγμή. Στις Υπηρεσίες του Music Assistant φαίνεται το γιατί.",
+    "provider.spotify.setup_flow.xonos_finish_retry.title": "Το Spotify δεν ξεκίνησε",
+    "provider.spotify.setup_flow.xonos_finish_retry.description": "Το Music Assistant δεν μπόρεσε να ξεκινήσει το Spotify με αυτές τις ρυθμίσεις, για παράδειγμα επειδή το δίκτυο χάθηκε για λίγο. Η σύνδεση και η αντιστοίχιση διατηρούνται: πάτησε Ολοκλήρωση για να δοκιμάσεις ξανά."
   },
   "ru_RU": {
     "provider.spotify.setup_flow.xonos_client_id.title": "Client ID вашего приложения Spotify",
@@ -125,7 +139,9 @@
     "common.errors.xonos_no_playable_items": "Здесь нечего воспроизводить: {0}",
     "common.errors.xonos_not_available": "Здесь нечего воспроизводить: сервис не дал треков, которые можно воспроизвести (например, они недоступны в вашей стране).",
     "provider.spotify.errors.xonos_playlist_not_yours": "Spotify даёт вашему приложению только треки ваших плейлистов, а не тех, на которые вы подписаны, и не плейлистов самого Spotify (например, Daily Mix). В Spotify скопируйте треки в свой плейлист и включите его.",
-    "common.errors.xonos_service_down": "Здесь нечего воспроизводить: {0} сейчас не работает. Причина указана в разделе «Сервисы Music Assistant»."
+    "common.errors.xonos_service_down": "Здесь нечего воспроизводить: {0} сейчас не работает. Причина указана в разделе «Сервисы Music Assistant».",
+    "provider.spotify.setup_flow.xonos_finish_retry.title": "Spotify не запустился",
+    "provider.spotify.setup_flow.xonos_finish_retry.description": "Music Assistant не смог запустить Spotify с этими настройками, например потому что сеть ненадолго пропала. Вход и сопряжение сохранены: нажмите «Завершить», чтобы попробовать снова."
   },
   "zh_CN": {
     "provider.spotify.setup_flow.xonos_client_id.title": "你的 Spotify 应用的 Client ID",
@@ -141,6 +157,8 @@
     "common.errors.xonos_no_playable_items": "这里没有可播放的内容：{0}",
     "common.errors.xonos_not_available": "这里没有可播放的内容：服务没有提供可以播放的歌曲（例如它们在你所在的国家/地区不可用）。",
     "provider.spotify.errors.xonos_playlist_not_yours": "Spotify 只向你自己的应用提供你自己的播放列表中的歌曲，不包括你关注的播放列表和 Spotify 自己的播放列表（例如 Daily Mix）。请在 Spotify 中把这些歌曲复制到你自己的播放列表，然后播放那个播放列表。",
-    "common.errors.xonos_service_down": "这里没有可播放的内容：{0} 目前无法使用。原因可在“Music Assistant 服务”中查看。"
+    "common.errors.xonos_service_down": "这里没有可播放的内容：{0} 目前无法使用。原因可在“Music Assistant 服务”中查看。",
+    "provider.spotify.setup_flow.xonos_finish_retry.title": "Spotify 未能启动",
+    "provider.spotify.setup_flow.xonos_finish_retry.description": "Music Assistant 无法用这些设置启动 Spotify，例如网络短暂中断。登录和配对都会保留：点击“完成”重试。"
   }
 }

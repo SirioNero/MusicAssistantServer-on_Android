@@ -241,6 +241,7 @@
     <string name="secret_saved">Guardada (escribe para cambiarla)</string>
     <string name="field_required">Obligatorio</string>
     <string name="field_invalid">Valor no válido</string>
+    <string name="folder_not_found">Esta carpeta no existe o Xonos no puede leerla.</string>
     <string name="show_advanced">Mostrar opciones avanzadas</string>
     <string name="hide_advanced">Ocultar opciones avanzadas</string>
     <string name="flow_cancel">Cancelar</string>

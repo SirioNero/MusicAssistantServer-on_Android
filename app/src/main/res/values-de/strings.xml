@@ -241,6 +241,7 @@
     <string name="secret_saved">Gespeichert (zum Ändern tippen)</string>
     <string name="field_required">Pflichtfeld</string>
     <string name="field_invalid">Ungültiger Wert</string>
+    <string name="folder_not_found">Diesen Ordner gibt es nicht, oder Xonos kann ihn nicht lesen.</string>
     <string name="show_advanced">Erweiterte Optionen anzeigen</string>
     <string name="hide_advanced">Erweiterte Optionen ausblenden</string>
     <string name="flow_cancel">Abbrechen</string>

@@ -241,6 +241,7 @@
     <string name="secret_saved">Salva (digite para mudar)</string>
     <string name="field_required">Obrigatório</string>
     <string name="field_invalid">Valor inválido</string>
+    <string name="folder_not_found">Esta pasta não existe ou o Xonos não a consegue ler.</string>
     <string name="show_advanced">Mostrar opções avançadas</string>
     <string name="hide_advanced">Ocultar opções avançadas</string>
     <string name="flow_cancel">Cancelar</string>

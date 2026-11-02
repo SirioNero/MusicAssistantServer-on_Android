@@ -365,11 +365,14 @@ def _patch(root: Path) -> None:
     )
     _replace(spotify, "import re\nimport tempfile\n", "import re\nimport shutil\nimport tempfile\n")
     # La cartella che propone il servizio dei file sul disco: sul telefono è quella della musica, che
-    # Xonos chiede il permesso di leggere.
+    # Xonos chiede il permesso di leggere. Xonos dice quale (XONOS_MUSIC_DIR): in un profilo secondario o nello
+    # Spazio privato di Android non è /storage/emulated/0/Music ma /storage/emulated/<profilo>/Music.
+    constants = root / "providers" / "filesystem_local" / "constants.py"
+    _replace(constants, "from dataclasses import replace\n", "import os\nfrom dataclasses import replace\n")
     _replace(
-        root / "providers" / "filesystem_local" / "constants.py",
+        constants,
         '    default_value="/media",\n',
-        '    default_value="/storage/emulated/0/Music",  # Xonos: la musica del telefono\n',
+        '    default_value=os.environ.get("XONOS_MUSIC_DIR", "/storage/emulated/0/Music"),  # Xonos: la musica\n',
     )
     # Il testo sulle copertine generate delle playlist: sul telefono nessuno dei caratteri cercati c'è, e si usa
     # quello di Pillow, che passa da FreeType. La libreria di FreeType di Chaquopy non è allineata a 16 KB: sui

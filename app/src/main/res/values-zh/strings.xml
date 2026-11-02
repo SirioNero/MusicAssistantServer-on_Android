@@ -231,6 +231,7 @@
     <string name="secret_saved">已保存（输入以更改）</string>
     <string name="field_required">必填</string>
     <string name="field_invalid">无效的值</string>
+    <string name="folder_not_found">此文件夹不存在，或 Xonos 无法读取它。</string>
     <string name="show_advanced">显示高级选项</string>
     <string name="hide_advanced">隐藏高级选项</string>
     <string name="flow_cancel">取消</string>

@@ -241,6 +241,7 @@
     <string name="secret_saved">Αποθηκευμένο (γράψτε για αλλαγή)</string>
     <string name="field_required">Υποχρεωτικό</string>
     <string name="field_invalid">Μη έγκυρη τιμή</string>
+    <string name="folder_not_found">Αυτός ο φάκελος δεν υπάρχει ή το Xonos δεν μπορεί να τον διαβάσει.</string>
     <string name="show_advanced">Εμφάνιση προηγμένων επιλογών</string>
     <string name="hide_advanced">Απόκρυψη προηγμένων επιλογών</string>
     <string name="flow_cancel">Ακύρωση</string>

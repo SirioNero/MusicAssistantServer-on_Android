@@ -244,6 +244,7 @@
     <string name="secret_saved">Saved (type to change it)</string>
     <string name="field_required">Required</string>
     <string name="field_invalid">Not a valid value</string>
+    <string name="folder_not_found">This folder doesn’t exist, or Xonos can’t read it.</string>
     <string name="show_advanced">Show advanced options</string>
     <string name="hide_advanced">Hide advanced options</string>
     <string name="flow_cancel">Cancel</string>

@@ -261,6 +261,7 @@
     <string name="secret_saved">Сохранено (введите, чтобы изменить)</string>
     <string name="field_required">Обязательно</string>
     <string name="field_invalid">Недопустимое значение</string>
+    <string name="folder_not_found">Этой папки нет, или Xonos не может её прочитать.</string>
     <string name="show_advanced">Показать дополнительные настройки</string>
     <string name="hide_advanced">Скрыть дополнительные настройки</string>
     <string name="flow_cancel">Отмена</string>

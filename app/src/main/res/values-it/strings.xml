@@ -241,6 +241,7 @@
     <string name="secret_saved">Salvata (scrivi per cambiarla)</string>
     <string name="field_required">Obbligatorio</string>
     <string name="field_invalid">Valore non valido</string>
+    <string name="folder_not_found">Questa cartella non c’è, o Xonos non può leggerla.</string>
     <string name="show_advanced">Mostra le opzioni avanzate</string>
     <string name="hide_advanced">Nascondi le opzioni avanzate</string>
     <string name="flow_cancel">Annulla</string>

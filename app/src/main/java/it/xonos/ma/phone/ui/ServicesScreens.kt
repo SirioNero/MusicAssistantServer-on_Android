@@ -588,6 +588,8 @@ private fun FieldHelp(description: String?, error: String?) {
 private fun errorText(error: String): String = when (error) {
     "required" -> stringResource(R.string.field_required)
     "invalid_value" -> stringResource(R.string.field_invalid)
+    // Il servizio dei file sul disco, con una cartella che non c'è (o che Xonos non può leggere).
+    "music_directory_not_found" -> stringResource(R.string.folder_not_found)
     else -> error
 }
 

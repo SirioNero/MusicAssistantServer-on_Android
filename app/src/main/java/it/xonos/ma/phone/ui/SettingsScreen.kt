@@ -281,6 +281,8 @@ private fun PhoneServerCard(page: SettingsPage, model: PhoneModel, host: Host) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            // Mentre scarica, prepara e avvia la prima volta (qualche minuto in tutto): schermo acceso.
+            KeepScreenOn(progress != null || (page.checking && model.usesPhoneServer(page)))
             page.phoneServerError?.let { error ->
                 Text(stringResource(R.string.phone_server_failed, error), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
             }

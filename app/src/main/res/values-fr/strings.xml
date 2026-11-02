@@ -241,6 +241,7 @@
     <string name="secret_saved">Enregistré (tapez pour le changer)</string>
     <string name="field_required">Obligatoire</string>
     <string name="field_invalid">Valeur non valide</string>
+    <string name="folder_not_found">Ce dossier n’existe pas, ou Xonos ne peut pas le lire.</string>
     <string name="show_advanced">Afficher les options avancées</string>
     <string name="hide_advanced">Masquer les options avancées</string>
     <string name="flow_cancel">Annuler</string>

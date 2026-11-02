@@ -6,6 +6,7 @@ import android.net.LinkProperties
 import android.net.Network
 import android.net.wifi.WifiManager
 import android.os.Build
+import android.os.Environment
 import android.os.SystemClock
 import android.system.Os
 import android.system.OsConstants
@@ -100,13 +101,19 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
 
     override suspend fun start(): Boolean = withContext(Dispatchers.IO) {
         launch()
-        val deadline = SystemClock.elapsedRealtime() + START_TIMEOUT_MS
-        while (SystemClock.elapsedRealtime() < deadline) {
+        // Si conta solo il tempo aspettato davvero: a schermo spento Android può congelare l'app (e il server con lei),
+        // e al risveglio quel tempo non è un avvio lento (prima: "it didn't start in 180 s" col server che partiva).
+        var waited = 0L
+        var last = SystemClock.elapsedRealtime()
+        while (waited < START_TIMEOUT_MS) {
             when (state) {
                 State.RUNNING -> return@withContext true
                 State.FAILED, State.STOPPED -> return@withContext false
                 State.STARTING -> delay(POLL_MS)
             }
+            val now = SystemClock.elapsedRealtime()
+            waited += minOf(now - last, 4 * POLL_MS)
+            last = now
         }
         error = "it didn't start in ${START_TIMEOUT_MS / 1000} s"
         false
@@ -160,6 +167,8 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
                 put("XONOS_PROOT_LOADER", prootLoader.path)
             }
             put("XONOS_DNS_FILE", dnsFile.path)
+            // La cartella Music di questo profilo (in un profilo secondario non è /storage/emulated/0/Music).
+            put("XONOS_MUSIC_DIR", Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC).path)
             put("PYTHONHOME", dir.path)
             put("PYTHONPATH", "$dir/app:$dir/site-packages")
             put("LD_LIBRARY_PATH", "$dir/lib:$dir/site-packages/chaquopy/lib")

@@ -337,11 +337,21 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
     )
 
     python = os.path.join(os.environ.get("XONOS_BIN", ""), "python3")
-    script = Path(__file__).with_name("xonos_fake_soloist.py")
     setup = {CONF_SOLOIST_API_KEY: "xonos-finta", CONF_SOLOIST_CONSENT: True}
+    # Anche le righe di debug del motore (lì finisce l'uscita del finto Soloist): se qualcosa non va, nel risultato.
+    records: list[str] = []
+
+    class Keep(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:
+            records.append(record.getMessage()[:200])
+
+    log = logging.getLogger("xonos.selftest.soloist")
+    log.setLevel(logging.DEBUG)
+    keep = Keep(logging.DEBUG)
+    log.addHandler(keep)
     provider = SimpleNamespace(
         mass=mass,
-        logger=logging.getLogger("xonos.selftest.soloist"),
+        logger=log,
         instance_id="xonos_fake",
         name="Spotify finto",
         available=True,
@@ -367,7 +377,8 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
     real_park = solo._XONOS_PARK_S
     solo.SoloistBinaryManager = FakeManager
     plain_args = backend._session_args
-    backend._session_args = lambda uri: [python, str(script), *plain_args(uri)[1:]]
+    # come modulo, come xonos_server: nel pacchetto il codice di Xonos può esserci solo compilato (.pyc)
+    backend._session_args = lambda uri: [python, "-m", "xonos_fake_soloist", *plain_args(uri)[1:]]
 
     def mark(uri: str) -> int:
         """Il valore del brano, come lo scrive il finto Soloist (in milioni)."""
@@ -403,6 +414,7 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
             failed.append(f"{what} ({seen})" if seen != "" else what)
 
     a, b, c, d, e = (f"spotify:track:xonos{x}" for x in "abcde")
+    first_a = first_b = first_r = first_e = -1.0
     try:
         os.environ["XONOS_FAKE_LEAK"] = "1"
         os.environ["XONOS_FAKE_DURATION_MS"] = "30000"
@@ -431,7 +443,10 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
         first_e, values, _ = await take(e, "e", seconds=1.0)
         check("da capo dopo un salto rifiutato", backend._run is not run_d and values == {mark(e)}, values)
         check("salto rifiutato contato", backend._xonos_jump_failures == 1, backend._xonos_jump_failures)
+    except Exception as err:  # noqa: BLE001 - nel risultato, con le ultime righe del motore
+        failed.append(repr(err))
     finally:
+        log.removeHandler(keep)
         for key in ("XONOS_FAKE_LEAK", "XONOS_FAKE_DURATION_MS", "XONOS_FAKE_NO_JUMP"):
             os.environ.pop(key, None)
         solo.SoloistBinaryManager = real_manager
@@ -446,7 +461,7 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
         f" da capo dopo un salto rifiutato {first_e:.2f} s"
     )
     if failed:
-        detail += "; non va: " + ", ".join(failed)
+        detail += "; non va: " + ", ".join(failed) + " | motore: " + " / ".join(records[-15:])
     return not failed, detail
 
 

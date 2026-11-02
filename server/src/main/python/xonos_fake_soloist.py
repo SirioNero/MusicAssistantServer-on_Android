@@ -192,4 +192,12 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    print("finto soloist: parte", flush=True)
+    try:
+        asyncio.run(main())
+    except BaseException as err:
+        import traceback
+
+        traceback.print_exc()
+        print(f"finto soloist: si ferma ({err!r})", flush=True)
+        raise

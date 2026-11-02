@@ -252,6 +252,8 @@ class PlaybackService : MediaLibraryService() {
      * invece di rispondere con cartelle in errore e voci vuote che l'auto poi non richiede.
      */
     private suspend fun awaitConnected() {
+        // Senza un Music Assistant scelto non c'è niente da aspettare.
+        if (app.repo.connection.value == Connection.NotConfigured) return
         val ok = withTimeoutOrNull(BROWSE_WAIT_MS) { app.repo.connection.first { it is Connection.Connected } } != null
         if (!ok) browsedOffline = true
     }

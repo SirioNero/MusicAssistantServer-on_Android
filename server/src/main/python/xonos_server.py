@@ -473,7 +473,11 @@ def _cpu_sample(ticks: int, before: dict[int, int], window: _CpuWindow) -> dict[
         alive.add(group)
         current[pid] = total
         name = os.path.basename(argv[0])
-        name = "proot" if name.startswith("libproot") else name
+        if name.startswith("libproot"):
+            # Col programma che segue (quello dopo "-w <cartella>"): proot[soloist] e proot[pulseaudio] separati, così
+            # dal registro si vede per quale dei due proot lavora di più.
+            at = argv.index("-w") + 2 if "-w" in argv else len(argv)
+            name = f"proot[{os.path.basename(argv[at])}]" if at < len(argv) else "proot"
         # Un processo nato nel frattempo (al più CPU_SAMPLE_S secondi fa) conta tutto il suo tempo.
         window.used[name] = window.used.get(name, 0.0) + (total - before.get(pid, 0)) / ticks
         together[name] = together.get(name, 0) + 1

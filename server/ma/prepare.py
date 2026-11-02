@@ -618,6 +618,52 @@ def _spotify(root: Path) -> None:
         "\n\n"
         "async def _authorize_developer_key(\n",
     )
+    # Un'app Spotify in Development Mode fa entrare solo gli account scritti nella sua User Management (il
+    # proprietario e al massimo altri 4): con un altro account l'accesso riesce, ma poi Spotify risponde 403 "the
+    # user may not be registered" a ogni richiesta. Music Assistant saltava il controllo e il servizio non andava,
+    # senza dire perché: ora un passo spiega cosa fare e, dopo, controlla di nuovo con lo stesso accesso.
+    _replace(
+        flow,
+        "            if response.status != 200:\n"
+        '                LOGGER.warning("Account check skipped: Spotify replied HTTP %s", response.status)\n'
+        "                return None\n",
+        '            if response.status == 403 and "registered" in (await response.text()).lower():\n'
+        "                # Xonos: l'account non è tra gli utenti dell'app Spotify della persona\n"
+        "                raise _XonosNotRegistered\n"
+        "            if response.status != 200:\n"
+        '                LOGGER.warning("Account check skipped: Spotify replied HTTP %s", response.status)\n'
+        "                return None\n",
+    )
+    _replace(
+        flow,
+        '        if account_id := await _verify_account(session, str(token_result["access_token"])):\n',
+        '        if account_id := await _xonos_verify_account(session, str(token_result["access_token"])):\n',
+    )
+    _replace(
+        flow,
+        "async def _verify_account(session: SetupSession, access_token: str) -> str | None:\n",
+        "class _XonosNotRegistered(Exception):\n"
+        '    """Xonos: Spotify non fa entrare questo account nell\'app della persona (User Management)."""\n'
+        "\n\n"
+        "async def _xonos_verify_account(session: SetupSession, access_token: str) -> str | None:\n"
+        '    """\n'
+        "    Xonos: come _verify_account, ma se l'account non è tra gli utenti dell'app Spotify della persona\n"
+        "    spiega come aggiungerlo e poi controlla di nuovo.\n"
+        "\n"
+        "    :param session: The setup session driving the flow.\n"
+        "    :param access_token: The access token from the just-completed sign-in.\n"
+        '    """\n'
+        "    errors: dict[str, str] | None = None\n"
+        "    while True:\n"
+        "        try:\n"
+        "            return await _verify_account(session, access_token)\n"
+        "        except _XonosNotRegistered:\n"
+        '            LOGGER.warning("Spotify: this account is not in the User Management of the Spotify app")\n'
+        '            await session.form([], step_id="xonos_user_not_registered", errors=errors)\n'
+        '            errors = {"base": "xonos_user_still_not_registered"}\n'
+        "\n\n"
+        "async def _verify_account(session: SetupSession, access_token: str) -> str | None:\n",
+    )
     # Con l'app della persona Spotify può dire "non suonabile" (is_playable) anche dei brani che si suonano, e allora
     # non si suonava niente ("There is nothing to play here."). A suonare è librespot, che decide da sé: si prova
     # comunque, tranne per il filtro dei contenuti espliciti della persona, e lo si scrive nel registro.

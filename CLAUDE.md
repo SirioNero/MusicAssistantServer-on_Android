@@ -711,6 +711,12 @@ Da una caccia ai bug con più agenti (8 aree, un giudice avversario per area) e 
     browser; con gli altri Music Assistant l'app lo dice a parole, `ENDED_AWAY`). Spotify: passo `xonos_finishing`
     ("Avvio di Spotify…") prima di `finish`, e se l'errore dice che il token non vale più (`refresh_token_invalid`,
     `invalid_grant`, `revoked`) il riprova rifà l'accesso nel browser. Descrizioni selezionabili, avanzamento in Markdown.
+    Account non scritto nella User Management dell'app Spotify della persona (Development Mode: il proprietario e altri
+    4): l'accesso riesce, poi `/v1/me` risponde 403 con "registered" nel testo e Music Assistant saltava il controllo.
+    Ora il passo `xonos_user_not_registered` spiega cosa fare e, ad Avanti, ricontrolla con lo stesso token
+    (`_xonos_verify_account`). Non provato con Spotify vero (il testo del 403 è quello che riportano gli sviluppatori).
+    I testi di Soloist che Music Assistant non traduce in italiano (35) sono in `server/ma/ma-strings.json`: `_texts`
+    li unisce solo per voci che Music Assistant ha in inglese (sennò si ferma).
   - Correzioni alle correzioni: tornando al server salvato in `choose` tornano token e accesso; avvisi sopra il
     lettore solo se si vede; "Riprova" con `phoneServerRetrying`; `forgetServer` solo se cambia l'indirizzo di casa,
     e tiene la pagina delle Impostazioni in qualsiasi scheda; `MaRepository.release()` mette Connecting (il prossimo

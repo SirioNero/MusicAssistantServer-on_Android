@@ -1,0 +1,1 @@
+librespot 0.8.0 59a21d4 (Built on 2026-11-02, Build ID: C9cl4Znv, Profile: release)

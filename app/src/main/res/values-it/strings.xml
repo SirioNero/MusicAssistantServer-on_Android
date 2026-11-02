@@ -255,6 +255,7 @@
     <string name="flow_done">Fatto</string>
     <string name="flow_aborted">Configurazione interrotta: %1$s</string>
     <string name="flow_aborted_plain">Configurazione interrotta.</string>
+    <string name="flow_ended_away">La configurazione si è chiusa mentre eri fuori da Xonos. Se il servizio non è nell’elenco, ricominciala.</string>
     <string name="flow_close">Chiudi</string>
     <string name="notice_saved">Salvato</string>
     <string name="notice_removed">Servizio tolto</string>

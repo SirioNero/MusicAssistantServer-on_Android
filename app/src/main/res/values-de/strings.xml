@@ -255,6 +255,7 @@
     <string name="flow_done">Fertig</string>
     <string name="flow_aborted">Einrichtung abgebrochen: %1$s</string>
     <string name="flow_aborted_plain">Einrichtung abgebrochen.</string>
+    <string name="flow_ended_away">Die Einrichtung wurde beendet, während du nicht in Xonos warst. Wenn der Dienst nicht in der Liste steht, starte sie erneut.</string>
     <string name="flow_close">Schließen</string>
     <string name="notice_saved">Gespeichert</string>
     <string name="notice_removed">Dienst entfernt</string>

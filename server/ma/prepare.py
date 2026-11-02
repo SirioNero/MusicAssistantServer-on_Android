@@ -387,6 +387,7 @@ def _patch(root: Path) -> None:
     # a mano, con la chiave di Last.fm della persona.
     _replace(root / "constants.py", '    ("lastfm_recommendations", False),\n', "")
     _reasons(root)
+    _flows(root)
     _spotify(root)
     _soloist(root)
     _texts(root)
@@ -447,6 +448,45 @@ def _reasons(root: Path) -> None:
     )
 
 
+def _flows(root: Path) -> None:
+    """
+    I flussi di configurazione dei servizi (Spotify e gli altri) sul telefono. Si fanno passando da un'app all'altra
+    (il browser, l'app Spotify, il Developer Dashboard), e intanto Xonos può perdere la connessione o restare indietro:
+    - un flusso fermo da 15 minuti si chiudeva, e creare l'app Spotify o la chiave di Soloist sul telefono ci mette
+      di più: sul server di una persona sola si aspettano 3 ore;
+    - un flusso finito (o interrotto) mentre la persona era altrove spariva subito, e al ritorno Xonos chiedeva il
+      passo e riceveva "Unknown (or finished) setup flow" al posto dell'esito: ora config/flows/get dà ancora
+      l'ultimo passo degli ultimi flussi finiti.
+    """
+    flows = root / "controllers" / "config" / "flows.py"
+    _replace(
+        flows,
+        "IDLE_FLOW_TTL = 15 * 60\n",
+        "IDLE_FLOW_TTL = 3 * 60 * 60  # Xonos: sul telefono, tra un'app e l'altra, ci vuole di più\n"
+        "# Xonos: gli ultimi flussi finiti, per chi torna a chiedere il passo dopo la fine\n"
+        "_XONOS_FINISHED: dict = {}\n",
+    )
+    _replace(
+        flows,
+        "        self._setup_flows.pop(flow.session.flow_id, None)\n",
+        "        self._setup_flows.pop(flow.session.flow_id, None)\n"
+        "        _XONOS_FINISHED[flow.session.flow_id] = flow\n"
+        "        while len(_XONOS_FINISHED) > 16:\n"
+        "            _XONOS_FINISHED.pop(next(iter(_XONOS_FINISHED)))\n",
+    )
+    _replace(
+        flows,
+        "        flow = self._get_flow(flow_id)\n"
+        "        self._check_flow_permission(flow)\n"
+        "        flow.session.last_activity = time.monotonic()\n"
+        "        if (step := flow.session.current_step) is None:\n",
+        "        flow = self._setup_flows.get(flow_id) or _XONOS_FINISHED.get(flow_id) or self._get_flow(flow_id)\n"
+        "        self._check_flow_permission(flow)\n"
+        "        flow.session.last_activity = time.monotonic()\n"
+        "        if (step := flow.session.current_step) is None:\n",
+    )
+
+
 def _spotify(root: Path) -> None:
     """
     Spotify sul telefono.
@@ -493,14 +533,23 @@ def _spotify(root: Path) -> None:
         "            # passo si ripete con l'errore, come fa Music Assistant: chiudere il flusso butterebbe anche\n"
         "            # l'abbinamento di Soloist appena fatto\n"
         "            xonos_errors = None\n"
+        "            xonos_reauth = False\n"
         "            while True:\n"
         "                if xonos_errors is not None:\n"
         '                    await session.form([], step_id="xonos_finish_retry", errors=xonos_errors, last_step=True)\n'
+        "                    if xonos_reauth:\n"
+        "                        # Il tentativo di prima ha già rinnovato (e invalidato) il token: un accesso nuovo nel\n"
+        "                        # browser, l'abbinamento resta\n"
+        '                        token_result = await _pkce_authenticate(session, client_id, step_id="authenticate")\n'
+        '                        setup_data[CONF_REFRESH_TOKEN_GLOBAL] = str(token_result["refresh_token"])\n'
+        "                # Mentre Music Assistant avvia Spotify (Soloist, PulseAudio, l'accesso) lo schermo lo dice\n"
+        '                session.progress("xonos_finishing", text="xonos_finishing")\n'
         "                try:\n"
         "                    await session.finish(setup_data)\n"
         "                    return\n"
         "                except SetupFlowError as err:\n"
         '                    xonos_errors = {"base": err.translation_key or str(err)}\n'
+        '                    xonos_reauth = any(word in f"{err.translation_key} {err}" for word in ("refresh_token_invalid", "invalid_grant", "revoked"))\n'
         '        client_id_default = str(session.context.setup_data.get(CONF_CLIENT_ID) or "")\n',
     )
     _replace(

@@ -275,6 +275,7 @@
     <string name="flow_done">Готово</string>
     <string name="flow_aborted">Настройка прервана: %1$s</string>
     <string name="flow_aborted_plain">Настройка прервана.</string>
+    <string name="flow_ended_away">Настройка завершилась, пока вы были вне Xonos. Если сервиса нет в списке, начните заново.</string>
     <string name="flow_close">Закрыть</string>
     <string name="notice_saved">Сохранено</string>
     <string name="notice_removed">Сервис удалён</string>

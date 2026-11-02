@@ -255,6 +255,7 @@
     <string name="flow_done">OK</string>
     <string name="flow_aborted">Configuration interrompue : %1$s</string>
     <string name="flow_aborted_plain">Configuration interrompue.</string>
+    <string name="flow_ended_away">La configuration s’est terminée pendant que tu étais hors de Xonos. Si le service n’est pas dans la liste, recommence.</string>
     <string name="flow_close">Fermer</string>
     <string name="notice_saved">Enregistré</string>
     <string name="notice_removed">Service retiré</string>

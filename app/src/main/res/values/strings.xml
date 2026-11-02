@@ -258,6 +258,7 @@
     <string name="flow_done">Done</string>
     <string name="flow_aborted">Setup stopped: %1$s</string>
     <string name="flow_aborted_plain">Setup stopped.</string>
+    <string name="flow_ended_away">Setup ended while you were outside Xonos. If the service isn’t in the list, start it again.</string>
     <string name="flow_close">Close</string>
     <string name="notice_saved">Saved</string>
     <string name="notice_removed">Service removed</string>

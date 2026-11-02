@@ -255,6 +255,7 @@
     <string name="flow_done">Τέλος</string>
     <string name="flow_aborted">Η ρύθμιση σταμάτησε: %1$s</string>
     <string name="flow_aborted_plain">Η ρύθμιση σταμάτησε.</string>
+    <string name="flow_ended_away">Η ρύθμιση έκλεισε ενώ ήσουν έξω από το Xonos. Αν η υπηρεσία δεν είναι στη λίστα, ξεκίνα ξανά.</string>
     <string name="flow_close">Κλείσιμο</string>
     <string name="notice_saved">Αποθηκεύτηκε</string>
     <string name="notice_removed">Η υπηρεσία αφαιρέθηκε</string>

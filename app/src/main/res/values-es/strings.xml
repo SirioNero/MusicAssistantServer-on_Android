@@ -255,6 +255,7 @@
     <string name="flow_done">Hecho</string>
     <string name="flow_aborted">Configuración detenida: %1$s</string>
     <string name="flow_aborted_plain">Configuración detenida.</string>
+    <string name="flow_ended_away">La configuración terminó mientras estabas fuera de Xonos. Si el servicio no está en la lista, empieza de nuevo.</string>
     <string name="flow_close">Cerrar</string>
     <string name="notice_saved">Guardado</string>
     <string name="notice_removed">Servicio quitado</string>

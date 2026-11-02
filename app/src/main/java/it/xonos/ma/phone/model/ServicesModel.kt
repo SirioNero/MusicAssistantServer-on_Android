@@ -157,7 +157,10 @@ class ServicesModel internal constructor(
                 if (e.problem == Problem.NOT_CONNECTED || e.problem == Problem.NETWORK) return@launch
                 val now = runCatching { services.configured() }.getOrNull() ?: return@launch
                 val added = now.filter { it.domain == page.domain }.map { it.instanceId }.firstOrNull { it !in page.before }
-                show(page, step.copy(type = if (added != null) "finish" else "abort", instanceId = added, reason = if (added != null) null else e.message))
+                // Il flusso non c'è più e non è comparso un servizio nuovo: si è chiuso mentre si era fuori (per esempio
+                // nel browser). Music Assistant risponde "'Unknown (or finished) setup flow: …'": lo si dice a parole.
+                val reason = if (e.message.orEmpty().contains("setup flow")) ENDED_AWAY else e.message
+                show(page, step.copy(type = if (added != null) "finish" else "abort", instanceId = added, reason = if (added != null) null else reason))
             }
         }
     }
@@ -259,6 +262,9 @@ class ServicesModel internal constructor(
     }
 
     companion object {
+        /** Il motivo di un flusso chiuso mentre si era fuori dall'app: lo schermo lo dice a parole. */
+        const val ENDED_AWAY = "xonos:ended-away"
+
         /** L'ordine dei gruppi: prima la musica, poi le casse, il resto in fondo. */
         val TYPES = listOf("music", "player", "plugin", "metadata", "audio_analysis")
 

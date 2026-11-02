@@ -1,6 +1,7 @@
 package it.xonos.ma.sendspin
 
 import android.util.Log
+import it.xonos.ma.data.SkipTrace
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -68,6 +69,9 @@ interface PcmOutput {
 
     /** Quanti fotogrammi vuole prima di cominciare a suonare. */
     val startFrames: Int get() = 0
+
+    /** Dove va il suono (altoparlante, Bluetooth A2DP...), per il registro; null se non si sa. */
+    val route: String? get() = null
 
     fun setGain(gain: Float)
 
@@ -177,6 +181,10 @@ class AudioEngine(
     private var statBlocks = 0
     private var statSum = 0L
     private var statMax = 0L
+
+    // L'ultima riga "lo si salta" nel registro e quante non ci sono finite dopo: una al secondo al massimo.
+    private var dropLoggedAt: Long? = null
+    private var dropsUnlogged = 0
 
     private val _outputting = MutableStateFlow(false)
 
@@ -404,6 +412,7 @@ class AudioEngine(
 
     private fun ensureOutput(format: StreamFormat): PcmOutput? {
         output?.let { return it }
+        val asked = clock()
         val created = outputs(format.sampleRate, format.channels) ?: return null
         synchronized(outputLock) {
             output = created
@@ -415,6 +424,8 @@ class AudioEngine(
         timed = false
         openedAt = clock()
         created.play()
+        // Dopo play: prima l'uscita non sa ancora dove va.
+        Log.i(TAG, "Uscita audio aperta in ${(clock() - asked) / 1000} ms${created.route?.let { " ($it)" }.orEmpty()}${SkipTrace.suffix()}")
         return created
     }
 
@@ -432,7 +443,10 @@ class AudioEngine(
         // sospeso (l'autoradio dopo una pausa) può restare fermo più di quanto [prime] aspetta, e il ritardo che si
         // scopre adesso è ancora quello dell'avvio, non un buco della rete: non si salta.
         val firstStamp = !timed && out.presentationTimeUs(framesWritten) != null
-        if (firstStamp) timed = true
+        if (firstStamp) {
+            timed = true
+            Log.i(TAG, "Uscita audio: primo tempo vero dopo ${(clock() - openedAt) / 1000} ms${out.route?.let { " ($it)" }.orEmpty()}${SkipTrace.suffix()}")
+        }
         var error = heardAt(out) - target // positivo: siamo in ritardo
         report(error, fresh)
         var start = 0
@@ -451,14 +465,14 @@ class AudioEngine(
                 // L'uscita ci ha messo più del margine chiesto al server: l'inizio del brano non si
                 // salta, lo si suona un po' dopo (fino a [MAX_LATE_US]) e si recupera piano.
                 val late = min(error, max(0L, MAX_LATE_US - lateUs))
-                Log.d(TAG, "Inizio ${(lateUs + late) / 1000} ms dopo il momento giusto: non si salta, si recupera piano")
+                Log.i(TAG, "Inizio ${(lateUs + late) / 1000} ms dopo il momento giusto: non si salta, si recupera piano")
                 lateUs += late
                 target += late
                 error -= late
             }
             if (error > 0) {
                 // Audio già passato: lo si salta.
-                Log.d(TAG, "Audio in ritardo di ${error / 1000} ms: lo si salta")
+                logDrop(error)
                 val drop = framesFor(error, out.sampleRate).coerceAtMost(count.toLong()).toInt()
                 start = drop
                 count -= drop
@@ -506,7 +520,7 @@ class AudioEngine(
         val now = clock()
         if (fresh) {
             // L'attesa iniziale non è uno scarto: le statistiche partono da dopo l'allineamento.
-            Log.d(TAG, "Avvio a ${error / 1000} ms dal momento giusto")
+            Log.i(TAG, "Avvio a ${error / 1000} ms dal momento giusto${SkipTrace.suffix()}")
             statSince = now
             statBlocks = 0
             statSum = 0
@@ -524,6 +538,20 @@ class AudioEngine(
         statBlocks = 0
         statSum = 0
         statMax = 0
+    }
+
+    /** "Lo si salta" nel registro, una riga al secondo al massimo: dopo un buco della rete può capitare a più pacchetti. */
+    private fun logDrop(errorUs: Long) {
+        val now = clock()
+        val last = dropLoggedAt
+        if (last != null && now - last < DROP_LOG_US) {
+            dropsUnlogged++
+            return
+        }
+        val more = if (dropsUnlogged > 0) " (e altre $dropsUnlogged volte dalla riga di prima)" else ""
+        Log.i(TAG, "Audio in ritardo di ${errorUs / 1000} ms: lo si salta$more${SkipTrace.suffix()}")
+        dropLoggedAt = now
+        dropsUnlogged = 0
     }
 
     /**
@@ -607,6 +635,7 @@ class AudioEngine(
         const val SOFT_US = 30_000.0
         const val MIN_LATENCY_US = 20_000L
         const val STATS_US = 30_000_000L
+        const val DROP_LOG_US = 1_000_000L
         const val PRIME_STEP_US = 10_000L
         const val PRIME_AHEAD_US = 50_000L
         const val PRIME_SLEEP_MS = 5L

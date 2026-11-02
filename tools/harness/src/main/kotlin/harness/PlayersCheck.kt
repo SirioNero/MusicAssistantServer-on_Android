@@ -71,12 +71,12 @@ private fun checks(): Unit = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val gathered = SkipSender(scope) { sent += it; delay(300) }
         var done = 0
-        for (i in 1..3) { gathered.request(i, gather = true) { done++ }; delay(100) }
+        for (i in 1..3) { gathered.request(i, SkipSender.GATHER_MS) { done++ }; delay(100) }
         delay(1_200)
         check("Salti raccolti: un comando solo, all'ultimo brano", sent == listOf(3) && done == 3, "$sent, conclusi $done")
         sent.clear()
         val immediate = SkipSender(scope) { sent += it; delay(300) }
-        for (i in 1..3) { immediate.request(i, gather = false); delay(50) }
+        for (i in 1..3) { immediate.request(i, 0L); delay(50) }
         delay(1_200)
         check("Salti subito: uno alla volta, l'ultimo è quello chiesto", sent.first() == 1 && sent.last() == 3 && sent.size <= 3, "$sent")
     }

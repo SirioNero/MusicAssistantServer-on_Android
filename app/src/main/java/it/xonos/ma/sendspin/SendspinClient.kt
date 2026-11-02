@@ -2,6 +2,7 @@ package it.xonos.ma.sendspin
 
 import android.util.Log
 import it.xonos.ma.data.MaClient
+import it.xonos.ma.data.SkipTrace
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -158,6 +159,10 @@ class SendspinClient(
         private var volume = id.volume
         private var muted = id.muted
 
+        // Dopo stream/start o stream/clear: il primo pacchetto audio va nel registro (vedi [SkipTrace]). Lo toccano
+        // solo i messaggi di questa connessione, che OkHttp consegna uno alla volta dallo stesso thread.
+        private var firstAudioAfter: String? = null
+
         suspend fun run(url: String): Outcome {
             engine.setVolume(volume, muted)
             val request = try {
@@ -262,9 +267,20 @@ class SendspinClient(
                         received,
                     ),
                 )
-                "stream/start" -> payload.optJSONObject("player")?.let(StreamFormat::from)?.let(engine::startStream)
-                "stream/clear" -> if (forPlayer(payload)) engine.clear()
-                "stream/end" -> if (forPlayer(payload)) engine.end()
+                "stream/start" -> payload.optJSONObject("player")?.let(StreamFormat::from)?.let { format ->
+                    Log.i(TAG, "Sendspin: stream/start (${format.codec})${SkipTrace.suffix()}")
+                    firstAudioAfter = "stream/start"
+                    engine.startStream(format)
+                }
+                "stream/clear" -> if (forPlayer(payload)) {
+                    Log.i(TAG, "Sendspin: stream/clear${SkipTrace.suffix()}")
+                    firstAudioAfter = "stream/clear"
+                    engine.clear()
+                }
+                "stream/end" -> if (forPlayer(payload)) {
+                    Log.i(TAG, "Sendspin: stream/end${SkipTrace.suffix()}")
+                    engine.end()
+                }
                 "server/command" -> payload.optJSONObject("player")?.let(::command)
                 "group/update" -> Log.d(TAG, "Gruppo: ${payload.optString("playback_state")}")
             }
@@ -276,6 +292,13 @@ class SendspinClient(
             if (bytes.size < AUDIO_HEADER || bytes[0].toInt() != AUDIO_CHUNK) return
             val data = bytes.toByteArray()
             val timestamp = ByteBuffer.wrap(data, 1, 8).long
+            firstAudioAfter?.let { after ->
+                firstAudioAfter = null
+                // L'anticipo: quanto prima del momento in cui va suonato è arrivato (negativo: è arrivato tardi).
+                val aheadMs = (engine.filter.toClient(timestamp) - now()) / 1000
+                val arrival = if (aheadMs >= 0) "con $aheadMs ms di anticipo" else "in ritardo di ${-aheadMs} ms"
+                Log.i(TAG, "Sendspin: primo audio dopo $after, $arrival${SkipTrace.suffix()}")
+            }
             engine.audio(timestamp, data, AUDIO_HEADER, data.size - AUDIO_HEADER)
         }
 

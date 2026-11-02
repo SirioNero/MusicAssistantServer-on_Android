@@ -130,7 +130,9 @@ prima di cominciare: le cose scritte qui sono già state verificate, non vanno r
 | `playback/Menu.kt` | Il menu e la ricerca, senza Media3 (si prova sulla JVM). Gli id dicono cosa fare: vedi il commento in testa |
 | `playback/BrowseTree.kt`, `ResourceLabels.kt` | Il menu come MediaItem; le sue scritte dalle risorse |
 | `playback/Artwork.kt` | Copertine servite a Gearslip, alla notifica e al lettore come `content://` firmati; i file li tiene `data/ArtCache.kt` (una copertina chiesta da più parti insieme si scarica una volta sola) |
-| `data/SkipSender.kt` | Avanti, indietro e "salta a" mandati a MA uno alla volta, sempre verso l'ultimo brano chiesto; raccolti per 400 ms solo con i servizi a un flusso (`QueueItem.singleStream`) |
+| `data/SkipSender.kt` | Avanti, indietro e "salta a" mandati a MA uno alla volta, sempre verso l'ultimo brano chiesto; raccolti solo con i servizi a un flusso (`QueueItem.singleStream`): 400 ms, 250 col server sul telefono (dalla 0.1.53) |
+| `playback/SkipPlan.kt` | Avanti e indietro: play_index sul brano noto (next/previous di MA aspettano 1 s), next/previous solo per ripeti, fine della coda e simili; il ritorno a capo della finestra con ripeti tutto; durante un salto in viaggio dal brano mostrato. Senza Media3 (`SkipCheckKt`) |
+| `data/SkipTrace.kt` | L'orologio di un salto per il registro: si azzera al tocco, le righe "Salto:", "Sendspin:" e "Uscita audio" dicono i ms dal tocco |
 | `data/PlaylistRemover.kt` | Toglie brani da una playlist: i tocchi vicini in un giro, il giro dopo solo quando il primo è applicato |
 | `data/SoloistUnlock.kt` | Spotify (Soloist) "già occupato" da un ascolto appeso: se nessun altro lettore lo suona, ricarica il servizio e riprova il comando (play, play_media, salti, ripresa dopo un calo di rete) |
 | `data/Lyrics.kt` | Il testo di un brano: lettore LRC (più tempi per riga, offset, tag, parole a tempo) e testo semplice |
@@ -584,6 +586,16 @@ di Xonos suona dal server sul telefono; la release ridotta con R8, da capo come 
     ritardo), Soloist tenuto acceso a fine brano o la coda di Spotify Connect (con `--single-track` esce comunque).
     Da decidere col registro: mandare subito il primo tocco (−0,4 s, ma un doppio tocco costa un cambio in più),
     avvisare Soloist del salto già al tocco, l'uscita del telefono tenuta calda tra un brano e l'altro.
+    Nell'app (0.1.53): tocchi raccolti per 250 ms col server sul telefono (400 con gli altri); avanti e indietro senza
+    indice (fine della finestra, finestra ridotta) passano da play_index quando il brano è noto e ripeti è spento,
+    invece di next/previous che Music Assistant fa partire dopo 1 s (`SkipPlan`); corretti il ritorno a capo della
+    finestra con ripeti tutto (avanti andava al brano current-3, indietro ~50 brani avanti) e il lampo del brano
+    vecchio al secondo tocco (il futuro di prima si chiude dopo che c'è quello nuovo). Righe nel logcat (tag Xonos)
+    coi ms dal tocco: «Salto: tocco verso N», «mando N», «Music Assistant ha risposto», «Sendspin: stream/start,
+    stream/end, primo audio con N ms di anticipo», «Uscita audio aperta in N ms (Bluetooth A2DP...)», «primo tempo
+    vero», «Avvio a N ms», «musica fuori N ms dopo il tocco». "Condividi il registro del server sul telefono" ora
+    aggiunge in fondo «Registro di Xonos» (`logcat -d -s Xonos:V AndroidRuntime:E`, ultime 64 K). Le modifiche a
+    data/, sendspin/, playback/ vanno portate in myCar.
   - **PhoneServer**: XONOS_PROOT e XONOS_PROOT_LOADER dalla cartella delle librerie, XONOS_DNS_FILE
     (`<dati>/resolv.conf`: i DNS della rete in uso più 1.1.1.1 e 8.8.8.8, riscritto con un NetworkCallback), il
     MulticastLock del Wi-Fi solo tra `XONOS_MULTICAST on` e `off` (permesso CHANGE_WIFI_MULTICAST_STATE).
@@ -846,7 +858,7 @@ Nella sandbox: Docker Hub risponde 429, si usa `mirror.gcr.io` (vedi `tools/READ
 si riavvia, il demone Docker si ferma e i container `ma` e `pods` vanno riavviati (`docker start`).
 Altre prove del banco: `ServicesCheckKt` (con il servizio finto `tools/ma-test/xonos_test`),
 `PlayersCheckKt` (una cassa finta, anche la sua coda), `AccountCheckKt`, `PerfCheckKt`, `PlaylistCheckKt`,
-`SearchCheckKt`, `ArtCheckKt`, `StartCheckKt` (l'avvio dell'audio senza server).
+`SearchCheckKt`, `ArtCheckKt`, `StartCheckKt` (l'avvio dell'audio senza server), `SkipCheckKt` (raccolta dei salti, `SkipPlan`, `SkipTrace`).
 
 Le misure sull'emulatore: il workflow "Misure" parte con `[misure]` nel messaggio del commit (con
 `[profilo]` genera anche il Baseline Profile) o a mano; costruisce MA in Docker sul runner, l'app

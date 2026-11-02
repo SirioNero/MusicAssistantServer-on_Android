@@ -85,7 +85,38 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
         val head = "Xonos ${BuildConfig.VERSION_NAME}, Music Assistant ${BuildConfig.SERVER_PACKAGE} (${pkg.abi}), " +
             "Android ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT}), ${state.name.lowercase()} $error".trim()
         val file = File(data, "musicassistant.log")
-        "$head\n\n" + if (file.isFile) tail(file) else "(no log yet)"
+        "$head\n\n" + (if (file.isFile) tail(file) else "(no log yet)") + "\n\n=== Registro di Xonos ===\n\n" + xonosLog()
+    }
+
+    /**
+     * Le righe di Xonos stesso dal logcat (tempi dei salti, Sendspin, uscita audio): un'app legge il suo logcat senza
+     * permessi. Solo i tag dell'app più i suoi arresti (AndroidRuntime), non XonosServer, che ripete il registro di
+     * Music Assistant qui sopra. Tutto il buffer e poi le ultime [XONOS_LOG_CHARS], da una riga intera: con un numero di
+     * righe (-t) logcat le conterebbe prima di filtrare i tag, e quelle di XonosServer ne prenderebbero il posto.
+     */
+    private fun xonosLog(): String = try {
+        val logcat = ProcessBuilder(listOf("logcat", "-d", "-v", "threadtime", "-s") + XONOS_TAGS)
+            .redirectErrorStream(true)
+            .start()
+        // -d finisce da solo; se logcat restasse appeso lo si chiude, e con lui il tubo: la lettura qui sotto finisce.
+        thread(name = "xonos-logcat", isDaemon = true) {
+            if (!logcat.waitFor(LOGCAT_TIMEOUT_S, TimeUnit.SECONDS)) {
+                logcat.destroy()
+                runCatching { logcat.inputStream.close() }
+            }
+        }
+        val lines = ArrayDeque<String>()
+        var chars = 0
+        logcat.inputStream.bufferedReader().useLines { all ->
+            for (line in all) {
+                lines.addLast(line)
+                chars += line.length + 1
+                while (chars > XONOS_LOG_CHARS && lines.isNotEmpty()) chars -= lines.removeFirst().length + 1
+            }
+        }
+        lines.joinToString("\n").ifEmpty { "(logcat non ha righe di Xonos)" }
+    } catch (e: Exception) {
+        "(logcat non disponibile: ${e.message ?: e})"
     }
 
     /** Le ultime [LOG_BYTES] del registro, da una riga intera. */
@@ -312,6 +343,13 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
         private const val LAST_LINES = 20
         /** Quanto registro si condivide: le ultime righe bastano, e stanno in una condivisione di Android. */
         private const val LOG_BYTES = 96 * 1024
+
+        /** Lo stesso per le righe di Xonos, in caratteri. */
+        private const val XONOS_LOG_CHARS = 64 * 1024
+
+        /** I tag di Xonos nel logcat (tutto il codice dell'app usa "Xonos"), più gli arresti dell'app. */
+        private val XONOS_TAGS = listOf("Xonos:V", "AndroidRuntime:E")
+        private const val LOGCAT_TIMEOUT_S = 10L
 
         /** Music Assistant sul telefono, dove può girare (un telefono a 64 bit); altrimenti null. */
         fun create(context: Context, http: OkHttpClient): PhoneServerControl? {

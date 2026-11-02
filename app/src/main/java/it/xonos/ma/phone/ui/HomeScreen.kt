@@ -164,7 +164,8 @@ private fun EmptyHome(model: PhoneModel) {
         )
         if (admin) {
             Spacer(Modifier.height(16.dp))
-            Button(onClick = { model.services.open() }, modifier = Modifier.testTag("home_services")) { Text(stringResource(R.string.services_add)) }
+            // "Aggiungi un servizio" porta dritto alla scelta del servizio (prima all'elenco di quelli interni di Music Assistant).
+            Button(onClick = { model.services.add() }, modifier = Modifier.testTag("home_services")) { Text(stringResource(R.string.services_add)) }
         }
     }
 }

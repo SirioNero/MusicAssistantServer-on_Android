@@ -1362,6 +1362,27 @@ class PhoneModel(
                 stacks.values.flatten().filter { it.started && failed(it) }.forEach(::reload)
             }
         }
+        // Arriva sul thread di OkHttp: si passa a quello dello schermo.
+        repo.addEventListener { event, _, _ -> if (event == SYNC_COMPLETED) scope.launch { libraryChanged() } }
+    }
+
+    /**
+     * Music Assistant ha finito di leggere la libreria (un servizio appena aggiunto, la cartella Music del telefono):
+     * Home e Libreria già aperte mostrano la musica nuova da sole. Prima la Home vuota continuava a dire "Aggiungi un
+     * servizio" finché non la si trascinava in giù.
+     */
+    private fun libraryChanged() {
+        for (page in stacks.values.flatten()) {
+            if (!page.started) continue
+            when (page) {
+                is HomePage -> if (page.job?.isActive != true) loadHome(page, refresh = true)
+                is LibraryPage -> {
+                    loadShelves(page)
+                    page.lists.values.forEach { refresh(it, quiet = true) }
+                }
+                else -> Unit
+            }
+        }
     }
 
     private fun failed(page: Page): Boolean = when (page) {
@@ -1417,6 +1438,9 @@ class PhoneModel(
 
         /** La password più corta che Music Assistant accetta per un account nuovo. */
         const val MIN_PASSWORD = 8
+
+        /** L'evento di Music Assistant quando ha finito di leggere la libreria dai servizi. */
+        const val SYNC_COMPLETED = "music_sync_completed"
 
         /** Il nome dell'account che Xonos si crea nel Music Assistant sul telefono. */
         const val PHONE_SERVER_USER = "xonos"

@@ -507,9 +507,53 @@ di Xonos suona dal server sul telefono; la release ridotta con R8, da capo come 
     In CI la riga non compare (le prove con i programmi Linux durano 21 s, prima del primo minuto): provata in
     locale; `_processes` e `SC_CLK_TCK` sull'emulatore li usa anche `cpu-audio`.
   - **prepare.py** (`_soloist`): `_resolve_architecture` accetta Android quando c'è XONOS_PROOT; il flusso di Spotify
-    mostra la scelta del motore solo allora (sennò librespot); `PAVolumeController` comanda PulseAudio con `pactl`
-    (stessa interfaccia: load/unload-module, set-sink-volume) perché la libpulse del sistema Linux è di glibc e il
-    Python del pacchetto no.
+    mostra la scelta del motore solo allora (sennò librespot); `PAVolumeController` (`PULSE_CONTROLLER`) comanda
+    PulseAudio senza libpulse (quella del sistema Linux è di glibc, il Python del pacchetto no): fino al 2.10.8-6 con
+    `pactl`, dal 2.10.8-7 dal socket a righe di testo di `module-cli-protocol-unix` (sotto), con `pactl` se non risponde.
+  - **Tempi di play, salti e ripresa** (pacchetto 2.10.8-7, Xonos 0.1.52; l'utente: "premendo play ci mette un po,
+    skip ci mette anche li un po"). In MA 2.10.8 Soloist suona un brano per processo (`--single-track`,
+    `_SingleTrackRun`): ogni play e ogni salto fermano il Soloist di prima e ne avviano uno nuovo, che rifà l'accesso a
+    Spotify; il lettore Sendspin non ha `PlayerFeature.PAUSE`, quindi la pausa ferma il flusso e la ripresa riparte da
+    capo con un seek (`_cold_seek`). Poi MA aspetta 1 s di audio (2 con la normalizzazione dinamica) prima di far
+    partire il lettore. Sul telefono ogni processo passa da proot, anche i 5 comandi a PulseAudio di ogni brano
+    (`PipeSink.create`, volume, sospendi, riprendi, togli). Ora PulseAudio parte anche con `module-cli-protocol-unix`
+    (`<cartella>/cli`, dopo `.nofail`: se manca parte lo stesso) e i comandi vanno lì (`hello` accende il prompt
+    `>>> ` che chiude ogni risposta; `load-module` non dice né l'indice né se non si è caricato: lo si cerca in
+    `list-modules`). Il modulo e le sue `libcli.so`/`libprotocol-cli.so` sono nel sistema Linux (`rootfs.py`).
+    Provato in locale col PulseAudio 16.1 del pacchetto in un chroot (`scratchpad`, non nel repository): 0,8 ms per
+    brano invece di 31 ms con `pactl` (senza proot), errori veri riconosciuti, la connessione si riapre. In CI la
+    prova `pulse-comandi` dell'autotest fa lo stesso col codice di MA: sull'emulatore 5 ms per brano col socket, 134 ms
+    con `pactl` in proot (12 prove su 12). `audio-nel-tubo` ora legge 55 MB in 4 s invece di 0,5 MB: la prova legge
+    il tubo senza freni e PulseAudio rende al ritmo di chi legge; in locale socket e pactl danno lo stesso tubo, e
+    `cpu-audio` (letto a 1,1 volte il tempo reale, come MA) è uguale a prima. Nel registro,
+    a ogni brano: «Soloist: avvio in N s (PulseAudio, processo, collegato e dentro Spotify, il brano suona, posizione e
+    tubo)», «primo audio N s dopo l'avvio», «fermato in N s»: dal registro della persona si vede cosa resta lento.
+    Non toccati: il buffer di MA (1–2 s, scelto da loro con prove d'ascolto) e `SkipSender` (400 ms per raccogliere i
+    salti veloci: con Soloist un salto in più costa un avvio intero).
+  - **Soloist resta acceso tra un brano e l'altro** (`_soloist_live` in prepare.py, stesso pacchetto 2.10.8-7 e Xonos
+    0.1.52; l'utente: "trova una soluzione per walkaraundare" l'avvio a ogni brano). Quando lo stream di un brano
+    finisce prima del brano (salto, pausa, un altro brano), `SoloistBackend._xonos_release` non spegne Soloist:
+    `xonos_park` lo mette in pausa (`pause` con conferma), sospende il sink e ferma il lettore del tubo; resta acceso
+    `_XONOS_PARK_S` (10 minuti), poi si spegne. Al brano dopo `_acquire_run` lo riusa (`_xonos_reuse` →
+    `xonos_switch`): butta quello che il brano prima ha lasciato nel tubo, poi lo stesso brano riprende (`resume`,
+    poi `_cold_seek` alla posizione chiesta, o `seek(0)`) e un altro parte con `play(uri)`; aspetta che Soloist dica di
+    suonare il brano chiesto (`_started` e `playing`, al massimo `_JUMP_TIMEOUT_S` = 5 s) col sink ancora sospeso, e
+    solo allora riapre il tubo. Se non si può (processo uscito, accesso perso, normalizzazione cambiata) o non va,
+    si spegne e si riparte da capo come prima; dopo `_XONOS_TRIES` (2) salti o riprese falliti di fila quel tipo non si
+    prova più. In pausa e mentre cambia brano le notizie del brano di prima, la pausa chiesta da noi e il "non più
+    attivo" non fermano niente (`_observe_item`, `_observe_external_pause`, `_observe_device_active`). Si appoggia a
+    cose che MA usa già: una pausa a metà brano non chiude un Soloist `--single-track` (così MA riconosce le pause
+    dall'app Spotify), il seek su un Soloist acceso (`_cold_seek`) e `play(uri)` su un Soloist acceso (il suo Spotify
+    Connect). Non verificato con Spotify vero: che un Soloist `--single-track` accetti `play(uri)` di un altro brano e
+    dica `playing` dopo `resume` col sink sospeso; se no, dopo due tentativi si torna a ripartire da capo. Anche
+    `_ENDPOINT_POLL_INTERVAL` di runtime.py da 0,25 a 0,05 s (l'attesa del file con la porta di Soloist a ogni avvio).
+    Nel registro: «Soloist: in pausa e acceso…», «salto/ripresa sulla sessione accesa in N s», «…non riuscito (…),
+    riparte da capo», «in pausa da N s senza brani, lo spengo». Prova `soloist-sessione` dell'autotest (CI): codice vero
+    di MA con `xonos_fake_soloist.py` (finto Soloist avviato con `python3 -m`, perché nel pacchetto il codice di Xonos
+    può esserci solo compilato), stesso protocollo (ws.addr/ws.port, eventi, conferme) e un valore fisso per brano
+    nel tubo; dopo ogni pausa lascia nel tubo un po' del brano di prima. Sull'emulatore, primo audio: da capo 0,58 s
+    (il finto parte in fretta), salto 0,06 s, ripresa a 5 s 0,11 s, salto rifiutato 6,1 s (5 s di attesa più l'avvio);
+    audio sempre e solo del brano chiesto, spegnimento dopo la pausa, fine naturale, 13 prove su 13.
   - **PhoneServer**: XONOS_PROOT e XONOS_PROOT_LOADER dalla cartella delle librerie, XONOS_DNS_FILE
     (`<dati>/resolv.conf`: i DNS della rete in uso più 1.1.1.1 e 8.8.8.8, riscritto con un NetworkCallback), il
     MulticastLock del Wi-Fi solo tra `XONOS_MULTICAST on` e `off` (permesso CHANGE_WIFI_MULTICAST_STATE).

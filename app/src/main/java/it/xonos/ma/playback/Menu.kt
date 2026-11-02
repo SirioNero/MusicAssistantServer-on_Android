@@ -127,7 +127,9 @@ class Menu(
      */
     suspend fun search(query: String): List<MenuNode> {
         val (wanted, text) = typeHint(query)
-        val found = lookup(text)
+        // Sempre di nuovo: un servizio lento (oltre 8 s) poteva mancare la prima volta, e la stessa ricerca ridava per
+        // tutto il viaggio quei risultati. Le cartelle dei risultati invece usano quelli appena mostrati.
+        val found = fresh(text)
         val best = bestMatches(text, found, wanted)
         val shown = best.map { it.second.uri }.toSet()
         val nodes = best.map { (type, item) -> entry(item, "find|$type|$text", -1) }
@@ -140,8 +142,10 @@ class Menu(
         return (nodes + folders).onEach { known.put(it.id, it) }
     }
 
-    private suspend fun lookup(text: String): Map<String, List<MaItem>> =
-        searches.get(text) ?: library.search(text).also { found ->
+    private suspend fun lookup(text: String): Map<String, List<MaItem>> = searches.get(text) ?: fresh(text)
+
+    private suspend fun fresh(text: String): Map<String, List<MaItem>> =
+        library.search(text).also { found ->
             searches.put(text, found)
             found.values.flatten().forEach { items.put(it.uri, it) }
         }
@@ -187,7 +191,7 @@ class Menu(
     /** "Metti ..." detto all'auto: si suona il risultato migliore. */
     private suspend fun playSearch(queue: String, query: String) {
         val (wanted, text) = typeHint(query)
-        val best = bestMatches(text, lookup(text), wanted).map { it.second }.firstOrNull { it.playable } ?: return
+        val best = bestMatches(text, fresh(text), wanted).map { it.second }.firstOrNull { it.playable } ?: return
         library.playMedia(queue, listOf(best.uri))
     }
 

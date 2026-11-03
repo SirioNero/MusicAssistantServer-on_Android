@@ -58,6 +58,9 @@ async def run(mass: Any) -> None:
         manager = SoloistBinaryManager(mass)
         binary = await manager.ensure_fresh(consent=True)
         say("soloist-download", True, f"{binary} {manager.diagnostics()}")
+        # Le opzioni di Soloist: in modalità Spotify Connect si annuncia nella rete locale (zeroconf), e un'opzione per
+        # non farlo (come --disable-discovery di librespot) chiuderebbe la porta agli altri account. Solo per saperlo.
+        say("soloist-opzioni", True, await _soloist_help(binary))
     except Exception as err:  # noqa: BLE001
         say("soloist-download", False, repr(err))
 
@@ -317,6 +320,22 @@ async def _pulse_commands(server: Any, rounds: int = 5) -> tuple[bool, str]:
     return used_socket and socket_ms < pactl_ms, detail
 
 
+async def _soloist_help(binary: Path) -> str:
+    """L'aiuto di Soloist (--help, poi -h), su una riga: le sue opzioni."""
+    lines: list[str] = []
+    for flag in ("--help", "-h"):
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                str(binary), flag, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT
+            )
+            out, _ = await asyncio.wait_for(proc.communicate(), 20)
+        except Exception as err:  # noqa: BLE001 - nel risultato
+            lines.append(f"{flag}: {err!r}")
+            continue
+        lines.append(f"{flag} ({proc.returncode}): " + " | ".join(out.decode(errors="replace").split("\n")))
+    return " || ".join(lines)[:4000]
+
+
 async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
     """
     La sessione di Soloist che resta accesa tra un brano e l'altro (_soloist_live e _soloist_connect in prepare.py).
@@ -407,7 +426,8 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
         """
         Uno stream come lo chiede Music Assistant: secondi al primo audio, i brani dei valori arrivati, byte.
 
-        In early i secondi del brano dei primi 0,3 s di audio.
+        In early i secondi del brano dei primi 0,3 s di audio. Al massimo 30 s: se la fine di un brano non si riconosce,
+        la prova non resta appesa (e le prove dopo partono).
         """
         details = SimpleNamespace(uri=f"spotify--xonos://track/{name}", queue_id="xonos_fake_queue", duration=duration)
         start = time.monotonic()
@@ -416,7 +436,9 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
         early.clear()
         got = 0
         gen = backend.stream_spotify_uri(uri, seek, streamdetails=details)
-        try:
+
+        async def read() -> None:
+            nonlocal first, got
             async for chunk in gen:
                 if first < 0:
                     first = time.monotonic() - start
@@ -427,6 +449,10 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
                 got += len(chunk)
                 if got >= seconds * FIFO_BYTES_PER_S:
                     break
+
+        try:
+            async with asyncio.timeout(30):
+                await read()
         finally:
             await gen.aclose()
         return first, values, got
@@ -448,7 +474,7 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
         if not ok:
             failed.append(f"{what} ({seen})" if seen != "" else what)
 
-    a, b, c, d, e, g, j, k, m, n, o, p, q = (f"spotify:track:xonos{x}" for x in "abcdegjkmnopq")
+    a, b, c, d, e, g, j, k, m, n, o, p, q, r, s = (f"spotify:track:xonos{x}" for x in "abcdegjkmnopqrs")
     f, h = "spotify:track:xonosshortf", "spotify:track:xonosshorth"
     first: dict[str, float] = {}
     try:
@@ -560,7 +586,7 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
         check("salto rifiutato contato", backend._xonos_failures["salto"] == 1, backend._xonos_failures)
         # due salti falliti di fila: per un po' niente tentativi (si riparte subito da capo)...
         backend._xonos_failures["salto"] = 2
-        failed_at = backend._xonos_failed_at["salto"] = time.monotonic()
+        failed_at = backend._xonos_failed_at["salto"] = solo._xonos_now()
         run_m = backend._run
         first["senza tentativo"], values, _ = await take(n, "n", seconds=1.0)
         check(
@@ -596,7 +622,7 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
         )
         check(
             "Spotify Connect che non parte: per un po' niente tentativi",
-            backend._xonos_connect_blocked_until > time.monotonic() and backend._xonos_connect_fails == 1,
+            backend._xonos_connect_blocked_until > solo._xonos_now() and backend._xonos_connect_fails == 1,
             (backend._xonos_connect_blocked_until, backend._xonos_connect_fails),
         )
         await drop()
@@ -606,6 +632,20 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
             values == {mark(q)} and not backend._run._xonos_connect,
             values,
         )
+        os.environ.pop("XONOS_FAKE_CONNECT_FAIL")
+        # un altro account Spotify entra in Soloist dalla rete locale (modalità Spotify Connect): il brano dopo non
+        # suona su quell'account, si chiede di rifare l'abbinamento. Per ultima: dopo, questo Soloist non si usa più.
+        await drop()
+        backend._xonos_connect_blocked_until = 0.0
+        os.environ["XONOS_FAKE_TAKEOVER"] = "1"
+        _, values, _ = await take(r, "r", seconds=1.0)
+        check("prima della presa", values == {mark(r)}, values)
+        refused = ""
+        try:
+            await take(s, "s", seconds=1.0)
+        except Exception as err:  # noqa: BLE001 - è quello che si aspetta
+            refused = repr(err)
+        check("un altro account: niente brano, abbinamento da rifare", "LoginFailed" in refused, refused or "suonato")
     except Exception as err:  # noqa: BLE001 - nel risultato, con le ultime righe del motore
         failed.append(repr(err))
     finally:
@@ -617,6 +657,7 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
             "XONOS_FAKE_DELAY_PLAY",
             "XONOS_FAKE_AUTOPLAY",
             "XONOS_FAKE_CONNECT_FAIL",
+            "XONOS_FAKE_TAKEOVER",
         ):
             os.environ.pop(key, None)
         for name, value in real.items():

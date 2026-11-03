@@ -21,7 +21,11 @@ XONOS_FAKE_NO_JUMP=1 (in modalità Spotify Connect il play di un altro brano non
 pausa smette di suonare, 0,2 s dopo scrive ancora fino a 0,2 s del brano nel tubo, riga "finto soloist: resto N", e solo
 allora conferma: chi svuotasse il tubo prima di aspettare la conferma se lo ritroverebbe nel brano dopo),
 XONOS_FAKE_DELAY_PLAY=<ms> (il play di un altro brano parte dopo tanto, come un brano che si carica piano),
-XONOS_FAKE_CONNECT_FAIL=1 (in modalità Spotify Connect non entra mai in Spotify).
+XONOS_FAKE_CONNECT_FAIL=1 (in modalità Spotify Connect non entra mai in Spotify), XONOS_FAKE_TAKEOVER=1 (dopo il primo
+brano entra un altro account, come da un'altra app nella rete locale: settings/Users/altro-user nella cartella dei dati).
+
+Una pausa a un Soloist già fermo riceve un errore e nessuna conferma: il Soloist vero può fare così (il plugin Spotify
+Connect di Music Assistant tollera "a rejected or unacknowledged pause"), e Xonos non deve contarci.
 """
 
 from __future__ import annotations
@@ -74,6 +78,8 @@ class FakeSoloist:
         self.delay_play_s = int(os.environ.get("XONOS_FAKE_DELAY_PLAY", "0")) / 1000
         self.autoplay = os.environ.get("XONOS_FAKE_AUTOPLAY", "1") != "0"
         self.connect_fail = os.environ.get("XONOS_FAKE_CONNECT_FAIL") == "1"
+        self.takeover = os.environ.get("XONOS_FAKE_TAKEOVER") == "1"
+        self.data_dir: Path | None = None
         self.playing = uri is not None
         self.position_ms = 0.0
         self.sockets: set[web.WebSocketResponse] = set()
@@ -144,6 +150,10 @@ class FakeSoloist:
             # come il Soloist vero con --single-track: un altro brano lo chiude
             print("finto soloist: un altro brano con --single-track, mi chiudo", flush=True)
             os._exit(0)
+        if name == "pause" and not self.playing:
+            # già fermo: un errore, nessuna conferma
+            await self.send({"type": "error", "command": name, "message": "nothing is playing"})
+            return
         if name == "pause" and self.leak and self.playing:
             # Soloist si ferma, ma un po' del brano arriva nel tubo poco prima della conferma
             self.playing = False
@@ -163,6 +173,9 @@ class FakeSoloist:
                 self.position_ms = 0.0
                 self.playing = True
                 await self.send({"type": "track_changed", "item": self.item()})
+                if self.takeover and self.data_dir is not None:
+                    # un altro account entra dalla rete locale
+                    (self.data_dir / "settings" / "Users" / "altro-user").mkdir(parents=True, exist_ok=True)
             if self.uri is None:
                 return
             self.playing = True
@@ -245,6 +258,7 @@ async def main() -> None:
     parser.add_argument("--ws", default="127.0.0.1:0")
     args, _ = parser.parse_known_args()
     fake = FakeSoloist(args.single_track)
+    fake.data_dir = Path(args.data_dir)
     app = web.Application()
     app.router.add_get("/", fake.handle)
     runner = web.AppRunner(app)

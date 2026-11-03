@@ -67,7 +67,7 @@ prima di cominciare: le cose scritte qui sono già state verificate, non vanno r
   (F-Droid rifiuta quel blocco). Build riproducibili: il workflow "Riproducibile" compila la release
   come F-Droid (la loro immagine `fdroidserver:buildserver-trixie`, OpenJDK 21, Gradle del wrapper,
   senza `tools/`) e la confronta byte per byte con l'APK della release tolta la firma: per la 0.1.38, la
-  0.1.42, la 0.1.49, la 0.1.50, la 0.1.52 e la 0.1.53 identici (la 0.1.53: da confermare, lanciato il 3 novembre). Così la ricetta ha `Binaries` e `AllowedAPKSigningKeys` (SHA-256 del certificato
+  0.1.42, la 0.1.49, la 0.1.50, la 0.1.52 e la 0.1.53 identici. Così la ricetta ha `Binaries` e `AllowedAPKSigningKeys` (SHA-256 del certificato
   `18ef3fc3…2c836`): F-Droid pubblica l'APK con la nostra firma e si passa da GitHub/Obtainium a F-Droid
   senza disinstallare. Dopo ogni release va lanciato a mano "Riproducibile": una versione non identica
   F-Droid non la pubblica. Il modello delle richieste di fdroiddata vuole in `commit` l'hash completo e
@@ -635,6 +635,22 @@ di Xonos suona dal server sul telefono; la release ridotta con R8, da capo come 
     salvato, che `play(uri)` senza activate suoni, cosa fa a fine brano, e se il primo secondo arriva prima dopo un
     salto (la sessione PulseAudio resta aperta). Nell'app: le righe INFO e DEBUG di Music Assistant non vanno più nel
     logcat (sono già in musicassistant.log), così «Registro di Xonos» nella condivisione tiene più minuti.
+    Dalla revisione avversaria (4 angoli, un verificatore per problema): stop() non aspetta 5 s l'uscita di un Soloist
+    Connect a fine brano (non esce mai); la pausa si manda una volta sola e solo se Soloist suona
+    (`_xonos_send_pause`): una pausa a un motore già fermo può non avere conferma (il plugin di MA la tollera), e il
+    cambio dopo la tollera se Soloist dice di non suonare; il play prima, casuale e ripeti dopo e in disparte (senza
+    brano Soloist potrebbe rifiutarli); durante l'accesso un Soloist uscito fa ripiegare subito; il ripiego conta (e
+    blocca Connect) solo se poi un processo per brano parte, e un salto non riuscito conta solo se poi il brano parte da
+    capo (`_xonos_unconfirmed`): un brano non disponibile o la rete assente non spengono niente; i tempi dei blocchi con
+    CLOCK_BOOTTIME (`_xonos_now`: time.monotonic() su Android si ferma in sospensione); audio letto oltre la durata più
+    5 s = brano ricominciato (ripeti acceso da fuori) e finito (`_xonos_overrun`). **La rete locale**: in modalità
+    Connect Soloist si annuncia con zeroconf e "any Spotify account may claim it from its app" (README del plugin
+    Spotify Connect di MA); senza MulticastLock un telefono spesso non riceve le domande mDNS, ma non è sicuro. Se un
+    altro account entra (un `settings/Users/<nome>-user` nuovo nella cartella dei dati, `_xonos_foreign_account`) Xonos
+    non suona più su quella sessione e chiede di rifare l'abbinamento (LoginFailed, `soloist_pairing_required`).
+    L'autotest stampa `soloist --help` (`soloist-opzioni`) per cercare un'opzione che spenga l'annuncio (librespot ha
+    `--disable-discovery`); se c'è, va usata. Non fatto (dipende dal Soloist vero): volume riportato a 100 se lo cambia
+    un'app, presa dell'account senza pausa (flusso muto), pausa di un'altra app negli ultimi secondi presa per la fine.
   - **PhoneServer**: XONOS_PROOT e XONOS_PROOT_LOADER dalla cartella delle librerie, XONOS_DNS_FILE
     (`<dati>/resolv.conf`: i DNS della rete in uso più 1.1.1.1 e 8.8.8.8, riscritto con un NetworkCallback), il
     MulticastLock del Wi-Fi solo tra `XONOS_MULTICAST on` e `off` (permesso CHANGE_WIFI_MULTICAST_STATE).

@@ -3292,7 +3292,8 @@ LIVE_RUN_METHODS = '''    # ---- Xonos: la sessione che resta accesa tra un bran
         engine moves to the queued copy, with the same uri, so no track change is seen. Without this the run would hand
         over the item's opening again until _xonos_overrun (5 s more). It needs the furthest position seen for this
         item (outside switches) near its end, a jump back of at least a second to its start, and at least half of the
-        item's time gone since the sink restarted: a late position of the item before cannot look like a restart.
+        item's audio already read (not wall time: the engine writes ahead and the first second comes at once): a late
+        position of the item before cannot look like a restart.
         """
         if (
             not self._xonos_connect
@@ -3309,7 +3310,7 @@ LIVE_RUN_METHODS = '''    # ---- Xonos: la sessione che resta accesa tra un bran
             peak_ms >= self._duration_ms - _XONOS_END_MS
             and position_ms < _XONOS_END_MS
             and peak_ms - position_ms >= 1000
-            and time.monotonic() - self._xonos_sink_at >= expected_s / 2
+            and self._read_bytes / _BYTES_PER_SECOND >= expected_s / 2
         )
 
     def _xonos_track_restarted(self) -> bool:
@@ -3317,8 +3318,8 @@ LIVE_RUN_METHODS = '''    # ---- Xonos: la sessione che resta accesa tra un bran
         Whether a track change to this same item means the engine started it over (Spotify Connect mode).
 
         At the end of an item that was also in the engine's queue the engine announces the queued copy, with the same
-        uri. It counts only near the item's end (_xonos_near_end) and with at least half of the item's time gone since
-        the sink restarted, so the announcement at the start of the item, or a repeated one, is not taken for it.
+        uri. It counts only near the item's end (_xonos_near_end) and with at least half of the item's audio already
+        read, so the announcement at the start of the item, or a repeated one, is not taken for it.
         """
         if (
             not self._xonos_connect
@@ -3330,7 +3331,7 @@ LIVE_RUN_METHODS = '''    # ---- Xonos: la sessione che resta accesa tra un bran
         ):
             return False
         expected_s = max(0.0, (self._duration_ms - self._seek_target_ms) / 1000)
-        return self._xonos_near_end() and time.monotonic() - self._xonos_sink_at >= expected_s / 2
+        return self._xonos_near_end() and self._read_bytes / _BYTES_PER_SECOND >= expected_s / 2
 
     def _xonos_near_end(self) -> bool:
         """Whether the item is at its end: by the engine's position, or by the audio read (Spotify Connect mode)."""

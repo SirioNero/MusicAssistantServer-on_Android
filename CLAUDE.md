@@ -1088,8 +1088,12 @@ del workflow `indagine-0157` della sessione.
   sulla sessione accesa restano a 5 s / 8 s. Se scade con Soloist acceso (`_xonos_slow_start`), la modalità Spotify Connect si
   ferma subito (`_xonos_block_connect`, prima del ripiego): dopo 8 s il ripiego (circa 7 s a freddo) può non entrare nei 15 s
   che Music Assistant dà al buffer (`BUFFER_READY_TIMEOUT`), e Music Assistant lo cancellerebbe prima che il blocco venga
-  messo: ogni brano avrebbe riprovato e fallito. Gli altri fallimenti (accesso, processo uscito) bloccano come prima solo
-  se poi un processo per brano parte.
+  messo: ogni brano avrebbe riprovato e fallito. Se poi fallisce da sé anche il processo per brano (brano non
+  disponibile, niente rete) il blocco si toglie (`undo_block`: non è colpa della modalità Spotify Connect); resta se Music
+  Assistant ha cancellato il ripiego. Gli altri fallimenti (accesso, processo uscito) bloccano come prima solo se poi un
+  processo per brano parte. Non fatto (raro): una cancellazione di Music Assistant dentro gli 8 s, dopo un salto fallito
+  sulla sessione accesa, non mette il blocco. Con il Soloist vero un primo brano che non parte costa 8 s più un avvio da
+  capo (oggi 6-7 s): sopra i 15 s di Music Assistant quando un altro servizio può cercare il brano (sennò 30 s).
 - **I 5 s a freddo** (nella 0.1.53 "il brano suona" era 0,55-0,83 s): non dimostrato. Con glibc 2.39 e un DNS finto
   (`scratchpad/dnsdrop/run.sh`): se si perde la seconda delle due domande che glibc manda insieme (A e AAAA) la risposta
   arriva dopo 5,11 s, con `options timeout:2 single-request-reopen` in 0,11 s; un primo server muto 5,08 s → 2,07 s con
@@ -1097,8 +1101,9 @@ del workflow `indagine-0157` della sessione.
   processo nuovo (anche lui con una ricerca DNS) dura sempre 0,8-1,2 s, e durante l'attesa proot conta 336 risvegli/s
   (Soloist lavora). Altra pista: dalla 0.1.54 Soloist trova nei dati una sessione Spotify Connect da ripristinare
   ("restoring session"), che la 0.1.53 non aveva. Fatto: `PhoneServer.writeDns` scrive `options timeout:2 attempts:2
-  single-request-reopen` e in testa `# xonos: rete Wi-Fi+VPN, via IPv6 predefinita sì, DNS della rete 1 IPv4 e 0 IPv6` (tipi e
-  numeri, mai indirizzi; glibc salta la riga), riscritto solo se cambia; Music Assistant la mette nella riga «Soloist: parte
+  single-request-reopen` (con single-request-reopen glibc manda A e AAAA uno dopo l'altro: un viaggio in più per ogni nome
+  nuovo) e in testa `# xonos: rete Wi-Fi+VPN, via IPv6 predefinita sì, DNS della rete 1 IPv4 e 0 IPv6` (tipi e
+  numeri, mai indirizzi; glibc salta la riga; con una VPN le vie sono quelle della VPN), riscritto solo se cambia; Music Assistant la mette nella riga «Soloist: parte
   da capo (controllo del programma N s; rete …, opzioni del DNS …)» (`_xonos_network`). Dal prossimo registro: se «il brano
   suona» a freddo scende sotto 1-2 s era il DNS; se no, la prossima prova è `--verbose` di Soloist nei 15 s dopo l'avvio
   (costo da misurare: le sue righe arrivano a Python per tutta la sessione) o i dati della sessione ripristinata.
@@ -1112,7 +1117,9 @@ del workflow `indagine-0157` della sessione.
 - **Autotest**: il finto Soloist ha `XONOS_FAKE_COLD_MS` (il primo play di un Soloist in modalità Spotify Connect: subito lo
   stato "playing" senza brano e la conferma, il brano e l'audio dopo tanto) e `XONOS_FAKE_STUCK` (mai). In `soloist-sessione`
   `_cold_cases`, coi tempi veri di Xonos: avvio a freddo di 5,5 s che resta in modalità Spotify Connect, salto subito dopo
-  sulla stessa sessione, primo brano che non parte (modalità ferma subito, ripiego sotto i 13 s). Le prove di prima
+  sulla stessa sessione, primo brano che non parte (modalità ferma prima del ripiego, dall'ordine delle righe del
+  registro; il ripiego del finto parte subito, quindi il tempo non dice niente dei 15 s), e lo stesso con un processo per
+  brano che non entra (`XONOS_FAKE_SINGLE_FAIL`: il blocco si toglie). Le prove di prima
   lasciavano `_XONOS_SWITCH_S`/`_JUMP_TIMEOUT_S` a 2 s anche per il precarico: ora si rimettono dopo la prova del salto
   rifiutato.
 - **Riproducibile** per la 0.1.56 lanciato dopo la release (proot cambiato).

@@ -1138,7 +1138,7 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
         )
         os.environ.pop("XONOS_FAKE_CONNECT_FAIL")
         await _preload_cases(backend, solo, take, nexts, records, check, mark, first, lambda: early)
-        await _cold_cases(backend, solo, take, real, check, mark, first, drop)
+        await _cold_cases(backend, solo, take, real, records, check, mark, first, drop)
         # un altro account Spotify entra in Soloist dalla rete locale (modalità Spotify Connect): il brano dopo non
         # suona su quell'account, si chiede di rifare l'abbinamento. Per ultima: dopo, questo Soloist non si usa più.
         await drop()
@@ -1166,6 +1166,7 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
             "XONOS_FAKE_TAKEOVER",
             "XONOS_FAKE_COLD_MS",
             "XONOS_FAKE_STUCK",
+            "XONOS_FAKE_SINGLE_FAIL",
         ):
             os.environ.pop(key, None)
         for name, value in real.items():
@@ -1178,7 +1179,15 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
 
 
 async def _cold_cases(
-    backend: Any, solo: Any, take: Any, real: dict[str, Any], check: Any, mark: Any, first: dict[str, float], drop: Any
+    backend: Any,
+    solo: Any,
+    take: Any,
+    real: dict[str, Any],
+    records: list[str],
+    check: Any,
+    mark: Any,
+    first: dict[str, float],
+    drop: Any,
 ) -> None:
     """
     soloist-sessione, il primo brano di un Soloist appena partito in modalità Spotify Connect, coi tempi veri di Xonos.
@@ -1197,7 +1206,11 @@ async def _cold_cases(
         backend._xonos_retries = {"salto": 0, "ripresa": 0}
         backend._xonos_unconfirmed = None
 
-    one, two, three = (f"spotify:track:xonoscold{x}" for x in "123")
+    one, two, three, four = (f"spotify:track:xonoscold{x}" for x in "1234")
+
+    def at(tail: list[str], text: str) -> int:
+        return next((i for i, line in enumerate(tail) if text in line), -1)
+
     try:
         await drop()
         fresh()
@@ -1231,26 +1244,52 @@ async def _cold_cases(
         await drop()
         fresh()
         os.environ["XONOS_FAKE_STUCK"] = "1"
+        count = len(records)
         first["Connect che non parte, ripiego"], values, _ = await take(three, "cold3", seconds=1.0)
+        tail = records[count:]
         run = backend._run
         check(
             "primo brano che non parte: un processo per brano",
             values == {mark(three)} and run is not None and not run._xonos_connect,
             (values, getattr(run, "_xonos_connect", None)),
         )
+        blocked, fallback = at(tail, "minuti un processo per brano"), at(tail, "provo un processo per brano")
         check(
-            "primo brano che non parte: modalità Spotify Connect ferma subito",
-            backend._xonos_connect_blocked_until > solo._xonos_now() and backend._xonos_connect_fails == 1,
-            (backend._xonos_connect_blocked_until, backend._xonos_connect_fails),
+            "primo brano che non parte: modalità Spotify Connect ferma prima del ripiego",
+            backend._xonos_connect_blocked_until > solo._xonos_now()
+            and backend._xonos_connect_fails == 1
+            and 0 <= blocked < fallback,
+            (backend._xonos_connect_blocked_until, backend._xonos_connect_fails, blocked, fallback, tail[-6:]),
         )
         check(
-            "primo brano che non parte: il ripiego entra nei 15 s di Music Assistant",
-            first["Connect che non parte, ripiego"] < 13.0,
+            "primo brano che non parte: il ripiego (finto, parte subito) dopo gli 8 s di attesa",
+            8.0 <= first["Connect che non parte, ripiego"] < 13.0,
             first["Connect che non parte, ripiego"],
+        )
+        # e se non parte nemmeno il processo per brano (brano non disponibile, niente rete...): non è colpa della modalità
+        # Spotify Connect, e il blocco messo prima del ripiego si toglie
+        await drop()
+        fresh()
+        os.environ["XONOS_FAKE_SINGLE_FAIL"] = "1"
+        count = len(records)
+        refused = ""
+        try:
+            await take(four, "cold4", seconds=1.0)
+        except Exception as err:  # noqa: BLE001 - è quello che si aspetta
+            refused = repr(err)
+        tail = records[count:]
+        check(
+            "non parte nemmeno un processo per brano: la modalità Spotify Connect resta accesa",
+            bool(refused)
+            and backend._xonos_connect_blocked_until <= solo._xonos_now()
+            and backend._xonos_connect_fails == 0
+            and at(tail, "la modalità Spotify Connect resta accesa") >= 0,
+            (refused or "suonato", backend._xonos_connect_blocked_until, backend._xonos_connect_fails, tail[-6:]),
         )
     finally:
         os.environ.pop("XONOS_FAKE_COLD_MS", None)
         os.environ.pop("XONOS_FAKE_STUCK", None)
+        os.environ.pop("XONOS_FAKE_SINGLE_FAIL", None)
         await drop()
         fresh()
 

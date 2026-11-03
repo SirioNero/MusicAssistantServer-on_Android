@@ -39,6 +39,7 @@ brano entra un altro account, come da un'altra app nella rete locale: settings/U
 In modalità Spotify Connect, il primo play di un Soloist appena partito: XONOS_FAKE_COLD_MS=<ms> (come il Soloist vero a
 freddo sul telefono: subito uno stato "playing" senza il brano chiesto e la conferma, il brano chiesto e l'audio solo
 dopo tanto; vale al posto di XONOS_FAKE_DELAY_PLAY), XONOS_FAKE_STUCK=1 (lo stesso, ma il brano non parte mai).
+Con --single-track, XONOS_FAKE_SINGLE_FAIL=1: non entra in Spotify e lo dice con "login failed".
 
 Una pausa a un Soloist già fermo riceve un errore e nessuna conferma: il Soloist vero può fare così (il plugin Spotify
 Connect di Music Assistant tollera "a rejected or unacknowledged pause"), e Xonos non deve contarci.
@@ -121,7 +122,9 @@ class FakeSoloist:
         self.stuck = os.environ.get("XONOS_FAKE_STUCK") == "1"
         self.played = False
         self.data_dir: Path | None = None
-        self.playing = uri is not None
+        # con --single-track: non entra in Spotify ("login failed"), come un brano o una rete che non vanno
+        self.single_fail = uri is not None and os.environ.get("XONOS_FAKE_SINGLE_FAIL") == "1"
+        self.playing = uri is not None and not self.single_fail
         self.position_ms = 0.0
         self.sockets: set[web.WebSocketResponse] = set()
         native = os.environ["PULSE_SERVER"].removeprefix("unix:")
@@ -183,6 +186,12 @@ class FakeSoloist:
         ws = web.WebSocketResponse()
         await ws.prepare(request)
         self.sockets.add(ws)
+        if self.single_fail:
+            # niente accesso né brano: Music Assistant lo sa dalla riga "login failed"
+            async for _msg in ws:
+                pass
+            self.sockets.discard(ws)
+            return ws
         logged_in = not (self.connect and self.connect_fail)
         await self.send({"type": "auth_state", "logged_in": logged_in, "is_active": True, "device_name": "Xonos finto"})
         await self.send({"type": "device_changed", "is_active": True})
@@ -411,6 +420,8 @@ async def main() -> None:
     (data / "ws.port").write_text(str(bound))
     mode = "Spotify Connect" if fake.connect else fake.uri
     print(f"finto soloist: {mode} su {host}:{bound}", flush=True)
+    if fake.single_fail:
+        print("finto soloist: login failed (prova)", flush=True)
     loop = asyncio.create_task(fake.play_loop())
     sink = asyncio.create_task(fake.watch_sink())
     await fake.done.wait()

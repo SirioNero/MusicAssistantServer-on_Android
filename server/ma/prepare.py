@@ -2776,6 +2776,8 @@ LIVE_BACKEND_METHODS = '''    async def _xonos_release(self, run: _SingleTrackRu
                 self.provider.unload_with_error(error)
             raise error
         connect_error: Exception | None = None
+        # il blocco messo prima del ripiego (avvio non partito in tempo): com'era prima, per toglierlo se il ripiego fallisce
+        undo_block: tuple[float, int] | None = None
         if _XONOS_CONNECT and _xonos_now() >= self._xonos_connect_blocked_until:
             run = _SingleTrackRun(self, spotify_uri, seek_position * 1000, streamdetails)
             run._xonos_connect = True
@@ -2794,6 +2796,7 @@ LIVE_BACKEND_METHODS = '''    async def _xonos_release(self, run: _SingleTrackRu
                     # Soloist acceso ha preso il play ma non è partito in tempo: niente modalità Spotify Connect per un
                     # po' già ora, perché il ripiego dopo tanto può non entrare nei 15 s che Music Assistant dà al buffer
                     # (sennò ogni brano riproverebbe la modalità Spotify Connect e fallirebbe da capo)
+                    undo_block = (self._xonos_connect_blocked_until, self._xonos_connect_fails)
                     self._xonos_block_connect(err)
                     connect_error = None
                 self.logger.info(
@@ -2811,10 +2814,17 @@ LIVE_BACKEND_METHODS = '''    async def _xonos_release(self, run: _SingleTrackRu
         run = _SingleTrackRun(self, spotify_uri, seek_position * 1000, streamdetails)
         try:
             await run.start()
-        except BaseException:
+        except BaseException as err:
             # non parte nemmeno così (brano non disponibile, niente rete...): non è colpa della modalità Spotify Connect
             # né della sessione accesa, e non si conta
             self._xonos_unconfirmed = None
+            if undo_block is not None and isinstance(err, Exception):
+                # il blocco messo prima del ripiego si toglie; resta se Music Assistant ha cancellato il ripiego (allora
+                # non si sa di chi è la colpa, e senza blocco ogni brano riproverebbe e fallirebbe)
+                self._xonos_connect_blocked_until, self._xonos_connect_fails = undo_block
+                self.logger.info(
+                    "Soloist: non parte nemmeno con un processo per brano: la modalità Spotify Connect resta accesa"
+                )
             await run.stop()
             raise
         self._xonos_count_failure()

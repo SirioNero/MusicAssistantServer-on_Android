@@ -2237,7 +2237,9 @@ def _soloist_preload(root: Path) -> None:
         "        self._xonos_position_said = False\n"
         "        self._xonos_levels: list[tuple[float, float | None]] = []\n"
         "        self._xonos_level_task: asyncio.Task[None] | None = None\n"
-        "        self._xonos_wakeups_from: tuple[str, int] | None = None\n",
+        "        self._xonos_wakeups_from: tuple[str, int] | None = None\n"
+        "        # Xonos: la posizione più avanti di questo brano detta da Soloist fuori dai cambi (_xonos_restarted)\n"
+        "        self._xonos_peak_ms: int | None = None\n",
     )
     _replace(
         backend,
@@ -2255,13 +2257,18 @@ def _soloist_preload(root: Path) -> None:
         '        """Confirm an armed seek once the engine reports at (or past) its target."""\n'
         "        self._position_ms = position_ms\n",
         '        """Confirm an armed seek once the engine reports at (or past) its target."""\n'
-        "        xonos_near_end = self._xonos_near_end()  # Xonos: prima di prendere la posizione nuova\n"
+        "        xonos_peak = self._xonos_peak_ms  # Xonos: prima di prendere la posizione nuova\n"
         "        self._position_ms = position_ms\n"
-        "        if self._xonos_restarted(xonos_near_end, position_ms):\n"
+        "        if self._xonos_parked or self._xonos_switching:\n"
+        "            # Xonos: in pausa o mentre cambia brano le posizioni possono essere del brano di prima: si riparte\n"
+        "            self._xonos_peak_ms = None\n"
+        "        elif self._xonos_restarted(xonos_peak, position_ms):\n"
         "            # Xonos: Soloist ha ricominciato lo stesso brano alla sua fine (era anche nella sua coda): è finito\n"
         '            self.logger.debug("Engine started %s over at its end; it has ended", self.spotify_uri)\n'
         "            self._xonos_item_ended()\n"
-        "            return\n",
+        "            return\n"
+        "        else:\n"
+        "            self._xonos_peak_ms = position_ms if xonos_peak is None else max(xonos_peak, position_ms)\n",
     )
     _replace(
         backend,
@@ -3261,22 +3268,32 @@ LIVE_RUN_METHODS = '''    # ---- Xonos: la sessione che resta accesa tra un bran
         read_s = self._read_bytes / _BYTES_PER_SECOND
         return read_s > (self._duration_ms - self._seek_target_ms) / 1000 + _XONOS_OVERRUN_S
 
-    def _xonos_restarted(self, near_end_before: bool, position_ms: int) -> bool:
+    def _xonos_restarted(self, peak_ms: int | None, position_ms: int) -> bool:
         """
         Whether the engine started this same item over at its end (Spotify Connect mode): the item is over.
 
         It happens when the item was also in the engine's queue (played with play(uri) while queued): at its end the
         engine moves to the queued copy, with the same uri, so no track change is seen. Without this the run would hand
-        over the item's opening again until _xonos_overrun (5 s more).
+        over the item's opening again until _xonos_overrun (5 s more). It needs the furthest position seen for this
+        item (outside switches) near its end, a jump back of at least a second to its start, and at least half of the
+        item's time gone since the sink restarted: a late position of the item before cannot look like a restart.
         """
+        if (
+            not self._xonos_connect
+            or not self._started.is_set()
+            or self._item_over
+            or self._xonos_parked
+            or self._xonos_switching
+            or not self._duration_ms
+            or peak_ms is None
+        ):
+            return False
+        expected_s = max(0.0, (self._duration_ms - self._seek_target_ms) / 1000)
         return (
-            self._xonos_connect
-            and self._started.is_set()
-            and not self._item_over
-            and not self._xonos_parked
-            and not self._xonos_switching
-            and near_end_before
+            peak_ms >= self._duration_ms - _XONOS_END_MS
             and position_ms < _XONOS_END_MS
+            and peak_ms - position_ms >= 1000
+            and time.monotonic() - self._xonos_sink_at >= expected_s / 2
         )
 
     def _xonos_near_end(self) -> bool:

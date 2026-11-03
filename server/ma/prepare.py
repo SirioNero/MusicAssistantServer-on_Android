@@ -2272,6 +2272,22 @@ def _soloist_preload(root: Path) -> None:
     )
     _replace(
         backend,
+        "        if isinstance(data, SoloistTrackChanged):\n"
+        "            if data.item is not None and data.item.uri:\n"
+        "                self._observe_item(data.item.uri, _decorated_duration_ms(data.item))\n"
+        "            return\n",
+        "        if isinstance(data, SoloistTrackChanged):\n"
+        "            if data.item is not None and data.item.uri == self.spotify_uri and self._xonos_track_restarted():\n"
+        "                # Xonos: lo stesso brano annunciato di nuovo alla sua fine: Soloist è passato alla copia in coda\n"
+        '                self.logger.debug("Engine started %s again from its queue; it has ended", self.spotify_uri)\n'
+        "                self._xonos_item_ended()\n"
+        "                return\n"
+        "            if data.item is not None and data.item.uri:\n"
+        "                self._observe_item(data.item.uri, _decorated_duration_ms(data.item))\n"
+        "            return\n",
+    )
+    _replace(
+        backend,
         "        xonos_stop = time.monotonic()  # Xonos: il tempo per fermarlo, per il registro\n"
         "        self._stopped = True\n",
         "        xonos_stop = time.monotonic()  # Xonos: il tempo per fermarlo, per il registro\n"
@@ -3295,6 +3311,26 @@ LIVE_RUN_METHODS = '''    # ---- Xonos: la sessione che resta accesa tra un bran
             and peak_ms - position_ms >= 1000
             and time.monotonic() - self._xonos_sink_at >= expected_s / 2
         )
+
+    def _xonos_track_restarted(self) -> bool:
+        """
+        Whether a track change to this same item means the engine started it over (Spotify Connect mode).
+
+        At the end of an item that was also in the engine's queue the engine announces the queued copy, with the same
+        uri. It counts only near the item's end (_xonos_near_end) and with at least half of the item's time gone since
+        the sink restarted, so the announcement at the start of the item, or a repeated one, is not taken for it.
+        """
+        if (
+            not self._xonos_connect
+            or not self._started.is_set()
+            or self._item_over
+            or self._xonos_parked
+            or self._xonos_switching
+            or not self._duration_ms
+        ):
+            return False
+        expected_s = max(0.0, (self._duration_ms - self._seek_target_ms) / 1000)
+        return self._xonos_near_end() and time.monotonic() - self._xonos_sink_at >= expected_s / 2
 
     def _xonos_near_end(self) -> bool:
         """Whether the item is at its end: by the engine's position, or by the audio read (Spotify Connect mode)."""

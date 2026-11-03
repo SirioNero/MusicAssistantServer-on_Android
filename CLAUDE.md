@@ -1057,7 +1057,8 @@ proot[soloist] 3–6%, ffmpeg 3–4%. Il blocco di un'ora di Spotify (0.1.53) er
   perdere la coda del brano che finisce (il tubo, 0,19 s, o i 2 s di PulseAudio): lo dice «brano finito … (atteso …)».
 - Verificato in CI (Server MA, emulatore Android 14 x86_64): 19 prove su 19; col finto Soloist primo audio «Connect
   avanti in coda» 0,29 s contro «Connect salto lento» 0,83 s (play di un brano non in coda, 600 ms di caricamento
-  finto), «Connect brano dopo pronto» 0,04 s; `pulse-livello` circa 1,96–1,99 s nel PulseAudio con pacat. Workflow
+  finto), «Connect brano dopo pronto» 0,04–0,06 s; pre8 finito dal track_changed, pre9 dall'audio letto (15,5 s su
+  16, «over at its end»); `pulse-livello` circa 1,96–1,99 s nel PulseAudio con pacat. Workflow
   "Soloist": FIONREAD 3,3 µs e 0 fermate in proot, TCGETS2 99,7 µs e 2 fermate, SIOCGIFINDEX ancora tradotto,
   accelerazione seccomp accesa. Una revisione avversaria del controllo del brano ripartito (3 angoli, un verificatore
   per problema) ha confermato solo il caso delle posizioni rare (corretto sopra; nella CI di prima nessun caso passava

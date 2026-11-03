@@ -102,6 +102,19 @@ private class AudioTrackOutput(override val sampleRate: Int, override val channe
             null
         }
 
+    // L'uscita fisica, per il ritardo misurato sull'AudioTrack di prima: solo se questo parte con pochi millesimi (da
+    // Android 12, vedi [threshold]). Con il buffer pieno si aspetta il primo tempo vero, come prima.
+    override val device: Int?
+        get() = if (threshold >= bufferFrames) {
+            null
+        } else {
+            try {
+                track.routedDevice?.id
+            } catch (e: Exception) {
+                null
+            }
+        }
+
     override val latencyUs: Long
         get() = bufferFrames * 1_000_000L / sampleRate + EXTRA_LATENCY_US
 

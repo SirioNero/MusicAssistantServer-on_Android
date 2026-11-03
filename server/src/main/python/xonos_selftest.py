@@ -8,7 +8,8 @@ si può: Music Assistant scarica Soloist (col consenso) e lo prova, avvia PulseA
 Poi lo ferma come lo ferma Music Assistant (AsyncProcess.close), guarda quanto processore usano proot e PulseAudio
 con dieci secondi di audio a tempo reale, con e senza la memoria condivisa di PulseAudio (memfd e srbchannel), e che
 PulseAudio si fermi quando non serve più. Prima di tutto, senza Spotify, il blocco di Spotify nel throttler di Music
-Assistant (spotify-blocco).
+Assistant (spotify-blocco). Poi il brano dopo che va nella coda di Soloist (soloist-brano-dopo, coi calcoli veri di Music
+Assistant) e quanto audio tiene PulseAudio per chi suona (pulse-livello, per la riga "dentro il salto").
 Nel registro di Music Assistant: righe "XONOS_SELFTEST <prova> ok|fail <dettagli>" e alla fine
 "XONOS_SELFTEST fine <riuscite>/<prove>".
 """
@@ -107,9 +108,18 @@ async def run(mass: Any) -> None:
     except Exception as err:  # noqa: BLE001
         say("pulseaudio", False, f"{err!r}; {await _pulseaudio_alone(Path(mass.cache_path))}")
 
+    # Il brano dopo che va nella coda di Soloist, dalla coda di Music Assistant (con ripeti, brani non disponibili, brani
+    # presi da un altro servizio): i calcoli veri di Music Assistant su una coda finta.
+    try:
+        next_ok, detail = _next_item_check()
+        say("soloist-brano-dopo", next_ok, detail)
+    except Exception as err:  # noqa: BLE001
+        say("soloist-brano-dopo", False, repr(err))
+
     if server is not None:
         # La sessione di Soloist che resta accesa tra un brano e l'altro, col codice vero di Music Assistant e un
-        # finto Soloist (xonos_fake_soloist.py): play, salto, ripresa, spegnimento, fine brano, salto rifiutato.
+        # finto Soloist (xonos_fake_soloist.py): play, salto, ripresa, spegnimento, fine brano, salto rifiutato, e il
+        # brano dopo nella coda di Soloist (avanti con skip_next, fine brano verso la coda, brano rimasto in coda).
         try:
             session_ok, detail = await _soloist_session(mass, server)
             say("soloist-sessione", session_ok, detail)
@@ -148,6 +158,12 @@ async def run(mass: Any) -> None:
             say("pulse-memfd", played, detail)
         except Exception as err:  # noqa: BLE001
             say("pulse-memfd", False, repr(err))
+        # Quanto audio tiene PulseAudio per chi suona sul sink, letto come lo legge la riga "dentro il salto" di Soloist.
+        try:
+            level_ok, detail = await _pulse_level(server, sink)
+            say("pulse-livello", level_ok, detail)
+        except Exception as err:  # noqa: BLE001
+            say("pulse-livello", False, repr(err))
 
     if sink is not None:
         with suppress(Exception):
@@ -553,6 +569,153 @@ async def _pulse_run(server: Any, sink: Any, client_conf: Path | None) -> tuple[
     )
 
 
+async def _pulse_level(server: Any, sink: Any) -> tuple[bool, str]:
+    """
+    Quanto audio tiene PulseAudio per chi suona sul sink (list-sink-inputs dal socket dei comandi), letto come lo legge la
+    riga "dentro il salto" di Soloist (_xonos_input_latency in prepare.py): pacat suona 2 s di rumore nel sink, letto dal
+    tubo al ritmo di Music Assistant. Va bene se con pacat si legge un numero (senza flusso deve dire None).
+    """
+    from music_assistant.providers.spotify.backends import soloist as solo  # noqa: PLC0415
+
+    send = getattr(server._controller, "_cli_send", None)
+    if send is None:
+        return False, "il socket dei comandi di PulseAudio non c'è"
+
+    async def level() -> float | None:
+        return solo._xonos_input_latency(await asyncio.to_thread(send, "list-sink-inputs"), sink.sink_name)
+
+    empty = await level()
+    loop = asyncio.get_running_loop()
+    fd = os.open(sink.fifo_path, os.O_RDONLY | os.O_NONBLOCK)
+    proc = None
+    feeder = None
+    levels: list[float | None] = []
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "pacat", "--raw", "--format=s16le", "--rate=44100", "--channels=2",
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+            env=server.child_env(sink.sink_name),
+        )
+
+        async def feed() -> None:
+            assert proc is not None and proc.stdin is not None
+            for _ in range(40):
+                proc.stdin.write(os.urandom(44100 * 4 // 10))
+                await proc.stdin.drain()
+
+        feeder = asyncio.create_task(feed())
+        started = loop.time()
+        received = 0
+        polled = started
+        while (elapsed := loop.time() - started) < 2.5:
+            allowed = int(elapsed * FIFO_BYTES_PER_S * 1.1) - received
+            if allowed > 0:
+                with suppress(BlockingIOError):
+                    received += len(os.read(fd, min(allowed, 65536)))
+            if loop.time() - polled >= 0.2:
+                polled = loop.time()
+                levels.append(await level())
+            await asyncio.sleep(0.02)
+    finally:
+        if feeder is not None:
+            feeder.cancel()
+            with suppress(BaseException):
+                await feeder
+        if proc is not None and proc.returncode is None:
+            proc.kill()
+            with suppress(Exception):
+                await asyncio.wait_for(proc.wait(), 5)
+        os.close(fd)
+    seen = [value for value in levels if value is not None]
+    shown = ", ".join("%.0f ms" % value for value in seen[:12]) or "niente"
+    return bool(seen), f"senza flusso: {empty}; con pacat: {shown} ({len(levels)} letture)"
+
+
+def _next_item_check() -> tuple[bool, str]:
+    """
+    Il brano dopo che va nella coda di Soloist (SoloistBackend._xonos_next_uri in prepare.py).
+
+    Con le classi vere di Music Assistant (QueueItem, Track, ProviderMapping, StreamDetails) e i suoi calcoli del brano
+    dopo (get_next_item e _get_next_index, che tengono conto di ripeti e dei brani non disponibili) su una coda finta:
+    il brano dopo, un brano non disponibile saltato, la fine della coda (niente; con ripeti tutto il primo), ripeti un
+    brano (niente), un brano che Music Assistant prende dai file del telefono o da un altro servizio Spotify (niente), il
+    brano di questa sessione cercato in tutta la coda.
+    """
+    from functools import partial  # noqa: PLC0415
+    from types import SimpleNamespace  # noqa: PLC0415
+
+    from music_assistant_models.enums import ContentType, RepeatMode  # noqa: PLC0415
+    from music_assistant_models.media_items import AudioFormat, ProviderMapping, Track  # noqa: PLC0415
+    from music_assistant_models.queue_item import QueueItem  # noqa: PLC0415
+    from music_assistant_models.streamdetails import StreamDetails  # noqa: PLC0415
+
+    from music_assistant.controllers.player_queues.controller import PlayerQueuesController  # noqa: PLC0415
+    from music_assistant.controllers.player_queues.queue_loader import QueueLoaderMixin  # noqa: PLC0415
+    from music_assistant.providers.spotify.backends import soloist as solo  # noqa: PLC0415
+
+    ours = "spotify--xonosprova"
+    spotify = AudioFormat(content_type=ContentType.OGG, bit_rate=320)
+    files = AudioFormat(content_type=ContentType.FLAC, sample_rate=44100, bit_depth=16)
+
+    def mapping(instance: str, item_id: str, audio: AudioFormat = spotify) -> ProviderMapping:
+        return ProviderMapping(
+            item_id=item_id, provider_domain=instance.split("--")[0], provider_instance=instance, audio_format=audio
+        )
+
+    def entry(index: int, *mappings: ProviderMapping, available: bool = True) -> QueueItem:
+        track = Track(item_id=str(index), provider="library", name=f"brano {index}", provider_mappings=set(mappings))
+        return QueueItem(
+            queue_id="coda",
+            queue_item_id=f"voce{index}",
+            name=f"brano {index}",
+            duration=200,
+            media_item=track,
+            available=available,
+        )
+
+    items = [
+        entry(0, mapping(ours, "zero")),
+        entry(1, mapping(ours, "uno")),
+        entry(2, mapping(ours, "due"), available=False),
+        entry(3, mapping(ours, "tre")),
+    ]
+    queue = SimpleNamespace(repeat_mode=RepeatMode.OFF, index_in_buffer=0, current_index=0)
+    queues = SimpleNamespace(_queue_data={"coda": SimpleNamespace(queue=queue, items=items)})
+    queues.get = lambda queue_id: queue if queue_id == "coda" else None
+    queues.queue_data_or_none = queues._queue_data.get
+    queues.get_item = partial(PlayerQueuesController.get_item, queues)
+    queues.index_by_id = partial(PlayerQueuesController.index_by_id, queues)
+    queues.get_next_item = partial(PlayerQueuesController.get_next_item, queues)
+    queues._get_next_index = partial(QueueLoaderMixin._get_next_index, queues)
+    backend = SimpleNamespace(mass=SimpleNamespace(player_queues=queues), provider=SimpleNamespace(instance_id=ours))
+
+    def after(index: int, repeat: Any = RepeatMode.OFF, *, near: bool = True) -> str | None:
+        details = StreamDetails(provider=ours, item_id=f"brano{index}", audio_format=spotify)
+        for position, item in enumerate(items):
+            item.streamdetails = details if position == index else None
+        queue.repeat_mode = repeat
+        queue.index_in_buffer = queue.current_index = index if near else None
+        run = SimpleNamespace(_xonos_details=details, queue_id="coda")
+        return solo.SoloistBackend._xonos_next_uri(backend, run)
+
+    cases = [
+        ("il dopo", after(0), "spotify:track:uno"),
+        ("non disponibile saltato", after(1), "spotify:track:tre"),
+        ("fine della coda", after(3), None),
+        ("ripeti tutto alla fine", after(3, RepeatMode.ALL), "spotify:track:zero"),
+        ("ripeti un brano", after(0, RepeatMode.ONE), None),
+        ("cercato in tutta la coda", after(0, near=False), "spotify:track:uno"),
+    ]
+    items[1] = entry(1, mapping(ours, "uno"), mapping("filesystem_local--telefono", "uno.flac", files))
+    cases.append(("dai file del telefono", after(0), None))
+    items[1] = entry(1, mapping("spotify--altro", "uno"))
+    cases.append(("da un altro servizio Spotify", after(0), None))
+    wrong = [f"{what}: {got} invece di {wanted}" for what, got, wanted in cases if got != wanted]
+    return not wrong, "; ".join(wrong) or f"{len(cases)} casi giusti"
+
+
 def _guest_usage(server: Any) -> dict[int, tuple[str, int, int]]:
     """
     I processi dei gruppi di proot: pid -> (nome, tick di processore, cambi di contesto). Un proot si chiama
@@ -676,7 +839,11 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
     pausa, la fine naturale. In modalità Spotify Connect: il salto sullo stesso processo, la ripresa, la fine naturale
     con l'autoplay e senza (Soloist resta acceso e il brano dopo suona sulla stessa sessione), un cambio annullato a metà
     (Soloist si spegne), un Soloist che non accetta salti (allora si riparte da capo), i salti riprovati dopo un po'
-    quando ne sono falliti due, e la modalità Spotify Connect che non parte (allora un processo per brano). L'audio che
+    quando ne sono falliti due, e la modalità Spotify Connect che non parte (allora un processo per brano). Poi il brano
+    dopo nella coda di Soloist (_soloist_preload in prepare.py; il brano dopo di Music Assistant lo dà la prova, nexts),
+    con un play lento (600 ms) e il brano in coda già caricato: avanti con skip_next (più veloce del play), un salto a
+    un brano non in coda (play, e quello in coda resta), il brano rimasto in coda (a fine brano Soloist ci passa: niente
+    suo audio, poi il brano dopo con play) e la fine di un brano verso quello in coda (ripresa, senza play). L'audio che
     arriva deve essere sempre e solo del brano chiesto, dal secondo chiesto: il finto Soloist scrive un valore per brano
     e per secondo, e a ogni pausa lascia nel tubo un po' del brano di prima.
     """
@@ -738,12 +905,16 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
             "_XONOS_RETRY_S",
             "_XONOS_CONNECT",
             "_XONOS_CONNECT_LOGIN_S",
+            "_XONOS_PRELOAD_AFTER_S",
         )
     }
     solo.SoloistBinaryManager = FakeManager
     plain_args = backend._session_args
     # come modulo, come xonos_server: nel pacchetto il codice di Xonos può esserci solo compilato (.pyc)
     backend._session_args = lambda uri: [python, "-m", "xonos_fake_soloist", *plain_args(uri)[1:]]
+    # il brano dopo nella coda di Music Assistant: qui lo dice la prova (la coda finta non è in Music Assistant)
+    nexts: dict[str, str] = {}
+    backend._xonos_next_uri = lambda run: nexts.get(run.spotify_uri)
 
     def mark(uri: str) -> int:
         """Il valore del brano, come lo scrive il finto Soloist (in milioni)."""
@@ -962,6 +1133,7 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
             values,
         )
         os.environ.pop("XONOS_FAKE_CONNECT_FAIL")
+        await _preload_cases(backend, solo, take, nexts, records, check, mark, first, lambda: early)
         # un altro account Spotify entra in Soloist dalla rete locale (modalità Spotify Connect): il brano dopo non
         # suona su quell'account, si chiede di rifare l'abbinamento. Per ultima: dopo, questo Soloist non si usa più.
         await drop()
@@ -996,6 +1168,99 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
     if failed:
         detail += "; non va: " + ", ".join(failed) + " | motore: " + " / ".join(records[-15:])
     return not failed, detail
+
+
+async def _preload_cases(
+    backend: Any, solo: Any, take: Any, nexts: dict[str, str], records: list[str], check: Any, mark: Any,
+    first: dict[str, float], early: Any,
+) -> None:
+    """
+    soloist-sessione, il brano dopo nella coda di Soloist (modalità Spotify Connect): vedi _soloist_session.
+
+    Il play di un brano non in coda aspetta 600 ms (XONOS_FAKE_DELAY_PLAY), un brano in coda da almeno 0,5 s parte con
+    skip_next in 50 ms: i tempi del primo audio ("Connect avanti in coda" e "Connect salto lento") mostrano il guadagno.
+    """
+
+    def since(count: int, text: str) -> bool:
+        return any(text in line for line in records[count:])
+
+    async with backend._run_lock:
+        if (left := backend._run) is not None:
+            await left.stop()
+            backend._run = None
+    backend._xonos_cancel_park()
+    # da capo: le prove di prima lasciano salti falliti e la modalità Spotify Connect bloccata
+    backend._xonos_connect_blocked_until = 0.0
+    backend._xonos_failures = {"salto": 0, "ripresa": 0}
+    backend._xonos_retries = {"salto": 0, "ripresa": 0}
+    os.environ["XONOS_FAKE_DELAY_PLAY"] = "600"
+    solo._XONOS_PRELOAD_AFTER_S = 0.3
+    one, two, three, four, six = (f"spotify:track:xonospre{x}" for x in "12346")
+    five, seven = "spotify:track:xonosshortpre5", "spotify:track:xonosshortpre7"
+    nexts.update({one: two, two: three, five: six, seven: one})
+    try:
+        # un brano, e dopo poco il suo dopo va nella coda di Soloist
+        first["Connect lento da capo"], values, _ = await take(one, "pre1", seconds=3.0)
+        run = backend._run
+        check("precarico: primo brano", run is not None and run._xonos_connect and values == {mark(one)}, values)
+        check("precarico: il dopo in coda", backend._xonos_queued_uri == two, backend._xonos_queued_uri)
+        # avanti verso il brano in coda: skip_next, e Soloist l'ha già caricato
+        count = len(records)
+        first["Connect avanti in coda"], values, _ = await take(two, "pre2", seconds=3.0)
+        check(
+            "precarico: avanti col brano in coda",
+            backend._run is run and values == {mark(two)} and early() == {0},
+            (values, early()),
+        )
+        check(
+            "precarico: skip_next sul brano già caricato",
+            since(count, "comando skip_next") and since(count, "già caricato")
+            and since(count, "Soloist: avanti col brano in coda (precaricato)")
+            and not since(count, "comando play spotify:track:xonospre2"),
+            records[count:][-6:],
+        )
+        check("precarico: riga dentro l'avanti", since(count, "Soloist: dentro l'avanti col brano in coda"))
+        # un salto a un brano che non è in coda: play (lento), e il brano in coda (pre3) resta lì
+        count = len(records)
+        first["Connect salto lento"], values, _ = await take(four, "pre4", seconds=1.0)
+        check(
+            "precarico: salto a un brano non in coda con play",
+            values == {mark(four)} and early() == {0} and not since(count, "comando skip_next"),
+            (values, early()),
+        )
+        check(
+            "precarico: avanti in coda più veloce del play",
+            first["Connect avanti in coda"] + 0.3 < first["Connect salto lento"],
+            (first["Connect avanti in coda"], first["Connect salto lento"]),
+        )
+        # il brano rimasto in coda: niente precarico, e a fine brano Soloist ci passa; non se ne sente niente, e il brano
+        # dopo di Music Assistant parte con play
+        count = len(records)
+        _, values, got = await take(five, "pre5", seconds=10, duration=3)
+        await asyncio.sleep(0.3)
+        check("precarico: brano rimasto in coda, fine del brano", got > 0 and values == {mark(five)}, (got, values))
+        check("precarico: brano rimasto in coda nel registro", since(count, "c'è già un brano che non è il dopo"))
+        _, values, _ = await take(six, "pre6", seconds=1.0)
+        check(
+            "precarico: dopo il brano rimasto, il brano dopo con play",
+            values == {mark(six)} and early() == {0} and since(count, "comando play spotify:track:xonospre6"),
+            (values, early()),
+        )
+        # a fine brano Soloist passa al brano in coda: si riprende da lì (seek a 0), senza play
+        count = len(records)
+        _, values, got = await take(seven, "pre7", seconds=10, duration=3)
+        await asyncio.sleep(0.3)
+        check("precarico: fine del brano verso la coda", got > 0 and values == {mark(seven)}, (got, values))
+        first["Connect brano dopo pronto"], values, _ = await take(one, "pre1", seconds=1.0)
+        check(
+            "precarico: brano dopo già pronto",
+            values == {mark(one)} and early() == {0} and since(count, "brano dopo già pronto in Soloist")
+            and not since(count, "comando play spotify:track:xonospre1"),
+            (values, early(), records[count:][-6:]),
+        )
+    finally:
+        os.environ.pop("XONOS_FAKE_DELAY_PLAY", None)
+        nexts.clear()
 
 
 async def _pulseaudio_alone(cache: Path) -> str:

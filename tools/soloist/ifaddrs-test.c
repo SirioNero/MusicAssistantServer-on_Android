@@ -3,7 +3,9 @@
  * interfacce di rete. Soloist le elenca per l'annuncio mDNS (l'abbinamento con l'app Spotify); da Android 11 le
  * app non possono fare bind() su un socket netlink né chiedere RTM_GETLINK, e getifaddrs() di glibc fa tutte e
  * due le cose. Prova: getifaddrs(), netlink con e senza bind, RTM_GETADDR da solo (come fa Android stesso),
- * l'ioctl SIOCGIFCONF.
+ * l'ioctl SIOCGIFCONF e, per ogni interfaccia, SIOCGIFINDEX (if_nametoindex, come ifaddr e zeroconf): Android la nega
+ * alle app per le interfacce vere, e dentro proot la risolve proot (syscall/enter.c). Il filtro di seccomp di
+ * app/native/proot.sh deve continuare a fermare il programma per lei.
  */
 #define _GNU_SOURCE
 #include <arpa/inet.h>
@@ -110,6 +112,11 @@ static void test_ioctl(void) {
         int ok = ioctl(fd, SIOCGIFFLAGS, &flags);
         printf("SIOCGIFCONF: %s %s flags=%s0x%x\n", item->ifr_name, text, ok == 0 ? "" : "(errore) ",
                ok == 0 ? flags.ifr_flags : errno);
+        unsigned ifindex = if_nametoindex(item->ifr_name);
+        if (ifindex > 0)
+            printf("SIOCGIFINDEX: %s = %u\n", item->ifr_name, ifindex);
+        else
+            printf("SIOCGIFINDEX: %s errore %d (%s)\n", item->ifr_name, errno, strerror(errno));
     }
     close(fd);
 }

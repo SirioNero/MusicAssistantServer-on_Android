@@ -16,6 +16,16 @@ Due modi, come Soloist:
   a fine brano passa all'autoplay e lo suona finché non lo si mette in pausa, o (XONOS_FAKE_AUTOPLAY=0) si ferma alla
   fine, in pausa; non si chiude mai da solo.
 
+La coda, come in Spotify: add_to_queue mette un brano in coda (provenienza "queue"), get_queue risponde con queue_changed
+(i brani in coda, poi l'autoplay), skip_next passa al primo della coda (o all'autoplay), e a fine brano si passa al primo
+della coda prima dell'autoplay. Un play(uri) non toglie niente dalla coda (come nelle app di Spotify). Un brano in coda da
+almeno PRELOAD_S è già caricato: skip_next lo fa partire in QUEUED_START_S, mentre il play di un altro brano aspetta
+XONOS_FAKE_DELAY_PLAY (sotto).
+
+Il sink di PulseAudio sospeso (Music Assistant lo sospende mentre aspetta, e quando cambia brano) non scrive niente nel
+tubo: il finto Soloist lo guarda dal socket dei comandi di PulseAudio (list-sinks) e intanto non scrive, come il vero
+Soloist che resta fermo quando PulseAudio non prende audio. Senza il socket dei comandi scrive sempre, come prima.
+
 I brani con "short" nell'uri durano 2,5 s, gli altri XONOS_FAKE_DURATION_MS (30 s di base). Altre variabili d'ambiente:
 XONOS_FAKE_NO_JUMP=1 (in modalità Spotify Connect il play di un altro brano non fa niente), XONOS_FAKE_LEAK=1 (alla
 pausa smette di suonare, 0,2 s dopo scrive ancora fino a 0,2 s del brano nel tubo, riga "finto soloist: resto N", e solo
@@ -54,6 +64,12 @@ ROOM = 32768
 # alla pausa il resto arriva tanto dopo, poco prima della conferma
 LEAK_DELAY_S = 0.2
 SHORT_MS = 2500
+# un brano in coda da tanto è già caricato: skip_next lo fa partire subito (come Spotify, che scarica il brano dopo)
+PRELOAD_S = 0.5
+QUEUED_START_S = 0.05
+# ogni quanto si guarda se il sink è sospeso; il prompt del socket dei comandi di PulseAudio dopo "hello"
+SINK_POLL_S = 0.03
+PROMPT = b">>> "
 
 
 def marker(uri: str) -> int:
@@ -64,6 +80,20 @@ def marker(uri: str) -> int:
 def sample_value(uri: str, position_ms: float) -> int:
     """Il valore di un campione: il brano nei milioni, il secondo del brano nelle migliaia."""
     return marker(uri) + int(position_ms // 1000) % 1000 * 1000
+
+
+def sink_suspended(listing: str, sink: str) -> bool:
+    """Da list-sinks di PulseAudio: se il sink con questo nome è sospeso."""
+    named = False
+    for raw in listing.splitlines():
+        line = raw.strip().lstrip("*").strip()
+        if line.startswith("index:"):
+            named = False
+        elif line.startswith("name:"):
+            named = line == f"name: <{sink}>"
+        elif named and line.startswith("state:"):
+            return line.split(":", 1)[1].strip() == "SUSPENDED"
+    return False
 
 
 class FakeSoloist:
@@ -84,9 +114,14 @@ class FakeSoloist:
         self.position_ms = 0.0
         self.sockets: set[web.WebSocketResponse] = set()
         native = os.environ["PULSE_SERVER"].removeprefix("unix:")
-        self.fifo = os.path.join(os.path.dirname(native), os.environ["PULSE_SINK"] + ".pcm")
+        self.sink = os.environ["PULSE_SINK"]
+        self.fifo = os.path.join(os.path.dirname(native), self.sink + ".pcm")
+        self.cli = os.path.join(os.path.dirname(native), "cli")
         self.fd: int | None = None
         self.done = asyncio.Event()
+        # la coda: (uri, quando è entrato); il sink sospeso (watch_sink)
+        self.queue: list[tuple[str, float]] = []
+        self.suspended = False
 
     @property
     def duration_ms(self) -> int:
@@ -160,6 +195,12 @@ class FakeSoloist:
             await asyncio.sleep(LEAK_DELAY_S)
             print(f"finto soloist: resto {self.write(int(RATE * 0.2))}", flush=True)
         await self.send({"type": "command_result", "command": name})
+        if name == "add_to_queue" and uri:
+            self.queue.append((str(uri), time.monotonic()))
+        elif name == "get_queue":
+            await self.send_queue()
+        elif name == "skip_next":
+            await self.skip_next()
         if name == "pause":
             self.playing = False
             await self.state()
@@ -183,6 +224,59 @@ class FakeSoloist:
         elif name == "seek":
             self.position_ms = float(cmd.get("position_ms") or 0)
             await self.send({"type": "position_sync", "position": self.position()})
+
+    async def send_queue(self) -> None:
+        """La coda come la dice Soloist (queue_changed): i brani in coda, poi l'autoplay."""
+        entries = [
+            {"uid": f"q{index}", "source": "queue", "item": {"uri": uri, "entity_type": "track", "decorations": {}}}
+            for index, (uri, _at) in enumerate(self.queue)
+        ]
+        if self.connect and self.autoplay:
+            entries.append(
+                {"uid": "a0", "source": "autoplay", "item": {"uri": AUTOPLAY, "entity_type": "track", "decorations": {}}}
+            )
+        await self.send({"type": "queue_changed", "previous": [], "upcoming": entries})
+
+    async def skip_next(self) -> None:
+        """Al primo della coda (già caricato se ci sta da PRELOAD_S), o all'autoplay; poi suona."""
+        if self.queue:
+            uri, at = self.queue.pop(0)
+            loaded = time.monotonic() - at >= PRELOAD_S
+            print(f"finto soloist: avanti al brano in coda ({'già caricato' if loaded else 'da caricare'})", flush=True)
+            await asyncio.sleep(QUEUED_START_S if loaded else self.delay_play_s)
+        else:
+            uri = AUTOPLAY
+            await asyncio.sleep(self.delay_play_s)
+        self.uri = uri
+        self.position_ms = 0.0
+        self.playing = True
+        await self.send({"type": "track_changed", "item": self.item()})
+        await self.state()
+
+    async def watch_sink(self) -> None:
+        """Se il sink di PulseAudio è sospeso, dal socket dei comandi (list-sinks); senza socket, mai sospeso."""
+        while True:
+            try:
+                reader, writer = await asyncio.open_unix_connection(self.cli)
+            except OSError:
+                self.suspended = False
+                await asyncio.sleep(0.5)
+                continue
+            try:
+                writer.write(b"hello\n")
+                await writer.drain()
+                await reader.readuntil(PROMPT)
+                while True:
+                    writer.write(b"list-sinks\n")
+                    await writer.drain()
+                    listing = (await reader.readuntil(PROMPT)).decode(errors="replace")
+                    self.suspended = sink_suspended(listing, self.sink)
+                    await asyncio.sleep(SINK_POLL_S)
+            except (OSError, asyncio.IncompleteReadError, asyncio.LimitOverrunError):
+                self.suspended = False
+                await asyncio.sleep(0.5)
+            finally:
+                writer.close()
 
     def queued(self) -> int:
         """Quanti byte del brano aspettano nel tubo."""
@@ -217,7 +311,7 @@ class FakeSoloist:
     async def play_loop(self) -> None:
         last_sync = 0.0
         while True:
-            if not self.playing or not self.sockets or self.queued() >= ROOM:
+            if not self.playing or not self.sockets or self.suspended or self.queued() >= ROOM:
                 await asyncio.sleep(0.02)
                 continue
             frames = self.write(CHUNK_FRAMES)
@@ -237,9 +331,10 @@ class FakeSoloist:
                 await asyncio.sleep(0.3)
                 self.done.set()
                 return
-            if self.autoplay:
-                # Spotify Connect: a fine brano passa all'autoplay e lo suona, finché non lo si mette in pausa
-                self.uri = AUTOPLAY
+            if self.queue or self.autoplay:
+                # Spotify Connect: a fine brano passa al primo della coda, sennò all'autoplay, e lo suona finché non lo
+                # si mette in pausa
+                self.uri = self.queue.pop(0)[0] if self.queue else AUTOPLAY
                 self.position_ms = 0.0
                 await self.send({"type": "track_changed", "item": self.item()})
                 await self.state()
@@ -273,8 +368,10 @@ async def main() -> None:
     mode = "Spotify Connect" if fake.connect else fake.uri
     print(f"finto soloist: {mode} su {host}:{bound}", flush=True)
     loop = asyncio.create_task(fake.play_loop())
+    sink = asyncio.create_task(fake.watch_sink())
     await fake.done.wait()
     loop.cancel()
+    sink.cancel()
     # come Soloist: a fine brano il processo se ne va, anche con la WebSocket ancora aperta
     for ws in list(fake.sockets):
         await ws.close()

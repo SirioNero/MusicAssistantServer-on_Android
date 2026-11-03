@@ -11,9 +11,13 @@ package it.xonos.ma.playback
  *   qualche brano prima di quello in corso, e indietro dal primo chiede l'ultimo.
  *
  * player_queues/next e previous di Music Assistant aspettano 1 s prima di far partire il brano (un rimbalzo contro i
- * tocchi ripetuti: call_later(1, play_index) in MA 2.10.8). Quando il brano è noto si salta direttamente
- * (play_index, dal giro di [it.xonos.ma.data.SkipSender]); next e previous restano per quello che sa solo Music
- * Assistant: ripeti tutto e ripeti uno, la fine della coda, "don't stop the music".
+ * tocchi ripetuti: call_later(1, play_index) in MA 2.10.8). Il brano dove andrebbero si sa già, e allora si salta
+ * direttamente (play_index, dal giro di [it.xonos.ma.data.SkipSender]), con le regole di Music Assistant:
+ * - avanti (queue_loader._get_next_index con is_skip): il brano dopo anche con ripeti uno, e dall'ultimo brano della
+ *   coda il primo con ripeti tutto;
+ * - indietro (controller.previous): il brano prima, mai a capo nemmeno con ripeti tutto, e dal primo il primo stesso.
+ * next resta per l'ultimo brano della coda senza ripeti tutto (la fine della coda, "don't stop the music": lo sa solo
+ * Music Assistant); next e previous per una coda senza brano in corso.
  */
 object SkipPlan {
 
@@ -22,16 +26,16 @@ object SkipPlan {
     /** Al brano [index] della coda, dal giro dei salti (play_index). */
     data class Jump(val index: Int) : Step
 
-    /** player_queues/next: il brano dopo lo decide Music Assistant. */
+    /** player_queues/next: il brano dopo lo decide Music Assistant (alla fine della coda, o senza brano in corso). */
     data object Next : Step
 
-    /** player_queues/previous: il brano prima lo decide Music Assistant. */
+    /** player_queues/previous: il brano prima lo decide Music Assistant (senza brano in corso). */
     data object Previous : Step
 
     /** Il brano in corso da capo. */
     data object Restart : Step
 
-    /** Niente: avanti dall'ultimo brano della coda mentre un salto è ancora in viaggio. */
+    /** Niente: avanti dall'ultimo brano della coda (senza ripeti tutto) mentre un salto è ancora in viaggio. */
     data object Stay : Step
 
     /**
@@ -64,20 +68,19 @@ object SkipPlan {
     fun next(requested: Int?, q: Queue): Step {
         if (q.current == null) return Next
         if (requested != null && requested > q.shown) return Jump(q.start + requested)
-        // Senza indice, o il ritorno a capo della finestra con ripeti tutto.
+        // Senza indice, o il ritorno a capo della finestra con ripeti tutto: si fa come farebbe Music Assistant dal brano
+        // mostrato (queue_loader._get_next_index con is_skip in MA 2.10.8: ripeti uno non conta, alla fine ripeti tutto
+        // torna al primo). Durante un salto next partirebbe dal brano dove Music Assistant è ancora: così il salto resta
+        // nello stesso giro di quello in viaggio.
         val next = q.showing + 1
-        if (!q.settled) {
-            // next partirebbe dal brano dove Music Assistant è ancora: si fa come farebbe lui da quello mostrato
-            // (queue_loader._get_next_index con is_skip in MA 2.10.8: ripeti uno non conta, alla fine ripeti tutto
-            // torna al primo), e il salto resta nello stesso giro di quello in viaggio.
-            return when {
-                next < q.size -> Jump(next)
-                q.repeat == "all" -> Jump(0)
-                else -> Stay
-            }
+        return when {
+            next < q.size -> Jump(next)
+            // Dall'ultimo brano (non quando la coda sembra più corta del brano mostrato: allora decide lui).
+            q.repeat == "all" && (next == q.size || !q.settled) -> Jump(0)
+            // La fine della coda, o "don't stop the music": lo sa solo Music Assistant.
+            q.settled -> Next
+            else -> Stay
         }
-        if (requested == null && q.repeat == "off" && next < q.size) return Jump(next)
-        return Next
     }
 
     /**
@@ -98,10 +101,9 @@ object SkipPlan {
             else -> q.shown == 0 && nearStart && q.showing > 0
         }
         if (!wanted) return if (q.settled) Restart else Jump(q.showing)
-        val previous = q.showing - 1
-        // Durante un salto previous partirebbe dal brano dove Music Assistant è ancora.
-        if (!q.settled) return Jump(maxOf(previous, 0))
-        if (q.repeat == "off" && previous >= 0) return Jump(previous)
-        return Previous
+        // Come previous di Music Assistant (controller.previous in MA 2.10.8: max(brano - 1, 0), con ogni ripeti), ma dal
+        // brano mostrato e senza il suo secondo di attesa. Durante un salto previous partirebbe dal brano dove Music
+        // Assistant è ancora.
+        return Jump(maxOf(q.showing - 1, 0))
     }
 }

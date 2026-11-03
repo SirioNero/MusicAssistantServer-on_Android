@@ -1,0 +1,6 @@
+  Duration: 00:00:02.13, start: 0.000000, bitrate: 64 kb/s
+  Stream #0:0: Audio: mp3 (mp3float), 24000 Hz, stereo, fltp, 64 kb/s
+Stream mapping:
+  Stream #0:0 -> #0:0 (mp3 (mp3float) -> pcm_s16le (native))
+  Stream #0:0: Audio: pcm_s16le, 24000 Hz, stereo, s16, 768 kb/s
+size=N/A time=00:00:02.11 bitrate=N/A speed= 469x    

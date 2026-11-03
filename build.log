@@ -1,0 +1,888 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.14.3/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :server:preBuild UP-TO-DATE
+> Task :server:preReleaseBuild UP-TO-DATE
+
+> Task :server:buildFfmpegX8664
+ffmpeg per x86_64 già pronto in /home/runner/work/MusicAssistantServer-on_Android/MusicAssistantServer-on_Android/server/build/ffmpeg/x86_64
+
+> Task :server:buildLibrespotX8664
+librespot per x86_64 già pronto in /home/runner/work/MusicAssistantServer-on_Android/MusicAssistantServer-on_Android/server/build/librespot/x86_64
+
+> Task :server:generateReleasePythonJniLibs
+> Task :server:mergeReleaseJniLibFolders
+> Task :server:generateReleaseResValues
+> Task :server:extractDeepLinksForAarRelease
+> Task :server:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :server:mergeReleaseNativeLibs
+> Task :server:findReleasePythonCommand
+
+> Task :server:stripReleaseDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libavcodec.so, libavfilter.so, libavformat.so, libavutil.so, libchaquopy_java.so, libcrypto_chaquopy.so, libcrypto_python.so, libffmpeg.so, libffprobe.so, liblibrespot.so, libpython3.13.so, libpython3.so, libsqlite3_chaquopy.so, libsqlite3_python.so, libssl_chaquopy.so, libssl_python.so, libswresample.so, libswscale.so. Run with --info option to learn more.
+
+> Task :server:extractReleasePythonBuildPackages
+> Task :server:copyReleaseJniLibsProjectAndLocalJars
+
+> Task :server:prepareServerWheels
+Scarico https://files.pythonhosted.org/packages/source/z/zeroconf/zeroconf-0.149.16.tar.gz
+Wheel per il server di Xonos: aiodns-4.0.4+xonos-py3-none-any.whl, orjson-3.11.6+xonos-py3-none-any.whl, zeroconf-0.149.16-py3-none-any.whl
+
+> Task :server:installReleasePythonRequirements
+Chaquopy: Installing for x86_64
+Looking in indexes: https://pypi.org/simple, https://chaquo.com/pypi-13.1
+Looking in links: /home/runner/work/MusicAssistantServer-on_Android/MusicAssistantServer-on_Android/server/build/wheels
+Collecting aiohttp==3.14.3 (from -r requirements.txt (line 8))
+  Downloading aiohttp-3.14.3-cp313-cp313-android_21_x86_64.whl.metadata (8.3 kB)
+Collecting cffi==1.17.1 (from -r requirements.txt (line 9))
+  Downloading cffi-1.17.1-0-cp313-cp313-android_24_x86_64.whl (179 kB)
+Collecting cryptography==42.0.8 (from -r requirements.txt (line 10))
+  Downloading cryptography-42.0.8-1-cp313-cp313-android_24_x86_64.whl (1.2 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.2/1.2 MB 3.0 MB/s  0:00:00
+Collecting numpy==1.26.2 (from -r requirements.txt (line 11))
+  Downloading numpy-1.26.2-0-cp313-cp313-android_24_x86_64.whl (6.4 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 6.4/6.4 MB 13.5 MB/s  0:00:00
+Collecting pillow==11.0.0 (from -r requirements.txt (line 12))
+  Downloading pillow-11.0.0-0-cp313-cp313-android_24_x86_64.whl (603 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 603.3/603.3 kB 42.5 MB/s  0:00:00
+Collecting pycryptodome==3.21.0 (from -r requirements.txt (line 13))
+  Downloading pycryptodome-3.21.0-0-cp313-cp313-android_24_x86_64.whl (1.6 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.6/1.6 MB 171.8 MB/s  0:00:00
+Processing ./build/wheels/aiodns-4.0.4+xonos-py3-none-any.whl (from -r requirements.txt (line 16))
+Processing ./build/wheels/orjson-3.11.6+xonos-py3-none-any.whl (from -r requirements.txt (line 17))
+Processing ./build/wheels/zeroconf-0.149.16-py3-none-any.whl (from -r requirements.txt (line 18))
+Collecting aiofiles==24.1.0 (from -r requirements.txt (line 21))
+  Downloading aiofiles-24.1.0-py3-none-any.whl.metadata (10 kB)
+Collecting aiohappyeyeballs==2.7.1 (from -r requirements.txt (line 22))
+  Downloading aiohappyeyeballs-2.7.1-py3-none-any.whl.metadata (5.9 kB)
+Collecting aiohttp-fast-zlib==0.3.0 (from -r requirements.txt (line 23))
+  Downloading aiohttp_fast_zlib-0.3.0-py3-none-any.whl.metadata (5.7 kB)
+Collecting aiohttp-socks==0.11.0 (from -r requirements.txt (line 24))
+  Downloading aiohttp_socks-0.11.0-py3-none-any.whl.metadata (3.6 kB)
+Collecting aiosendspin==10.2.1 (from -r requirements.txt (line 25))
+  Downloading aiosendspin-10.2.1-py3-none-any.whl.metadata (1.8 kB)
+Collecting aiosignal==1.4.0 (from -r requirements.txt (line 26))
+  Downloading aiosignal-1.4.0-py3-none-any.whl.metadata (3.7 kB)
+Collecting aiosqlite==0.22.1 (from -r requirements.txt (line 27))
+  Downloading aiosqlite-0.22.1-py3-none-any.whl.metadata (4.3 kB)
+Collecting anyascii==0.3.3 (from -r requirements.txt (line 28))
+  Downloading anyascii-0.3.3-py3-none-any.whl.metadata (1.6 kB)
+Collecting attrs==26.1.0 (from -r requirements.txt (line 29))
+  Downloading attrs-26.1.0-py3-none-any.whl.metadata (8.8 kB)
+Collecting awesomeversion==25.8.0 (from -r requirements.txt (line 30))
+  Downloading awesomeversion-25.8.0-py3-none-any.whl.metadata (9.8 kB)
+Collecting backoff==2.2.1 (from -r requirements.txt (line 31))
+  Downloading backoff-2.2.1-py3-none-any.whl.metadata (14 kB)
+Collecting beautifulsoup4==4.15.0 (from -r requirements.txt (line 32))
+  Downloading beautifulsoup4-4.15.0-py3-none-any.whl.metadata (3.8 kB)
+Collecting cachetools==7.2.6 (from -r requirements.txt (line 33))
+  Downloading cachetools-7.2.6-py3-none-any.whl.metadata (5.5 kB)
+Collecting certifi==2025.11.12 (from -r requirements.txt (line 34))
+  Downloading certifi-2025.11.12-py3-none-any.whl.metadata (2.5 kB)
+Collecting chardet==7.6.0 (from -r requirements.txt (line 35))
+  Downloading chardet-7.6.0-py3-none-any.whl.metadata (9.6 kB)
+Collecting colorlog==6.12.0 (from -r requirements.txt (line 36))
+  Downloading colorlog-6.12.0-py3-none-any.whl.metadata (11 kB)
+Collecting cpace==0.1.0 (from -r requirements.txt (line 37))
+  Downloading cpace-0.1.0-py3-none-any.whl.metadata (3.1 kB)
+Collecting frozenlist==1.8.0 (from -r requirements.txt (line 38))
+  Downloading frozenlist-1.8.0-py3-none-any.whl.metadata (20 kB)
+Collecting getmac==0.9.5 (from -r requirements.txt (line 39))
+  Downloading getmac-0.9.5-py2.py3-none-any.whl.metadata (35 kB)
+Collecting hass-client==1.3.1 (from -r requirements.txt (line 40))
+  Downloading hass_client-1.3.1-py3-none-any.whl.metadata (1.5 kB)
+Collecting idna==3.20 (from -r requirements.txt (line 41))
+  Downloading idna-3.20-py3-none-any.whl.metadata (7.2 kB)
+Collecting ifaddr==0.2.0 (from -r requirements.txt (line 42))
+  Downloading ifaddr-0.2.0-py3-none-any.whl.metadata (4.9 kB)
+Collecting markdownify==1.2.3 (from -r requirements.txt (line 43))
+  Downloading markdownify-1.2.3-py3-none-any.whl.metadata (9.9 kB)
+Collecting mashumaro==3.20 (from -r requirements.txt (line 44))
+  Downloading mashumaro-3.20-py3-none-any.whl.metadata (118 kB)
+Collecting multidict==6.9.1 (from -r requirements.txt (line 45))
+  Downloading multidict-6.9.1-cp313-cp313-android_24_x86_64.whl.metadata (5.3 kB)
+Collecting music-assistant-models==1.1.205 (from -r requirements.txt (line 46))
+  Downloading music_assistant_models-1.1.205-py3-none-any.whl.metadata (1.3 kB)
+Collecting mutagen==1.48.1 (from -r requirements.txt (line 47))
+  Downloading mutagen-1.48.1-py3-none-any.whl.metadata (1.8 kB)
+Collecting noiseprotocol==0.3.1 (from -r requirements.txt (line 48))
+  Downloading noiseprotocol-0.3.1-py3-none-any.whl.metadata (1.0 kB)
+Collecting podcastparser==0.6.11 (from -r requirements.txt (line 49))
+  Downloading podcastparser-0.6.11-py2.py3-none-any.whl.metadata (1.2 kB)
+Collecting propcache==0.5.4 (from -r requirements.txt (line 50))
+  Downloading propcache-0.5.4-py3-none-any.whl.metadata (25 kB)
+Collecting pycountry==24.6.1 (from -r requirements.txt (line 51))
+  Downloading pycountry-24.6.1-py3-none-any.whl.metadata (12 kB)
+Collecting pycparser==3.12 (from -r requirements.txt (line 52))
+  Downloading pycparser-3.12-py3-none-any.whl.metadata (9.7 kB)
+Collecting pyjwt==2.15.1 (from -r requirements.txt (line 53))
+  Downloading pyjwt-2.15.1-py3-none-any.whl.metadata (3.5 kB)
+Collecting python-slugify==8.0.4 (from -r requirements.txt (line 54))
+  Downloading python_slugify-8.0.4-py2.py3-none-any.whl.metadata (8.5 kB)
+Collecting python-socks==2.8.2 (from -r requirements.txt (line 55))
+  Downloading python_socks-2.8.2-py3-none-any.whl.metadata (8.2 kB)
+Collecting radios==0.3.2 (from -r requirements.txt (line 56))
+  Downloading radios-0.3.2-py3-none-any.whl.metadata (8.6 kB)
+Collecting shortuuid==1.0.13 (from -r requirements.txt (line 57))
+  Downloading shortuuid-1.0.13-py3-none-any.whl.metadata (5.8 kB)
+Collecting six==1.17.0 (from -r requirements.txt (line 58))
+  Downloading six-1.17.0-py2.py3-none-any.whl.metadata (1.7 kB)
+Collecting soupsieve==3.0.4 (from -r requirements.txt (line 59))
+  Downloading soupsieve-3.0.4-py3-none-any.whl.metadata (4.4 kB)
+Collecting text-unidecode==1.3 (from -r requirements.txt (line 60))
+  Downloading text_unidecode-1.3-py2.py3-none-any.whl.metadata (2.4 kB)
+Collecting typing-extensions==4.16.0 (from -r requirements.txt (line 61))
+  Downloading typing_extensions-4.16.0-py3-none-any.whl.metadata (3.3 kB)
+Collecting xmltodict==1.0.4 (from -r requirements.txt (line 62))
+  Downloading xmltodict-1.0.4-py3-none-any.whl.metadata (14 kB)
+Collecting yarl==1.25.1 (from -r requirements.txt (line 63))
+  Downloading yarl-1.25.1-py3-none-any.whl.metadata (111 kB)
+Collecting aioaudiobookshelf==0.1.25 (from -r requirements.txt (line 67))
+  Downloading aioaudiobookshelf-0.1.25-py3-none-any.whl.metadata (4.6 kB)
+Collecting aiojellyfin==0.14.1 (from -r requirements.txt (line 68))
+  Downloading aiojellyfin-0.14.1-py2.py3-none-any.whl.metadata (1.2 kB)
+Collecting annotated-doc==0.0.5 (from -r requirements.txt (line 69))
+  Downloading annotated_doc-0.0.5-py3-none-any.whl.metadata (6.5 kB)
+Collecting anyio==4.15.1 (from -r requirements.txt (line 70))
+  Downloading anyio-4.15.1-py3-none-any.whl.metadata (4.7 kB)
+Collecting bandcamp-async-api==0.2.2 (from -r requirements.txt (line 71))
+  Downloading bandcamp_async_api-0.2.2-py3-none-any.whl.metadata (11 kB)
+Collecting bidict==0.24.1 (from -r requirements.txt (line 72))
+  Downloading bidict-0.24.1-py3-none-any.whl.metadata (8.7 kB)
+Collecting charset-normalizer==3.5.2 (from -r requirements.txt (line 73))
+  Downloading charset_normalizer-3.5.2-cp313-cp313-android_24_x86_64.whl.metadata (46 kB)
+Collecting defusedxml==0.7.1 (from -r requirements.txt (line 74))
+  Downloading defusedxml-0.7.1-py2.py3-none-any.whl.metadata (32 kB)
+Collecting fake-useragent==2.2.0 (from -r requirements.txt (line 75))
+  Downloading fake_useragent-2.2.0-py3-none-any.whl.metadata (17 kB)
+Collecting gql==4.0.0 (from gql[aiohttp]==4.0.0->-r requirements.txt (line 76))
+  Downloading gql-4.0.0-py3-none-any.whl.metadata (10 kB)
+Collecting graphql-core==3.2.13 (from -r requirements.txt (line 77))
+  Downloading graphql_core-3.2.13-py3-none-any.whl.metadata (11 kB)
+Collecting h11==0.16.0 (from -r requirements.txt (line 78))
+  Downloading h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+Collecting httpcore==1.0.9 (from -r requirements.txt (line 79))
+  Downloading httpcore-1.0.9-py3-none-any.whl.metadata (21 kB)
+Collecting httpx==0.28.1 (from -r requirements.txt (line 80))
+  Downloading httpx-0.28.1-py3-none-any.whl.metadata (7.1 kB)
+Collecting liblistenbrainz==0.7.0 (from -r requirements.txt (line 81))
+  Downloading liblistenbrainz-0.7.0-py3-none-any.whl.metadata (3.8 kB)
+Collecting lyricsgenius==3.12.2 (from -r requirements.txt (line 82))
+  Downloading lyricsgenius-3.12.2-py3-none-any.whl.metadata (6.3 kB)
+Collecting make-it-sync==2.1.1 (from -r requirements.txt (line 83))
+  Downloading make_it_sync-2.1.1-py3-none-any.whl.metadata (3.8 kB)
+Collecting markdown-it-py==4.2.0 (from -r requirements.txt (line 84))
+  Downloading markdown_it_py-4.2.0-py3-none-any.whl.metadata (7.4 kB)
+Collecting mdurl==0.1.2 (from -r requirements.txt (line 85))
+  Downloading mdurl-0.1.2-py3-none-any.whl.metadata (1.6 kB)
+Collecting onedrive-personal-sdk==0.1.7 (from -r requirements.txt (line 86))
+  Downloading onedrive_personal_sdk-0.1.7-py3-none-any.whl.metadata (4.8 kB)
+Collecting pkce==1.0.3 (from -r requirements.txt (line 87))
+  Downloading pkce-1.0.3-py3-none-any.whl.metadata (984 bytes)
+Collecting plexapi==4.18.2 (from -r requirements.txt (line 88))
+  Downloading plexapi-4.18.2-py3-none-any.whl.metadata (9.5 kB)
+Collecting py-opensonic==10.4.1 (from -r requirements.txt (line 89))
+  Downloading py_opensonic-10.4.1-py3-none-any.whl.metadata (4.8 kB)
+Collecting pydantic==1.10.26 (from -r requirements.txt (line 90))
+  Downloading pydantic-1.10.26-py3-none-any.whl.metadata (155 kB)
+Collecting pygments==2.21.0 (from -r requirements.txt (line 91))
+  Downloading pygments-2.21.0-py3-none-any.whl.metadata (2.5 kB)
+Collecting pylast==7.0.2 (from -r requirements.txt (line 92))
+  Downloading pylast-7.0.2-py3-none-any.whl.metadata (7.0 kB)
+Collecting python-dotenv==1.2.4 (from -r requirements.txt (line 93))
+  Downloading python_dotenv-1.2.4-py3-none-any.whl.metadata (29 kB)
+Collecting python-engineio==4.15.0 (from -r requirements.txt (line 94))
+  Downloading python_engineio-4.15.0-py3-none-any.whl.metadata (2.6 kB)
+Collecting python-google-drive-api==0.1.0 (from -r requirements.txt (line 95))
+  Downloading python_google_drive_api-0.1.0-py3-none-any.whl.metadata (1.5 kB)
+Collecting python-socketio==5.17.0 (from -r requirements.txt (line 96))
+  Downloading python_socketio-5.17.0-py3-none-any.whl.metadata (3.6 kB)
+Collecting requests==2.34.2 (from -r requirements.txt (line 97))
+  Downloading requests-2.34.2-py3-none-any.whl.metadata (4.8 kB)
+Collecting rich==15.0.0 (from -r requirements.txt (line 98))
+  Downloading rich-15.0.0-py3-none-any.whl.metadata (18 kB)
+Collecting shellingham==1.5.4 (from -r requirements.txt (line 99))
+  Downloading shellingham-1.5.4-py2.py3-none-any.whl.metadata (3.5 kB)
+Collecting simple-websocket==1.1.0 (from -r requirements.txt (line 100))
+  Downloading simple_websocket-1.1.0-py3-none-any.whl.metadata (1.5 kB)
+Collecting soundcloudpy==0.1.4 (from -r requirements.txt (line 101))
+  Downloading soundcloudpy-0.1.4-py3-none-any.whl.metadata (3.0 kB)
+Collecting sxm==0.2.8 (from -r requirements.txt (line 102))
+  Downloading sxm-0.2.8-py3-none-any.whl.metadata (4.6 kB)
+Collecting tenacity==9.2.1 (from -r requirements.txt (line 103))
+  Downloading tenacity-9.2.1-py3-none-any.whl.metadata (1.4 kB)
+Collecting typer==0.27.3 (from -r requirements.txt (line 104))
+  Downloading typer-0.27.3-py3-none-any.whl.metadata (16 kB)
+Collecting ua-parser-builtins==202610 (from -r requirements.txt (line 105))
+  Downloading ua_parser_builtins-202610-py3-none-any.whl.metadata (1.8 kB)
+Collecting ua-parser==1.0.2 (from -r requirements.txt (line 106))
+  Downloading ua_parser-1.0.2-py3-none-any.whl.metadata (5.5 kB)
+Collecting urllib3==2.8.0 (from -r requirements.txt (line 107))
+  Downloading urllib3-2.8.0-py3-none-any.whl.metadata (7.4 kB)
+Collecting wsproto==1.3.2 (from -r requirements.txt (line 108))
+  Downloading wsproto-1.3.2-py3-none-any.whl.metadata (5.2 kB)
+Collecting zvuk-music==0.6.1 (from zvuk-music[async]==0.6.1->-r requirements.txt (line 109))
+  Downloading zvuk_music-0.6.1-py3-none-any.whl.metadata (12 kB)
+Collecting chaquopy-libffi>=3.3 (from cffi==1.17.1->-r requirements.txt (line 9))
+  Downloading chaquopy_libffi-3.3-3-py3-none-android_24_x86_64.whl (35 kB)
+Collecting chaquopy-openblas>=0.2.20 (from numpy==1.26.2->-r requirements.txt (line 11))
+  Downloading chaquopy_openblas-0.2.20-5-py3-none-android_21_x86_64.whl (5.3 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 5.3/5.3 MB 6.6 MB/s  0:00:01
+Collecting chaquopy-libcxx>=11000 (from numpy==1.26.2->-r requirements.txt (line 11))
+  Downloading chaquopy_libcxx-180000-0-py3-none-android_24_x86_64.whl (422 kB)
+Collecting chaquopy-libjpeg>=1.5.3 (from pillow==11.0.0->-r requirements.txt (line 12))
+  Downloading chaquopy_libjpeg-1.5.3-1-py3-none-android_21_x86_64.whl (147 kB)
+Collecting chaquopy-freetype>=2.9.1 (from pillow==11.0.0->-r requirements.txt (line 12))
+  Downloading chaquopy_freetype-2.9.1-2-py3-none-android_21_x86_64.whl (567 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 567.8/567.8 kB 44.8 MB/s  0:00:00
+Collecting chaquopy-libgfortran>=4.9 (from chaquopy-openblas>=0.2.20->numpy==1.26.2->-r requirements.txt (line 11))
+  Downloading chaquopy_libgfortran-4.9-0-py3-none-android_21_x86_64.whl (541 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 541.1/541.1 kB 106.1 MB/s  0:00:00
+Downloading aiohttp-3.14.3-cp313-cp313-android_21_x86_64.whl (515 kB)
+Downloading multidict-6.9.1-cp313-cp313-android_24_x86_64.whl (63 kB)
+Downloading yarl-1.25.1-py3-none-any.whl (63 kB)
+Downloading aiofiles-24.1.0-py3-none-any.whl (15 kB)
+Downloading aiohappyeyeballs-2.7.1-py3-none-any.whl (15 kB)
+Downloading aiohttp_fast_zlib-0.3.0-py3-none-any.whl (8.6 kB)
+Downloading aiohttp_socks-0.11.0-py3-none-any.whl (10 kB)
+Downloading python_socks-2.8.2-py3-none-any.whl (55 kB)
+Downloading aiosendspin-10.2.1-py3-none-any.whl (356 kB)
+Downloading aiosignal-1.4.0-py3-none-any.whl (7.5 kB)
+Downloading aiosqlite-0.22.1-py3-none-any.whl (17 kB)
+Downloading anyascii-0.3.3-py3-none-any.whl (345 kB)
+Downloading attrs-26.1.0-py3-none-any.whl (67 kB)
+Downloading awesomeversion-25.8.0-py3-none-any.whl (15 kB)
+Downloading backoff-2.2.1-py3-none-any.whl (15 kB)
+Downloading beautifulsoup4-4.15.0-py3-none-any.whl (109 kB)
+Downloading cachetools-7.2.6-py3-none-any.whl (19 kB)
+Downloading certifi-2025.11.12-py3-none-any.whl (159 kB)
+Downloading chardet-7.6.0-py3-none-any.whl (680 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 680.3/680.3 kB 136.6 MB/s  0:00:00
+Downloading colorlog-6.12.0-py3-none-any.whl (12 kB)
+Downloading cpace-0.1.0-py3-none-any.whl (9.5 kB)
+Downloading frozenlist-1.8.0-py3-none-any.whl (13 kB)
+Downloading getmac-0.9.5-py2.py3-none-any.whl (35 kB)
+Downloading hass_client-1.3.1-py3-none-any.whl (16 kB)
+Downloading idna-3.20-py3-none-any.whl (69 kB)
+Downloading ifaddr-0.2.0-py3-none-any.whl (12 kB)
+Downloading markdownify-1.2.3-py3-none-any.whl (15 kB)
+Downloading six-1.17.0-py2.py3-none-any.whl (11 kB)
+Downloading mashumaro-3.20-py3-none-any.whl (94 kB)
+Downloading music_assistant_models-1.1.205-py3-none-any.whl (80 kB)
+Downloading mutagen-1.48.1-py3-none-any.whl (195 kB)
+Downloading noiseprotocol-0.3.1-py3-none-any.whl (20 kB)
+Downloading podcastparser-0.6.11-py2.py3-none-any.whl (12 kB)
+Downloading propcache-0.5.4-py3-none-any.whl (16 kB)
+Downloading pycountry-24.6.1-py3-none-any.whl (6.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 6.3/6.3 MB 336.5 MB/s  0:00:00
+Downloading pycparser-3.12-py3-none-any.whl (62 kB)
+Downloading pyjwt-2.15.1-py3-none-any.whl (33 kB)
+Downloading python_slugify-8.0.4-py2.py3-none-any.whl (10 kB)
+Downloading radios-0.3.2-py3-none-any.whl (10 kB)
+Downloading shortuuid-1.0.13-py3-none-any.whl (10 kB)
+Downloading soupsieve-3.0.4-py3-none-any.whl (42 kB)
+Downloading text_unidecode-1.3-py2.py3-none-any.whl (78 kB)
+Downloading typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+Downloading xmltodict-1.0.4-py3-none-any.whl (13 kB)
+Downloading aioaudiobookshelf-0.1.25-py3-none-any.whl (44 kB)
+Downloading aiojellyfin-0.14.1-py2.py3-none-any.whl (12 kB)
+Downloading annotated_doc-0.0.5-py3-none-any.whl (5.3 kB)
+Downloading anyio-4.15.1-py3-none-any.whl (132 kB)
+Downloading bandcamp_async_api-0.2.2-py3-none-any.whl (20 kB)
+Downloading bidict-0.24.1-py3-none-any.whl (36 kB)
+Downloading charset_normalizer-3.5.2-cp313-cp313-android_24_x86_64.whl (238 kB)
+Downloading defusedxml-0.7.1-py2.py3-none-any.whl (25 kB)
+Downloading fake_useragent-2.2.0-py3-none-any.whl (161 kB)
+Downloading gql-4.0.0-py3-none-any.whl (89 kB)
+Downloading graphql_core-3.2.13-py3-none-any.whl (268 kB)
+Downloading h11-0.16.0-py3-none-any.whl (37 kB)
+Downloading httpcore-1.0.9-py3-none-any.whl (78 kB)
+Downloading httpx-0.28.1-py3-none-any.whl (73 kB)
+Downloading liblistenbrainz-0.7.0-py3-none-any.whl (24 kB)
+Downloading lyricsgenius-3.12.2-py3-none-any.whl (50 kB)
+Downloading make_it_sync-2.1.1-py3-none-any.whl (4.4 kB)
+Downloading markdown_it_py-4.2.0-py3-none-any.whl (91 kB)
+Downloading mdurl-0.1.2-py3-none-any.whl (10.0 kB)
+Downloading onedrive_personal_sdk-0.1.7-py3-none-any.whl (15 kB)
+Downloading pkce-1.0.3-py3-none-any.whl (3.2 kB)
+Downloading plexapi-4.18.2-py3-none-any.whl (178 kB)
+Downloading py_opensonic-10.4.1-py3-none-any.whl (45 kB)
+Downloading pydantic-1.10.26-py3-none-any.whl (166 kB)
+Downloading pygments-2.21.0-py3-none-any.whl (1.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.3/1.3 MB 231.1 MB/s  0:00:00
+Downloading pylast-7.0.2-py3-none-any.whl (26 kB)
+Downloading python_dotenv-1.2.4-py3-none-any.whl (23 kB)
+Downloading python_engineio-4.15.0-py3-none-any.whl (60 kB)
+Downloading python_google_drive_api-0.1.0-py3-none-any.whl (11 kB)
+Downloading python_socketio-5.17.0-py3-none-any.whl (82 kB)
+Downloading requests-2.34.2-py3-none-any.whl (73 kB)
+Downloading urllib3-2.8.0-py3-none-any.whl (135 kB)
+Downloading rich-15.0.0-py3-none-any.whl (310 kB)
+Downloading shellingham-1.5.4-py2.py3-none-any.whl (9.8 kB)
+Downloading simple_websocket-1.1.0-py3-none-any.whl (13 kB)
+Downloading soundcloudpy-0.1.4-py3-none-any.whl (10 kB)
+Downloading sxm-0.2.8-py3-none-any.whl (17 kB)
+Downloading tenacity-9.2.1-py3-none-any.whl (32 kB)
+Downloading typer-0.27.3-py3-none-any.whl (123 kB)
+Downloading ua_parser_builtins-202610-py3-none-any.whl (90 kB)
+Downloading ua_parser-1.0.2-py3-none-any.whl (31 kB)
+Downloading wsproto-1.3.2-py3-none-any.whl (24 kB)
+Downloading zvuk_music-0.6.1-py3-none-any.whl (80 kB)
+Installing collected packages: text-unidecode, podcastparser, orjson, ifaddr, chaquopy-libjpeg, chaquopy-libgfortran, chaquopy-libffi, chaquopy-libcxx, chaquopy-freetype, aiodns, zeroconf, xmltodict, urllib3, ua-parser-builtins, typing-extensions, tenacity, soupsieve, six, shortuuid, shellingham, python-socks, python-slugify, python-dotenv, pyjwt, pygments, pycryptodome, pycparser, pycountry, propcache, pkce, pillow, mutagen, multidict, mdurl, make-it-sync, idna, h11, graphql-core, getmac, frozenlist, fake-useragent, defusedxml, colorlog, charset-normalizer, chardet, chaquopy-openblas, certifi, cachetools, bidict, backoff, awesomeversion, attrs, anyascii, annotated-doc, aiosqlite, aiohappyeyeballs, aiofiles, yarl, wsproto, ua-parser, requests, pydantic, numpy, mashumaro, markdown-it-py, httpcore, cffi, beautifulsoup4, anyio, aiosignal, zvuk-music, simple-websocket, rich, plexapi, music-assistant-models, markdownify, lyricsgenius, liblistenbrainz, httpx, gql, cryptography, aiohttp, typer, soundcloudpy, radios, python-google-drive-api, python-engineio, pylast, py-opensonic, onedrive-personal-sdk, noiseprotocol, hass-client, cpace, bandcamp-async-api, aiojellyfin, aiohttp-socks, aiohttp-fast-zlib, sxm, python-socketio, aiosendspin, aioaudiobookshelf
+
+Successfully installed aioaudiobookshelf-0.1.25 aiodns-4.0.4+xonos aiofiles-24.1.0 aiohappyeyeballs-2.7.1 aiohttp-3.14.3 aiohttp-fast-zlib-0.3.0 aiohttp-socks-0.11.0 aiojellyfin-0.14.1 aiosendspin-10.2.1 aiosignal-1.4.0 aiosqlite-0.22.1 annotated-doc-0.0.5 anyascii-0.3.3 anyio-4.15.1 attrs-26.1.0 awesomeversion-25.8.0 backoff-2.2.1 bandcamp-async-api-0.2.2 beautifulsoup4-4.15.0 bidict-0.24.1 cachetools-7.2.6 certifi-2025.11.12 cffi-1.17.1 chaquopy-freetype-2.9.1 chaquopy-libcxx-180000 chaquopy-libffi-3.3 chaquopy-libgfortran-4.9 chaquopy-libjpeg-1.5.3 chaquopy-openblas-0.2.20 chardet-7.6.0 charset-normalizer-3.5.2 colorlog-6.12.0 cpace-0.1.0 cryptography-42.0.8 defusedxml-0.7.1 fake-useragent-2.2.0 frozenlist-1.8.0 getmac-0.9.5 gql-4.0.0 graphql-core-3.2.13 h11-0.16.0 hass-client-1.3.1 httpcore-1.0.9 httpx-0.28.1 idna-3.20 ifaddr-0.2.0 liblistenbrainz-0.7.0 lyricsgenius-3.12.2 make-it-sync-2.1.1 markdown-it-py-4.2.0 markdownify-1.2.3 mashumaro-3.20 mdurl-0.1.2 multidict-6.9.1 music-assistant-models-1.1.205 mutagen-1.48.1 noiseprotocol-0.3.1 numpy-1.26.2 onedrive-personal-sdk-0.1.7 orjson-3.11.6+xonos pillow-11.0.0 pkce-1.0.3 plexapi-4.18.2 podcastparser-0.6.11 propcache-0.5.4 py-opensonic-10.4.1 pycountry-24.6.1 pycparser-3.12 pycryptodome-3.21.0 pydantic-1.10.26 pygments-2.21.0 pyjwt-2.15.1 pylast-7.0.2 python-dotenv-1.2.4 python-engineio-4.15.0 python-google-drive-api-0.1.0 python-slugify-8.0.4 python-socketio-5.17.0 python-socks-2.8.2 radios-0.3.2 requests-2.34.2 rich-15.0.0 shellingham-1.5.4 shortuuid-1.0.13 simple-websocket-1.1.0 six-1.17.0 soundcloudpy-0.1.4 soupsieve-3.0.4 sxm-0.2.8 tenacity-9.2.1 text-unidecode-1.3 typer-0.27.3 typing-extensions-4.16.0 ua-parser-1.0.2 ua-parser-builtins-202610 urllib3-2.8.0 wsproto-1.3.2 xmltodict-1.0.4 yarl-1.25.1 zeroconf-0.149.16 zvuk-music-0.6.1
+
+> Task :server:prepareMusicAssistant
+Scarico https://github.com/music-assistant/server/archive/refs/tags/2.10.8.tar.gz
+Music Assistant 2.10.8 per Xonos in /home/runner/work/MusicAssistantServer-on_Android/MusicAssistantServer-on_Android/server/build/music-assistant/music_assistant (59 servizi, 95 file riscritti per Python 3.13)
+
+> Task :server:mergeReleasePythonSources
+> Task :server:generateReleasePythonProxies
+> Task :server:generateReleaseResources
+> Task :server:packageReleaseResources
+> Task :server:mergeReleaseShaders
+> Task :server:compileReleaseShaders NO-SOURCE
+> Task :server:generateReleaseAssets UP-TO-DATE
+> Task :server:parseReleaseLocalResources
+> Task :server:generateReleasePythonMiscAssets
+> Task :server:generateReleaseRFile
+> Task :server:generateReleasePythonRequirementsAssets
+> Task :server:compileReleaseKotlin NO-SOURCE
+> Task :server:extractReleaseAnnotations
+> Task :server:generateReleasePythonSourceAssets
+> Task :server:generateReleasePythonBuildAssets
+> Task :server:mergeReleaseAssets
+> Task :server:javaPreCompileRelease
+> Task :server:compileReleaseJavaWithJavac NO-SOURCE
+> Task :server:prepareLintJarForPublish
+> Task :server:mergeReleaseGeneratedProguardFiles
+> Task :server:mergeReleaseConsumerProguardFiles
+> Task :server:prepareReleaseArtProfile
+> Task :server:processReleaseJavaRes NO-SOURCE
+> Task :server:writeReleaseAarMetadata
+> Task :server:mapReleaseSourceSetPaths
+> Task :server:processReleaseManifest
+> Task :server:mergeReleaseResources
+> Task :server:mergeReleaseJavaResource
+> Task :server:syncReleaseLibJars
+> Task :server:verifyReleaseResources
+> Task :server:bundleReleaseAar
+> Task :server:assembleRelease
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:generateDebugBuildConfig
+> Task :app:generateDebugResValues
+> Task :app:checkDebugAarMetadata
+> Task :app:mapDebugSourceSetPaths
+> Task :app:generateDebugResources
+> Task :app:packageDebugResources
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug
+> Task :app:parseDebugLocalResources
+> Task :app:mergeDebugResources
+> Task :app:processDebugMainManifest
+> Task :app:processDebugManifest
+> Task :app:javaPreCompileDebug
+> Task :app:mergeDebugShaders
+> Task :app:compileDebugShaders NO-SOURCE
+> Task :app:processDebugManifestForPackage
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets
+> Task :app:compressDebugAssets
+> Task :app:desugarDebugFileDependencies
+> Task :app:checkDebugDuplicateClasses
+> Task :app:processDebugResources
+
+> Task :app:buildProot
+talloc 2.5.0 per arm64-v8a
+proot 5.1.107.101 per arm64-v8a
+  CC	cli/note.o
+  CC	execve/enter.o
+  CC	execve/exit.o
+  CC	execve/shebang.o
+  CC	execve/elf.o
+  CC	execve/ldso.o
+  CC	execve/auxv.o
+  CC	path/binding.o
+./execve/ldso.c:108:8: warning: variable 'is_known' set but not used [-Wunused-but-set-variable]
+  108 |                 bool is_known = false;
+      |                      ^
+  CC	path/glue.o
+  CC	path/canon.o
+./path/glue.c:76:14: warning: 'talloc_autofree_context' is deprecated [-Wdeprecated-declarations]
+   76 |         autofreed = talloc_autofree_context();
+      |                     ^
+/tmp/tmp.HJFg4TNcK7/arm64-v8a/talloc/talloc.h:1084:46: note: 'talloc_autofree_context' has been explicitly marked deprecated here
+ 1084 | _PUBLIC_ void *talloc_autofree_context(void) _DEPRECATED_;
+      |                                              ^
+/tmp/tmp.HJFg4TNcK7/arm64-v8a/talloc/talloc.h:119:38: note: expanded from macro '_DEPRECATED_'
+  119 | #define _DEPRECATED_ __attribute__ ((deprecated))
+      |                                      ^
+1 warning generated.
+  CC	path/f2fs-bug.o
+  CC	path/proc.o
+1 warning generated.
+  CC	path/temp.o
+  CC	syscall/syscall.o
+./path/temp.c:37:33: warning: 'talloc_autofree_context' is deprecated [-Wdeprecated-declarations]
+   37 |         temp_directory = talloc_strdup(talloc_autofree_context(), tmp);
+      |                                        ^
+/tmp/tmp.HJFg4TNcK7/arm64-v8a/talloc/talloc.h:1084:46: note: 'talloc_autofree_context' has been explicitly marked deprecated here
+ 1084 | _PUBLIC_ void *talloc_autofree_context(void) _DEPRECATED_;
+      |                                              ^
+/tmp/tmp.HJFg4TNcK7/arm64-v8a/talloc/talloc.h:119:38: note: expanded from macro '_DEPRECATED_'
+  119 | #define _DEPRECATED_ __attribute__ ((deprecated))
+      |                                      ^
+./path/temp.c:273:13: warning: 'talloc_autofree_context' is deprecated [-Wdeprecated-declarations]
+  273 |                 context = talloc_autofree_context();
+      |                           ^
+/tmp/tmp.HJFg4TNcK7/arm64-v8a/talloc/talloc.h:1084:46: note: 'talloc_autofree_context' has been explicitly marked deprecated here
+ 1084 | _PUBLIC_ void *talloc_autofree_context(void) _DEPRECATED_;
+      |                                              ^
+/tmp/tmp.HJFg4TNcK7/arm64-v8a/talloc/talloc.h:119:38: note: expanded from macro '_DEPRECATED_'
+  119 | #define _DEPRECATED_ __attribute__ ((deprecated))
+      |                                      ^
+  CC	syscall/chain.o
+  CC	syscall/enter.o
+2 warnings generated.
+  CC	syscall/exit.o
+  CC	syscall/sysnum.o
+  CC	syscall/socket.o
+  CC	syscall/heap.o
+./syscall/socket.c:183:10: warning: 'mktemp' is deprecated: mktemp is unsafe, use mkstemp or tmpfile instead [-Wdeprecated-declarations]
+  183 |                 (void) mktemp(shorter_host_path);
+      |                        ^
+/usr/local/lib/android/sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin/../sysroot/usr/include/stdlib.h:60:66: note: 'mktemp' has been explicitly marked deprecated here
+   60 | char* _Nullable mktemp(char* _Nonnull __template) __attribute__((__deprecated__("mktemp is unsafe, use mkstemp or tmpfile instead")));
+      |                                                                  ^
+  CC	syscall/rlimit.o
+1 warning generated.
+  CC	syscall/pipe_shadow.o
+  CC	tracee/tracee.o
+  CC	tracee/reg.o
+  CC	tracee/event.o
+  CC	tracee/seccomp.o
+./tracee/seccomp.c:326:7: warning: variable 'status' set but not used [-Wunused-but-set-variable]
+  326 |                 int status;
+      |                     ^
+./tracee/seccomp.c:638:29: warning: comparison of integers of different signs: 'gid_t' (aka 'unsigned int') and 'int' [-Wsign-compare]
+  638 |                 if (rxid != rxid_ && rxid != -1)
+      |                                      ~~~~ ^  ~~
+./tracee/seccomp.c:640:29: warning: comparison of integers of different signs: 'gid_t' (aka 'unsigned int') and 'int' [-Wsign-compare]
+  640 |                 if (exid != exid_ && exid != -1)
+      |                                      ~~~~ ^  ~~
+./tracee/seccomp.c:642:29: warning: comparison of integers of different signs: 'gid_t' (aka 'unsigned int') and 'int' [-Wsign-compare]
+  642 |                 if (sxid != sxid_ && sxid != -1)
+      |                                      ~~~~ ^  ~~
+./tracee/seccomp.c:631:12: warning: variable 'ret' is used uninitialized whenever 'if' condition is false [-Wsometimes-uninitialized]
+  631 |                 else if (sysnum == PR_setresgid)
+      |                          ^~~~~~~~~~~~~~~~~~~~~~
+./tracee/seccomp.c:633:7: note: uninitialized use occurs here
+  633 |                 if (ret) {  // EFAULT = address outside address space
+      |                     ^~~
+  CC	tracee/statx.o
+  CC	ptrace/ptrace.o
+./tracee/seccomp.c:631:8: note: remove the 'if' if its condition is always true
+  631 |                 else if (sysnum == PR_setresgid)
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+  632 |                         ret = getresgid(&rxid_, &exid_, &sxid_);
+./tracee/seccomp.c:150:9: note: initialize the variable 'ret' to silence this warning
+  150 |         int ret;
+      |                ^
+      |                 = 0
+  CC	ptrace/user.o
+5 warnings generated.
+  CC	ptrace/wait.o
+  CC	extension/ashmem_memfd/ashmem_memfd.o
+  CC	extension/kompat/kompat.o
+./extension/ashmem_memfd/ashmem_memfd.c:173:96: warning: unused parameter 'data2' [-Wunused-parameter]
+  173 | int ashmem_memfd_callback(Extension *extension, ExtensionEvent event, intptr_t data1, intptr_t data2)
+      |                                                                                                ^
+  CC	extension/fake_id0/chown.o
+1 warning generated.
+  CC	extension/fake_id0/chroot.o
+  CC	extension/fake_id0/getsockopt.o
+  CC	extension/fake_id0/sendmsg.o
+  CC	extension/fake_id0/socket.o
+  CC	extension/fake_id0/open.o
+./extension/fake_id0/chroot.c:54:2: warning: ignoring return value of function declared with 'warn_unused_result' attribute [-Wunused-result]
+   54 |         realpath(path, path_host_absolute);
+      |         ^~~~~~~~ ~~~~~~~~~~~~~~~~~~~~~~~~
+  CC	extension/fake_id0/unlink.o
+1 warning generated.
+  CC	extension/fake_id0/rename.o
+  CC	extension/fake_id0/chmod.o
+  CC	extension/fake_id0/utimensat.o
+  CC	extension/fake_id0/access.o
+  CC	extension/fake_id0/exec.o
+  CC	extension/fake_id0/link.o
+  CC	extension/fake_id0/symlink.o
+  CC	extension/fake_id0/mk.o
+  CC	extension/fake_id0/stat.o
+  CC	extension/fake_id0/helper_functions.o
+  CC	extension/fake_id0/fake_id0.o
+  CC	extension/hidden_files/hidden_files.o
+./extension/fake_id0/helper_functions.c:209:3: warning: misleading indentation; statement is not part of the previous 'else' [-Wmisleading-indentation]
+  209 |                 emulated_gid = config->egid;
+      |                 ^
+./extension/fake_id0/helper_functions.c:207:2: note: previous statement is here
+  207 |         else
+      |         ^
+  CC	extension/mountinfo/mountinfo.o
+1 warning generated.
+  CC	extension/port_switch/port_switch.o
+  CC	extension/sysvipc/sysvipc.o
+  CC	extension/sysvipc/sysvipc_msg.o
+./extension/port_switch/port_switch.c:174:100: warning: sizeof on array function parameter will return size of 'long *' instead of 'long[]' [-Wsizeof-array-argument]
+  174 |                     write_data(tracee, peek_reg(tracee, CURRENT, SYSARG_2), socketcall_arg2, sizeof(socketcall_arg2));
+      |                                                                                                    ^
+./extension/port_switch/port_switch.c:145:121: note: declared here
+  145 | void mod_port(Tracee *tracee, bool is_socketcall, bool is_bind, bool is_udp, struct sockaddr_storage *my_sockaddr, long socketcall_arg2[]) {   
+      |                                                                                                                         ^
+./extension/port_switch/port_switch.c:182:100: warning: sizeof on array function parameter will return size of 'long *' instead of 'long[]' [-Wsizeof-array-argument]
+  182 |                     write_data(tracee, peek_reg(tracee, CURRENT, SYSARG_2), socketcall_arg2, sizeof(socketcall_arg2));
+      |                                                                                                    ^
+./extension/port_switch/port_switch.c:145:121: note: declared here
+  145 | void mod_port(Tracee *tracee, bool is_socketcall, bool is_bind, bool is_udp, struct sockaddr_storage *my_sockaddr, long socketcall_arg2[]) {   
+      |                                                                                                                         ^
+./extension/port_switch/port_switch.c:204:100: warning: sizeof on array function parameter will return size of 'long *' instead of 'long[]' [-Wsizeof-array-argument]
+  204 |                     write_data(tracee, peek_reg(tracee, CURRENT, SYSARG_2), socketcall_arg2, sizeof(socketcall_arg2));
+      |                                                                                                    ^
+./extension/port_switch/port_switch.c:145:121: note: declared here
+  145 | void mod_port(Tracee *tracee, bool is_socketcall, bool is_bind, bool is_udp, struct sockaddr_storage *my_sockaddr, long socketcall_arg2[]) {   
+      |                                                                                                                         ^
+./extension/port_switch/port_switch.c:212:100: warning: sizeof on array function parameter will return size of 'long *' instead of 'long[]' [-Wsizeof-array-argument]
+  212 |                     write_data(tracee, peek_reg(tracee, CURRENT, SYSARG_2), socketcall_arg2, sizeof(socketcall_arg2));
+      |                                                                                                    ^
+./extension/port_switch/port_switch.c:145:121: note: declared here
+  145 | void mod_port(Tracee *tracee, bool is_socketcall, bool is_bind, bool is_udp, struct sockaddr_storage *my_sockaddr, long socketcall_arg2[]) {   
+      |                                                                                                                         ^
+  CC	extension/sysvipc/sysvipc_sem.o
+4 warnings generated.
+  CC	extension/sysvipc/sysvipc_shm.o
+  CC	extension/link2symlink/link2symlink.o
+  CC	extension/fix_symlink_size/fix_symlink_size.o
+./extension/sysvipc/sysvipc_shm.c:828:10: warning: 'mktemp' is deprecated: mktemp is unsafe, use mkstemp or tmpfile instead [-Wdeprecated-declarations]
+  828 |                 (void) mktemp(path);
+      |                        ^
+/usr/local/lib/android/sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin/../sysroot/usr/include/stdlib.h:60:66: note: 'mktemp' has been explicitly marked deprecated here
+   60 | char* _Nullable mktemp(char* _Nonnull __template) __attribute__((__deprecated__("mktemp is unsafe, use mkstemp or tmpfile instead")));
+      |                                                                  ^
+  CC	loader/loader.o
+  CC	loader/assembly.o
+1 warning generated.
+./loader/loader.c:253:5: warning: inline asm clobber list contains reserved registers: SP [-Winline-asm]
+  253 |                                 BRANCH(stmt->start.stack_pointer, stmt->start.entry_point);
+      |                                 ^
+./loader/assembly-arm64.h:32:3: note: expanded from macro 'BRANCH'
+   32 |                 "// Restore initial stack pointer.      \n\t"   \
+      |                 ^
+./loader/loader.c:253:5: note: Reserved registers on the clobber list may not be preserved across the asm statement, and clobbering them may lead to undefined behaviour.
+./loader/assembly-arm64.h:32:3: note: expanded from macro 'BRANCH'
+   32 |                 "// Restore initial stack pointer.      \n\t"   \
+      |                 ^
+  GEN	build.h
+1 warning generated.
+  LD	loader/loader
+  CC	cli/cli.o
+  CC	cli/proot.o
+  CC	execve/aoxp.o
+  CC	path/path.o
+./cli/cli.c:582:14: warning: unused variable 'pointers' [-Wunused-variable]
+  582 |         void *const pointers[] = { this_function, call_site };
+      |                     ^~~~~~~~
+  CC	syscall/seccomp.o
+  CC	tracee/mem.o
+1 warning generated.
+  CC	extension/extension.o
+  CC	loader/loader-info.o
+  LD	proot
+offset_to_pokedata_workaround=1016;
+a192f4a0c2999542c414111ad88c4603ea74e0a0cab5d40d8c65e839ee514934  arm64-v8a/libproot-loader.so
+063c8111a88a382434a58108c847027a41d8a0fd94cd14f8ae43dffda4b9cef5  arm64-v8a/libproot.so
+talloc 2.5.0 per x86_64
+proot 5.1.107.101 per x86_64
+  CC	cli/note.o
+  CC	execve/enter.o
+  CC	execve/exit.o
+  CC	execve/shebang.o
+  CC	execve/elf.o
+  CC	execve/ldso.o
+  CC	execve/auxv.o
+  CC	path/binding.o
+  CC	path/glue.o
+./execve/ldso.c:108:8: warning: variable 'is_known' set but not used [-Wunused-but-set-variable]
+  108 |                 bool is_known = false;
+      |                      ^
+./path/glue.c:76:14: warning: 'talloc_autofree_context' is deprecated [-Wdeprecated-declarations]
+   76 |         autofreed = talloc_autofree_context();
+      |                     ^
+/tmp/tmp.HJFg4TNcK7/x86_64/talloc/talloc.h:1084:46: note: 'talloc_autofree_context' has been explicitly marked deprecated here
+ 1084 | _PUBLIC_ void *talloc_autofree_context(void) _DEPRECATED_;
+      |                                              ^
+/tmp/tmp.HJFg4TNcK7/x86_64/talloc/talloc.h:119:38: note: expanded from macro '_DEPRECATED_'
+  119 | #define _DEPRECATED_ __attribute__ ((deprecated))
+      |                                      ^
+1 warning generated.
+  CC	path/canon.o
+  CC	path/f2fs-bug.o
+  CC	path/proc.o
+1 warning generated.
+  CC	path/temp.o
+  CC	syscall/syscall.o
+  CC	syscall/chain.o
+./path/temp.c:37:33: warning: 'talloc_autofree_context' is deprecated [-Wdeprecated-declarations]
+   37 |         temp_directory = talloc_strdup(talloc_autofree_context(), tmp);
+      |                                        ^
+/tmp/tmp.HJFg4TNcK7/x86_64/talloc/talloc.h:1084:46: note: 'talloc_autofree_context' has been explicitly marked deprecated here
+ 1084 | _PUBLIC_ void *talloc_autofree_context(void) _DEPRECATED_;
+      |                                              ^
+/tmp/tmp.HJFg4TNcK7/x86_64/talloc/talloc.h:119:38: note: expanded from macro '_DEPRECATED_'
+  119 | #define _DEPRECATED_ __attribute__ ((deprecated))
+      |                                      ^
+./path/temp.c  CC	syscall/enter.o
+:273:13: warning: 'talloc_autofree_context' is deprecated [-Wdeprecated-declarations]
+  273 |                 context = talloc_autofree_context();
+      |                           ^
+/tmp/tmp.HJFg4TNcK7/x86_64/talloc/talloc.h:1084:46: note: 'talloc_autofree_context' has been explicitly marked deprecated here
+ 1084 | _PUBLIC_ void *talloc_autofree_context(void) _DEPRECATED_;
+      |                                              ^
+/tmp/tmp.HJFg4TNcK7/x86_64/talloc/talloc.h:119:38: note: expanded from macro '_DEPRECATED_'
+  119 | #define _DEPRECATED_ __attribute__ ((deprecated))
+      |                                      ^
+2 warnings generated.
+  CC	syscall/sysnum.o
+  CC	syscall/exit.o
+  CC	syscall/socket.o
+./syscall/socket.c:183:10: warning: 'mktemp' is deprecated: mktemp is unsafe, use mkstemp or tmpfile instead [-Wdeprecated-declarations]
+  183 |                 (void) mktemp(shorter_host_path);
+      |                        ^
+/usr/local/lib/android/sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin/../sysroot/usr/include/stdlib.h:60:66: note: 'mktemp' has been explicitly marked deprecated here
+   60 | char* _Nullable mktemp(char* _Nonnull __template) __attribute__((__deprecated__("mktemp is unsafe, use mkstemp or tmpfile instead")));
+      |                                                                  ^
+  CC	syscall/heap.o
+1 warning generated.
+  CC	syscall/rlimit.o
+  CC	syscall/pipe_shadow.o
+  CC	tracee/tracee.o
+  CC	tracee/reg.o
+  CC	tracee/event.o
+./tracee/reg.c:291:45: warning: unused parameter 'including_sysnum' [-Wunused-parameter]
+  291 | int push_specific_regs(Tracee *tracee, bool including_sysnum)
+      |                                             ^
+1 warning generated.
+  CC	tracee/seccomp.o
+  CC	tracee/statx.o
+./tracee/seccomp.c:326:7: warning: variable 'status' set but not used [-Wunused-but-set-variable]
+  326 |                 int status;
+      |                     ^
+./tracee/seccomp.c:638:29: warning: comparison of integers of different signs: 'gid_t' (aka 'unsigned int') and 'int' [-Wsign-compare]
+  638 |                 if (rxid != rxid_ && rxid != -1)
+      |                                      ~~~~ ^  ~~
+./tracee/seccomp.c:640:29: warning: comparison of integers of different signs: 'gid_t' (aka 'unsigned int') and 'int' [-Wsign-compare]
+  640 |                 if (exid != exid_ && exid != -1)
+      |                                      ~~~~ ^  ~~
+./tracee/seccomp.c:642:29: warning: comparison of integers of different signs: 'gid_t' (aka 'unsigned int') and 'int' [-Wsign-compare]
+  642 |                 if (sxid != sxid_ && sxid != -1)
+      |                                      ~~~~ ^  ~~
+./tracee/seccomp.c:631:12: warning: variable 'ret' is used uninitialized whenever 'if' condition is false [-Wsometimes-uninitialized]
+  631 |                 else if (sysnum == PR_setresgid)
+      |                          ^~~~~~~~~~~~~~~~~~~~~~
+./tracee/seccomp.c:633:7: note: uninitialized use occurs here
+  633 |                 if (ret) {  // EFAULT = address outside address space
+      |                     ^~~
+./tracee/seccomp.c:631:8: note: remove the 'if' if its condition is always true
+  631 |                 else if (sysnum == PR_setresgid)
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+  632 |                         ret = getresgid(&rxid_, &exid_, &sxid_);
+./tracee/seccomp.c:150:9: note: initialize the variable 'ret' to silence this warning
+  150 |         int ret;
+      |                ^
+      |                 = 0
+  CC	ptrace/ptrace.o
+  CC	ptrace/user.o
+5 warnings generated.
+  CC	ptrace/wait.o
+  CC	extension/ashmem_memfd/ashmem_memfd.o
+  CC	extension/kompat/kompat.o
+  CC	extension/fake_id0/chown.o
+./extension/ashmem_memfd/ashmem_memfd.c:173:96: warning: unused parameter 'data2' [-Wunused-parameter]
+  173 | int ashmem_memfd_callback(Extension *extension, ExtensionEvent event, intptr_t data1, intptr_t data2)
+      |                                                                                                ^
+  CC	extension/fake_id0/chroot.o
+1 warning generated.
+  CC	extension/fake_id0/getsockopt.o
+  CC	extension/fake_id0/sendmsg.o
+./extension/fake_id0/chroot.c:54:2: warning: ignoring return value of function declared with 'warn_unused_result' attribute [-Wunused-result]
+   54 |         realpath(path, path_host_absolute);
+      |         ^~~~~~~~ ~~~~~~~~~~~~~~~~~~~~~~~~
+1 warning generated.
+  CC	extension/fake_id0/socket.o
+  CC	extension/fake_id0/open.o
+  CC	extension/fake_id0/unlink.o
+  CC	extension/fake_id0/rename.o
+  CC	extension/fake_id0/chmod.o
+  CC	extension/fake_id0/utimensat.o
+  CC	extension/fake_id0/access.o
+  CC	extension/fake_id0/link.o
+  CC	extension/fake_id0/exec.o
+  CC	extension/fake_id0/symlink.o
+  CC	extension/fake_id0/mk.o
+  CC	extension/fake_id0/stat.o
+  CC	extension/fake_id0/helper_functions.o
+  CC	extension/fake_id0/fake_id0.o
+./extension/fake_id0/helper_functions.c:209:3: warning: misleading indentation; statement is not part of the previous 'else' [-Wmisleading-indentation]
+  209 |                 emulated_gid = config->egid;
+      |                 ^
+./extension/fake_id0/helper_functions.c:207:2: note: previous statement is here
+  207 |         else
+      |         ^
+  CC	extension/hidden_files/hidden_files.o
+  CC	extension/mountinfo/mountinfo.o
+1 warning generated.
+  CC	extension/port_switch/port_switch.o
+  CC	extension/sysvipc/sysvipc.o
+  CC	extension/sysvipc/sysvipc_msg.o
+./extension/port_switch/port_switch.c:174:100: warning: sizeof on array function parameter will return size of 'long *' instead of 'long[]' [-Wsizeof-array-argument]
+  174 |                     write_data(tracee, peek_reg(tracee, CURRENT, SYSARG_2), socketcall_arg2, sizeof(socketcall_arg2));
+      |                                                                                                    ^
+./extension/port_switch/port_switch.c:145:121: note: declared here
+  145 | void mod_port(Tracee *tracee, bool is_socketcall, bool is_bind, bool is_udp, struct sockaddr_storage *my_sockaddr, long socketcall_arg2[]) {   
+      |                                                                                                                         ^
+./extension/port_switch/port_switch.c:182:100: warning: sizeof on array function parameter will return size of 'long *' instead of 'long[]' [-Wsizeof-array-argument]
+  182 |                     write_data(tracee, peek_reg(tracee, CURRENT, SYSARG_2), socketcall_arg2, sizeof(socketcall_arg2));
+      |                                                                                                    ^
+./extension/port_switch/port_switch.c:145:121: note: declared here
+  145 | void mod_port(Tracee *tracee, bool is_socketcall, bool is_bind, bool is_udp, struct sockaddr_storage *my_sockaddr, long socketcall_arg2[]) {   
+      |                                                                                                                         ^
+./extension/port_switch/port_switch.c:204:100: warning: sizeof on array function parameter will return size of 'long *' instead of 'long[]' [-Wsizeof-array-argument]
+  204 |                     write_data(tracee, peek_reg(tracee, CURRENT, SYSARG_2), socketcall_arg2, sizeof(socketcall_arg2));
+      |                                                                                                    ^
+./extension/port_switch/port_switch.c:145:121: note: declared here
+  145 | void mod_port(Tracee *tracee, bool is_socketcall, bool is_bind, bool is_udp, struct sockaddr_storage *my_sockaddr, long socketcall_arg2[]) {   
+      |                                                                                                                         ^
+./extension/port_switch/port_switch.c:212:100: warning: sizeof on array function parameter will return size of 'long *' instead of 'long[]' [-Wsizeof-array-argument]
+  212 |                     write_data(tracee, peek_reg(tracee, CURRENT, SYSARG_2), socketcall_arg2, sizeof(socketcall_arg2));
+      |                                                                                                    ^
+./extension/port_switch/port_switch.c:145:121: note: declared here
+  145 | void mod_port(Tracee *tracee, bool is_socketcall, bool is_bind, bool is_udp, struct sockaddr_storage *my_sockaddr, long socketcall_arg2[]) {   
+      |                                                                                                                         ^
+4 warnings generated.
+  CC	extension/sysvipc/sysvipc_sem.o
+  CC	extension/sysvipc/sysvipc_shm.o
+  CC	extension/link2symlink/link2symlink.o
+  CC	extension/fix_symlink_size/fix_symlink_size.o
+  CC	loader/loader.o
+./extension/sysvipc/sysvipc_shm.c:828:10: warning: 'mktemp' is deprecated: mktemp is unsafe, use mkstemp or tmpfile instead [-Wdeprecated-declarations]
+  828 |                 (void) mktemp(path);
+      |                        ^
+/usr/local/lib/android/sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin/../sysroot/usr/include/stdlib.h:60:66: note: 'mktemp' has been explicitly marked deprecated here
+   60 | char* _Nullable mktemp(char* _Nonnull __template) __attribute__((__deprecated__("mktemp is unsafe, use mkstemp or tmpfile instead")));
+      |                                                                  ^
+  CC	loader/assembly.o
+1 warning generated.
+  LD	loader/loader
+  GEN	build.h
+  CC	cli/proot.o
+  CC	cli/cli.o
+  CC	execve/aoxp.o
+  CC	path/path.o
+./cli/cli.c:582:14: warning: unused variable 'pointers' [-Wunused-variable]
+  582 |         void *const pointers[] = { this_function, call_site };
+      |                     ^~~~~~~~
+  CC	syscall/seccomp.o
+  CC	tracee/mem.o
+1 warning generated.
+  CC	extension/extension.o
+./tracee/mem.c:199:39: warning: unused parameter 'tracee' [-Wunused-parameter]
+  199 | void mem_prepare_after_execve(Tracee *tracee)
+      |                                       ^
+./tracee/mem.c:206:46: warning: unused parameter 'tracee' [-Wunused-parameter]
+  206 | void mem_prepare_before_first_execve(Tracee *tracee)
+      |                                              ^
+2 warnings generated.
+  LD	proot
+6ec46497dfb545a44ea0aed730e0c8f87faa99f7b2636f1405ad2830fc806939  x86_64/libproot-loader.so
+f5c1ed093bc6d5f6fdfe9bec6148ec27a9c24eedcf45c88ffdea7fd2b3bb7661  x86_64/libproot.so
+
+> Task :app:compileDebugKotlin
+> Task :app:mergeExtDexDebug
+> Task :app:mergeDebugJniLibFolders
+> Task :app:mergeLibDexDebug
+> Task :app:validateSigningDebug
+> Task :app:mergeDebugNativeLibs
+> Task :app:writeDebugAppMetadata
+> Task :app:writeDebugSigningConfigVersions
+> Task :app:preReleaseBuild UP-TO-DATE
+> Task :app:mergeReleaseJniLibFolders
+> Task :app:stripDebugDebugSymbols
+> Task :app:mergeReleaseNativeLibs
+> Task :app:buildKotlinToolingMetadata
+> Task :app:stripReleaseDebugSymbols
+> Task :app:checkReleaseDuplicateClasses
+> Task :app:generateReleaseBuildConfig
+> Task :app:extractReleaseNativeSymbolTables
+> Task :app:mergeReleaseNativeDebugMetadata NO-SOURCE
+> Task :app:checkReleaseAarMetadata
+> Task :app:generateReleaseResValues
+> Task :app:mapReleaseSourceSetPaths
+> Task :app:generateReleaseResources
+> Task :app:packageReleaseResources
+> Task :app:parseReleaseLocalResources
+> Task :app:createReleaseCompatibleScreenManifests
+> Task :app:extractDeepLinksRelease
+> Task :app:processReleaseMainManifest
+> Task :app:processReleaseManifest
+> Task :app:processReleaseManifestForPackage
+> Task :app:javaPreCompileRelease
+> Task :app:mergeReleaseResources
+> Task :app:mergeReleaseArtProfile
+> Task :app:extractProguardFiles
+> Task :app:mergeReleaseStartupProfile
+> Task :app:mergeReleaseShaders
+> Task :app:compileReleaseShaders NO-SOURCE
+> Task :app:generateReleaseAssets UP-TO-DATE
+> Task :app:mergeReleaseAssets
+> Task :app:compressReleaseAssets
+> Task :app:extractReleaseVersionControlInfo
+> Task :app:validateSigningRelease
+> Task :app:writeReleaseAppMetadata
+> Task :app:writeReleaseSigningConfigVersions
+> Task :app:processReleaseResources
+
+> Task :app:compileDebugKotlin
+w: file:///home/runner/work/MusicAssistantServer-on_Android/MusicAssistantServer-on_Android/app/src/main/java/it/xonos/ma/playback/MaPlayer.kt:93:17 This property hides Java field 'field window: Timeline.Window' thus making it inaccessible.
+w: file:///home/runner/work/MusicAssistantServer-on_Android/MusicAssistantServer-on_Android/app/src/main/java/it/xonos/ma/playback/PlaybackService.kt:528:42 'static field WIFI_MODE_FULL_HIGH_PERF: Int' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/MusicAssistantServer-on_Android/MusicAssistantServer-on_Android/app/src/main/java/it/xonos/ma/playback/PlaybackService.kt:577:74 'constructor(p0: MediaSession): MediaSession.ConnectionResult.AcceptedResultBuilder' is deprecated. Deprecated in Java.
+
+> Task :app:compileDebugJavaWithJavac
+> Task :app:dexBuilderDebug
+> Task :app:mergeDebugGlobalSynthetics
+> Task :app:processDebugJavaRes
+> Task :app:mergeProjectDexDebug
+> Task :app:mergeDebugJavaResource
+> Task :app:packageDebug
+> Task :app:createDebugApkListingFileRedirect
+> Task :app:assembleDebug
+> Task :app:compileReleaseKotlin
+w: file:///home/runner/work/MusicAssistantServer-on_Android/MusicAssistantServer-on_Android/app/src/main/java/it/xonos/ma/playback/MaPlayer.kt:93:17 This property hides Java field 'field window: Timeline.Window' thus making it inaccessible.
+w: file:///home/runner/work/MusicAssistantServer-on_Android/MusicAssistantServer-on_Android/app/src/main/java/it/xonos/ma/playback/PlaybackService.kt:528:42 'static field WIFI_MODE_FULL_HIGH_PERF: Int' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/MusicAssistantServer-on_Android/MusicAssistantServer-on_Android/app/src/main/java/it/xonos/ma/playback/PlaybackService.kt:577:74 'constructor(p0: MediaSession): MediaSession.ConnectionResult.AcceptedResultBuilder' is deprecated. Deprecated in Java.
+
+> Task :app:compileReleaseJavaWithJavac
+> Task :app:mergeReleaseGeneratedProguardFiles
+> Task :app:processReleaseJavaRes
+> Task :app:mergeReleaseJavaResource
+> Task :app:expandReleaseArtProfileWildcards
+> Task :app:minifyReleaseWithR8
+> Task :app:convertShrunkResourcesToBinaryRelease
+> Task :app:optimizeReleaseResources
+> Task :app:compileReleaseArtProfile
+> Task :app:packageRelease
+> Task :app:createReleaseApkListingFileRedirect
+> Task :app:assembleRelease
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1793700767855.json
+
+BUILD SUCCESSFUL in 6m 12s
+121 actionable tasks: 121 executed

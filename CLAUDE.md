@@ -1070,6 +1070,54 @@ proot[soloist] 3–6%, ffmpeg 3–4%. Il blocco di un'ora di Spotify (0.1.53) er
   tocchi veloci), brano vecchio zitto al tocco, qualità Spotify "molto alta" invece di "senza perdita" (si prova dalle
   impostazioni del servizio, senza aggiornare).
 
+## Avvio paziente (0.1.57, ramo `claude/avvio-paziente`, pacchetto 2.10.8-12)
+
+Dal registro dell'utente con la 0.1.56 (3 novembre 2026, sera; l'utente: "un passo indietro"): l'avvio in modalità
+Spotify Connect non riusciva mai, la modalità si spegneva per 30 minuti e ogni avanti ripartiva da capo (7,2-7,9 s dal
+tocco, contro 0,7-1,1 s dei salti sulla sessione accesa nella 0.1.55). Il precarico non è mai partito (vive solo in
+modalità Spotify Connect). Analisi (3 filoni, un verificatore per proposta) in `scratchpad/log-0156.txt` e nel risultato
+del workflow `indagine-0157` della sessione.
+- **Perché**: il Soloist vero dice il brano chiesto (track_changed) solo quando ne ha l'audio; un Soloist appena partito ci
+  mette 5,2-5,5 s dopo l'accesso (7 avvii su 7, tutti uguali), mentre `_xonos_connect_play` aspettava `_JUMP_TIMEOUT_S`
+  (5 s) dal play. Subito dopo il play Soloist manda uno stato "playing" senza il brano e la conferma («dentro l'avvio (non
+  riuscito): +0.01 suona, +0.06 posizione 0.0 s, +0.06 conferma; PulseAudio: nessun flusso»). Nella 0.1.55 era andata per
+  caso: Soloist riprendeva lo stesso brano dell'ultima volta e lo diceva subito (l'attesa del caricamento finiva nel
+  `_cold_seek`, che ha 15 s). Lo stato "playing" arriva a ogni avvio insieme a "became active device": non distingue un
+  Soloist che carica da uno bloccato (scartato dal verificatore).
+- **Fatto**: `_XONOS_CONNECT_START_S` (8 s dal play) per il primo brano di un Soloist in modalità Spotify Connect; i cambi
+  sulla sessione accesa restano a 5 s / 8 s. Se scade con Soloist acceso (`_xonos_slow_start`), la modalità Spotify Connect si
+  ferma subito (`_xonos_block_connect`, prima del ripiego): dopo 8 s il ripiego (circa 7 s a freddo) può non entrare nei 15 s
+  che Music Assistant dà al buffer (`BUFFER_READY_TIMEOUT`), e Music Assistant lo cancellerebbe prima che il blocco venga
+  messo: ogni brano avrebbe riprovato e fallito. Gli altri fallimenti (accesso, processo uscito) bloccano come prima solo
+  se poi un processo per brano parte.
+- **I 5 s a freddo** (nella 0.1.53 "il brano suona" era 0,55-0,83 s): non dimostrato. Con glibc 2.39 e un DNS finto
+  (`scratchpad/dnsdrop/run.sh`): se si perde la seconda delle due domande che glibc manda insieme (A e AAAA) la risposta
+  arriva dopo 5,11 s, con `options timeout:2 single-request-reopen` in 0,11 s; un primo server muto 5,08 s → 2,07 s con
+  `timeout:2`; AAAA mai risposta 15 s → 2 s; con un server sano 0,07 s in tutti i casi. Contro: l'accesso a Spotify di un
+  processo nuovo (anche lui con una ricerca DNS) dura sempre 0,8-1,2 s, e durante l'attesa proot conta 336 risvegli/s
+  (Soloist lavora). Altra pista: dalla 0.1.54 Soloist trova nei dati una sessione Spotify Connect da ripristinare
+  ("restoring session"), che la 0.1.53 non aveva. Fatto: `PhoneServer.writeDns` scrive `options timeout:2 attempts:2
+  single-request-reopen` e in testa `# xonos: rete Wi-Fi+VPN, via IPv6 predefinita sì, DNS della rete 1 IPv4 e 0 IPv6` (tipi e
+  numeri, mai indirizzi; glibc salta la riga), riscritto solo se cambia; Music Assistant la mette nella riga «Soloist: parte
+  da capo (controllo del programma N s; rete …, opzioni del DNS …)» (`_xonos_network`). Dal prossimo registro: se «il brano
+  suona» a freddo scende sotto 1-2 s era il DNS; se no, la prossima prova è `--verbose` di Soloist nei 15 s dopo l'avvio
+  (costo da misurare: le sue righe arrivano a Python per tutta la sessione) o i dati della sessione ripristinata.
+- **Avanti dall'ultimo brano della coda** (19:39 nel registro: un brano da solo, 18 tocchi «deciso da Music Assistant»):
+  `SkipPlan.next` dà `Stay` quando il brano mostrato è l'ultimo della coda e ripeti non è "tutto": next di Music Assistant lì
+  non fa niente (`_get_next_index` con is_skip dà None anche con ripeti uno; l'autoplay riempie la coda solo al cambio di
+  brano) e il tocco teneva il lettore fermo 3 s ad aspettare. Next resta per una coda che sembra più corta del brano
+  mostrato e per una coda senza brano in corso. Non fatto (proposto): il tasto avanti spento a fine coda (va calcolato anche
+  sullo stato segnaposto di Media3 durante un salto, sennò si spegne per 7-10 s), e chiedere all'utente se un brano da solo
+  debba continuare (autoplay di Music Assistant). `SkipCheck`: 48 prove (SkipPlan 38).
+- **Autotest**: il finto Soloist ha `XONOS_FAKE_COLD_MS` (il primo play di un Soloist in modalità Spotify Connect: subito lo
+  stato "playing" senza brano e la conferma, il brano e l'audio dopo tanto) e `XONOS_FAKE_STUCK` (mai). In `soloist-sessione`
+  `_cold_cases`, coi tempi veri di Xonos: avvio a freddo di 5,5 s che resta in modalità Spotify Connect, salto subito dopo
+  sulla stessa sessione, primo brano che non parte (modalità ferma subito, ripiego sotto i 13 s). Le prove di prima
+  lasciavano `_XONOS_SWITCH_S`/`_JUMP_TIMEOUT_S` a 2 s anche per il precarico: ora si rimettono dopo la prova del salto
+  rifiutato.
+- **Riproducibile** per la 0.1.56 lanciato dopo la release (proot cambiato).
+- Da portare in myCar: `SkipPlan` (Stay a fine coda), insieme al resto di 0.1.53-0.1.56.
+
 ## Lingue
 
 - `Language.kt`: en (predefinita), it, es, de, fr, pt, el, ru, zh-CN. La scelta vale per la schermata

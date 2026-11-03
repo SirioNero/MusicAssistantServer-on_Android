@@ -905,6 +905,7 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
             "_XONOS_RETRY_S",
             "_XONOS_CONNECT",
             "_XONOS_CONNECT_LOGIN_S",
+            "_XONOS_CONNECT_START_S",
             "_XONOS_PRELOAD_AFTER_S",
         )
     }
@@ -1109,6 +1110,9 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
             (first["tentativo dopo un po'"], backend._xonos_failures, backend._xonos_retries),
         )
         os.environ.pop("XONOS_FAKE_NO_JUMP")
+        # i tempi veri dei cambi (le prove qui sopra li accorciano)
+        solo._XONOS_SWITCH_S = real["_XONOS_SWITCH_S"]
+        solo._JUMP_TIMEOUT_S = real["_JUMP_TIMEOUT_S"]
         # la modalità Spotify Connect che non entra in Spotify: un processo per brano, e per un po' resta così
         await drop()
         os.environ["XONOS_FAKE_CONNECT_FAIL"] = "1"
@@ -1134,6 +1138,7 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
         )
         os.environ.pop("XONOS_FAKE_CONNECT_FAIL")
         await _preload_cases(backend, solo, take, nexts, records, check, mark, first, lambda: early)
+        await _cold_cases(backend, solo, take, real, check, mark, first, drop)
         # un altro account Spotify entra in Soloist dalla rete locale (modalità Spotify Connect): il brano dopo non
         # suona su quell'account, si chiede di rifare l'abbinamento. Per ultima: dopo, questo Soloist non si usa più.
         await drop()
@@ -1159,6 +1164,8 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
             "XONOS_FAKE_AUTOPLAY",
             "XONOS_FAKE_CONNECT_FAIL",
             "XONOS_FAKE_TAKEOVER",
+            "XONOS_FAKE_COLD_MS",
+            "XONOS_FAKE_STUCK",
         ):
             os.environ.pop(key, None)
         for name, value in real.items():
@@ -1168,6 +1175,84 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
     if failed:
         detail += "; non va: " + ", ".join(failed) + " | motore: " + " / ".join(records[-15:])
     return not failed, detail
+
+
+async def _cold_cases(
+    backend: Any, solo: Any, take: Any, real: dict[str, Any], check: Any, mark: Any, first: dict[str, float], drop: Any
+) -> None:
+    """
+    soloist-sessione, il primo brano di un Soloist appena partito in modalità Spotify Connect, coi tempi veri di Xonos.
+
+    Il Soloist vero dice il brano chiesto solo quando ne ha l'audio: a freddo, sul telefono dell'utente, 5,2-5,5 s dopo
+    l'accesso (registro della 0.1.56). Con i 5 s dei salti l'avvio non riusciva e la modalità Spotify Connect si spegneva
+    per 30 minuti. Il finto fa lo stesso con XONOS_FAKE_COLD_MS, e con XONOS_FAKE_STUCK un primo brano che non parte mai.
+    """
+    for name in ("_XONOS_SWITCH_S", "_JUMP_TIMEOUT_S", "_XONOS_CONNECT_LOGIN_S", "_XONOS_CONNECT_START_S"):
+        setattr(solo, name, real[name])
+
+    def fresh() -> None:
+        backend._xonos_connect_blocked_until = 0.0
+        backend._xonos_connect_fails = 0
+        backend._xonos_failures = {"salto": 0, "ripresa": 0}
+        backend._xonos_retries = {"salto": 0, "ripresa": 0}
+        backend._xonos_unconfirmed = None
+
+    one, two, three = (f"spotify:track:xonoscold{x}" for x in "123")
+    try:
+        await drop()
+        fresh()
+        os.environ["XONOS_FAKE_COLD_MS"] = "5500"
+        first["Connect da capo a freddo"], values, _ = await take(one, "cold1", seconds=1.0)
+        run = backend._run
+        check(
+            "a freddo: resta in modalità Spotify Connect",
+            values == {mark(one)}
+            and run is not None
+            and run._xonos_connect
+            and backend._xonos_connect_blocked_until <= solo._xonos_now()
+            and backend._xonos_connect_fails == 0,
+            (values, getattr(run, "_xonos_connect", None), backend._xonos_connect_fails),
+        )
+        check(
+            "a freddo: il primo audio dopo il caricamento",
+            5.4 <= first["Connect da capo a freddo"] <= 8.5,
+            first["Connect da capo a freddo"],
+        )
+        os.environ.pop("XONOS_FAKE_COLD_MS")
+        first["Connect salto dopo un avvio a freddo"], values, _ = await take(two, "cold2", seconds=1.0)
+        check(
+            "dopo l'avvio a freddo il salto sulla stessa sessione",
+            values == {mark(two)}
+            and backend._run is run
+            and backend._xonos_failures["salto"] == 0
+            and first["Connect salto dopo un avvio a freddo"] < 1.5,
+            (values, backend._run is run, backend._xonos_failures, first["Connect salto dopo un avvio a freddo"]),
+        )
+        await drop()
+        fresh()
+        os.environ["XONOS_FAKE_STUCK"] = "1"
+        first["Connect che non parte, ripiego"], values, _ = await take(three, "cold3", seconds=1.0)
+        run = backend._run
+        check(
+            "primo brano che non parte: un processo per brano",
+            values == {mark(three)} and run is not None and not run._xonos_connect,
+            (values, getattr(run, "_xonos_connect", None)),
+        )
+        check(
+            "primo brano che non parte: modalità Spotify Connect ferma subito",
+            backend._xonos_connect_blocked_until > solo._xonos_now() and backend._xonos_connect_fails == 1,
+            (backend._xonos_connect_blocked_until, backend._xonos_connect_fails),
+        )
+        check(
+            "primo brano che non parte: il ripiego entra nei 15 s di Music Assistant",
+            first["Connect che non parte, ripiego"] < 13.0,
+            first["Connect che non parte, ripiego"],
+        )
+    finally:
+        os.environ.pop("XONOS_FAKE_COLD_MS", None)
+        os.environ.pop("XONOS_FAKE_STUCK", None)
+        await drop()
+        fresh()
 
 
 async def _preload_cases(

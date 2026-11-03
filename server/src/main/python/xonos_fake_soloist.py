@@ -36,6 +36,9 @@ allora conferma: chi svuotasse il tubo prima di aspettare la conferma se lo ritr
 XONOS_FAKE_DELAY_PLAY=<ms> (il play di un altro brano parte dopo tanto, come un brano che si carica piano),
 XONOS_FAKE_CONNECT_FAIL=1 (in modalità Spotify Connect non entra mai in Spotify), XONOS_FAKE_TAKEOVER=1 (dopo il primo
 brano entra un altro account, come da un'altra app nella rete locale: settings/Users/altro-user nella cartella dei dati).
+In modalità Spotify Connect, il primo play di un Soloist appena partito: XONOS_FAKE_COLD_MS=<ms> (come il Soloist vero a
+freddo sul telefono: subito uno stato "playing" senza il brano chiesto e la conferma, il brano chiesto e l'audio solo
+dopo tanto; vale al posto di XONOS_FAKE_DELAY_PLAY), XONOS_FAKE_STUCK=1 (lo stesso, ma il brano non parte mai).
 
 Una pausa a un Soloist già fermo riceve un errore e nessuna conferma: il Soloist vero può fare così (il plugin Spotify
 Connect di Music Assistant tollera "a rejected or unacknowledged pause"), e Xonos non deve contarci.
@@ -113,6 +116,10 @@ class FakeSoloist:
         self.autoplay = os.environ.get("XONOS_FAKE_AUTOPLAY", "1") != "0"
         self.connect_fail = os.environ.get("XONOS_FAKE_CONNECT_FAIL") == "1"
         self.takeover = os.environ.get("XONOS_FAKE_TAKEOVER") == "1"
+        # il primo brano di un Soloist appena partito in modalità Spotify Connect: lento (a freddo), o mai
+        self.cold_s = int(os.environ.get("XONOS_FAKE_COLD_MS", "0")) / 1000
+        self.stuck = os.environ.get("XONOS_FAKE_STUCK") == "1"
+        self.played = False
         self.data_dir: Path | None = None
         self.playing = uri is not None
         self.position_ms = 0.0
@@ -192,6 +199,27 @@ class FakeSoloist:
         name = str(cmd.get("command") or "")
         uri = cmd.get("uri")
         print(f"finto soloist: comando {name} {uri or cmd.get('position_ms') or cmd.get('enabled') or ''}", flush=True)
+        first = self.connect and name == "play" and bool(uri) and not self.played
+        if first:
+            self.played = True
+        if first and (self.cold_s or self.stuck):
+            # come il Soloist vero appena partito: subito uno stato "playing" senza il brano chiesto, poi la conferma;
+            # il brano chiesto lo dice solo quando ne ha l'audio
+            await self.send(
+                {"type": "playback_changed", "status": "playing", "item": self.item(), "position": self.position()}
+            )
+            await self.send({"type": "command_result", "command": name})
+            if self.stuck:
+                print("finto soloist: primo brano che non parte mai", flush=True)
+                return
+            print(f"finto soloist: primo brano a freddo fra {self.cold_s:.1f} s", flush=True)
+            await asyncio.sleep(self.cold_s)
+            self.uri = str(uri)
+            self.position_ms = 0.0
+            self.playing = True
+            await self.send({"type": "track_changed", "item": self.item()})
+            await self.state()
+            return
         if name == "play" and uri and uri != self.uri and not self.connect:
             # come il Soloist vero con --single-track: un altro brano lo chiude
             print("finto soloist: un altro brano con --single-track, mi chiudo", flush=True)

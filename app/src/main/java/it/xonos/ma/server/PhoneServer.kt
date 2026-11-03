@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.LinkProperties
 import android.net.Network
+import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Environment
@@ -21,6 +22,8 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import java.io.File
 import java.io.RandomAccessFile
+import java.net.Inet4Address
+import java.net.Inet6Address
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
@@ -43,6 +46,8 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
     private val cache = File(context.cacheDir, "music-assistant")
     private val dnsFile = File(data, "resolv.conf")
     private var dnsWatch: ConnectivityManager.NetworkCallback? = null
+    /** L'ultimo file del DNS scritto (le notizie della rete arrivano spesso uguali). */
+    @Volatile private var lastDns: String? = null
     private val multicastLock: WifiManager.MulticastLock? by lazy {
         app.getSystemService(WifiManager::class.java)?.createMulticastLock("xonos-soloist")?.apply {
             setReferenceCounted(false)
@@ -298,10 +303,25 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
      */
     private fun watchDns() {
         val connectivity = app.getSystemService(ConnectivityManager::class.java) ?: return
-        writeDns(connectivity.getLinkProperties(connectivity.activeNetwork))
+        // a ogni avvio del server il file si riscrive (la cartella dei dati può essere stata tolta)
+        lastDns = null
+        val active = connectivity.activeNetwork
+        writeDns(connectivity.getLinkProperties(active), active?.let { connectivity.getNetworkCapabilities(it) })
         if (dnsWatch != null) return
         val callback = object : ConnectivityManager.NetworkCallback() {
-            override fun onLinkPropertiesChanged(network: Network, properties: LinkProperties) = writeDns(properties)
+            private var properties: LinkProperties? = null
+            private var capabilities: NetworkCapabilities? = null
+
+            override fun onLinkPropertiesChanged(network: Network, properties: LinkProperties) {
+                this.properties = properties
+                writeDns(properties, capabilities)
+            }
+
+            // Arriva spesso (in rete mobile a ogni cambio di segnale): il file si riscrive solo se cambia.
+            override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
+                this.capabilities = capabilities
+                properties?.let { writeDns(it, capabilities) }
+            }
         }
         runCatching { connectivity.registerDefaultNetworkCallback(callback) }
             .onSuccess { dnsWatch = callback }
@@ -314,16 +334,41 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
         runCatching { app.getSystemService(ConnectivityManager::class.java)?.unregisterNetworkCallback(callback) }
     }
 
-    private fun writeDns(properties: LinkProperties?) {
-        val servers = properties?.dnsServers.orEmpty().mapNotNull { it.hostAddress } + FALLBACK_DNS
-        // glibc ne legge al massimo tre.
-        val text = servers.distinct().take(3).joinToString("") { "nameserver $it\n" }
+    private fun writeDns(properties: LinkProperties?, capabilities: NetworkCapabilities?) {
+        val own = properties?.dnsServers.orEmpty()
+        val servers = own.mapNotNull { it.hostAddress } + FALLBACK_DNS
+        // glibc ne legge al massimo tre. Le opzioni (provate con glibc 2.39 e un DNS finto): se il server perde una delle
+        // due domande che glibc manda insieme (A e AAAA) la risposta arriva in 0,1 s invece che dopo 5 s
+        // (single-request-reopen), e un server che non risponde costa 2 s invece di 5 (timeout:2). Con un server che
+        // risponde non cambia niente. La prima riga dice la rete a Music Assistant, per il registro (glibc la salta).
+        val text = "# xonos: ${describeNetwork(properties, capabilities, own)}\n" +
+            servers.distinct().take(3).joinToString("") { "nameserver $it\n" } +
+            "options timeout:2 attempts:2 single-request-reopen\n"
+        if (text == lastDns) return
+        lastDns = text
         runCatching {
             data.mkdirs()
             val next = File(data, "resolv.conf.new")
             next.writeText(text)
             next.renameTo(dnsFile)
         }.onFailure { Log.w(TAG, "DNS per i programmi Linux", it) }
+    }
+
+    /** La rete per il registro di Music Assistant: tipi e numeri, mai indirizzi. */
+    private fun describeNetwork(
+        properties: LinkProperties?,
+        capabilities: NetworkCapabilities?,
+        dns: List<java.net.InetAddress>,
+    ): String {
+        val kinds = listOf(
+            NetworkCapabilities.TRANSPORT_WIFI to "Wi-Fi",
+            NetworkCapabilities.TRANSPORT_CELLULAR to "rete mobile",
+            NetworkCapabilities.TRANSPORT_ETHERNET to "Ethernet",
+            NetworkCapabilities.TRANSPORT_VPN to "VPN",
+        ).filter { capabilities?.hasTransport(it.first) == true }.joinToString("+") { it.second }.ifEmpty { "?" }
+        val ipv6 = properties?.routes.orEmpty().any { it.isDefaultRoute && it.destination.address is Inet6Address }
+        return "rete $kinds, via IPv6 predefinita ${if (ipv6) "sì" else "no"}, DNS della rete " +
+            "${dns.count { it is Inet4Address }} IPv4 e ${dns.count { it is Inet6Address }} IPv6"
     }
 
     companion object {

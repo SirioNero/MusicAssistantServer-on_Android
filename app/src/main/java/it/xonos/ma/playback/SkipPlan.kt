@@ -16,8 +16,10 @@ package it.xonos.ma.playback
  * - avanti (queue_loader._get_next_index con is_skip): il brano dopo anche con ripeti uno, e dall'ultimo brano della
  *   coda il primo con ripeti tutto;
  * - indietro (controller.previous): il brano prima, mai a capo nemmeno con ripeti tutto, e dal primo il primo stesso.
- * next resta per l'ultimo brano della coda senza ripeti tutto (la fine della coda, "don't stop the music": lo sa solo
- * Music Assistant); next e previous per una coda senza brano in corso.
+ * Dall'ultimo brano della coda, senza ripeti tutto, avanti non fa niente: next di Music Assistant lì non fa niente
+ * (_get_next_index con is_skip dà None anche con ripeti uno; l'autoplay aggiunge brani solo al cambio di brano, mai dentro
+ * next), e il tocco teneva fermo il lettore per 3 s ad aspettare un brano che non arriva. next resta per una coda che
+ * sembra più corta del brano mostrato (il numero non è ancora arrivato); next e previous per una coda senza brano in corso.
  */
 object SkipPlan {
 
@@ -26,7 +28,7 @@ object SkipPlan {
     /** Al brano [index] della coda, dal giro dei salti (play_index). */
     data class Jump(val index: Int) : Step
 
-    /** player_queues/next: il brano dopo lo decide Music Assistant (alla fine della coda, o senza brano in corso). */
+    /** player_queues/next: il brano dopo lo decide Music Assistant (coda più corta del brano mostrato, o senza brano in corso). */
     data object Next : Step
 
     /** player_queues/previous: il brano prima lo decide Music Assistant (senza brano in corso). */
@@ -35,7 +37,7 @@ object SkipPlan {
     /** Il brano in corso da capo. */
     data object Restart : Step
 
-    /** Niente: avanti dall'ultimo brano della coda (senza ripeti tutto) mentre un salto è ancora in viaggio. */
+    /** Niente: avanti dall'ultimo brano della coda senza ripeti tutto (Music Assistant non farebbe niente), anche mentre un salto è in viaggio. */
     data object Stay : Step
 
     /**
@@ -77,7 +79,9 @@ object SkipPlan {
             next < q.size -> Jump(next)
             // Dall'ultimo brano (non quando la coda sembra più corta del brano mostrato: allora decide lui).
             q.repeat == "all" && (next == q.size || !q.settled) -> Jump(0)
-            // La fine della coda, o "don't stop the music": lo sa solo Music Assistant.
+            // L'ultimo brano della coda, con ripeti spento o ripeti uno: next di Music Assistant non farebbe niente.
+            next == q.size -> Stay
+            // La coda sembra più corta del brano mostrato (il numero non è ancora arrivato): decide Music Assistant.
             q.settled -> Next
             else -> Stay
         }

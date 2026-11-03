@@ -34,8 +34,8 @@ android {
         targetSdk = 34
         // Si alzano entrambi a ogni pubblicazione in main: la release prende il tag v<versionName>, che
         // Obtainium confronta con l'app installata, e F-Droid compila da quel tag.
-        versionCode = 56
-        versionName = "0.1.56"
+        versionCode = 57
+        versionName = "0.1.57"
         buildConfigField("String", "SERVER_PACKAGE", "\"$serverPackage\"")
         buildConfigField(
             "String",

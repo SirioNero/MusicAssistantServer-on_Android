@@ -12,7 +12,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -121,7 +123,13 @@ class SendspinClient(
             _phase.value = Phase.CONNECTING
             val url = if (direct) directUrl(baseUrl) else MaClient.websocketUrl(baseUrl, "/sendspin")
             val current = Session(token, authenticate = !direct)
-            session = current
+            // Col lock di start() e stop(), e solo se questo ciclo vale ancora: uno vecchio, fermato mentre non era in
+            // attesa, si metterebbe al posto della sessione di quello nuovo, che non riceverebbe più niente.
+            val context = currentCoroutineContext()
+            synchronized(this) {
+                context.ensureActive()
+                session = current
+            }
             val outcome = try {
                 current.run(url)
             } catch (e: CancellationException) {

@@ -16,6 +16,13 @@ class Library(private val repo: MaRepository) {
     private val unlock = SoloistUnlock(repo)
 
     /**
+     * Quanto si aspetta la risposta di play_media: Music Assistant risponde quando la musica parte, dopo aver letto
+     * tutto l'elenco. Col server sul telefono le richieste a Spotify rispettano il suo limite (30 ogni 30 s), e il primo
+     * play di una playlist lunga o di un artista può volerci di più: lì l'app lo allunga (vedi XonosApp).
+     */
+    @Volatile var playTimeoutMs = PLAY_TIMEOUT_MS
+
+    /**
      * Un elenco di elementi: diventano MaItem man mano che arrivano, lontano dal thread principale.
      * [onPart] riceve quelli arrivati fin lì a ogni pezzo (gli elenchi lunghi arrivano a pezzi di 500).
      */
@@ -232,7 +239,7 @@ class Library(private val repo: MaRepository) {
             }
         }
         unlock.retrying(queueId) {
-            repo.command("player_queues/play_media", 60_000) {
+            repo.command("player_queues/play_media", playTimeoutMs) {
                 put("queue_id", queueId)
                 put("media", if (media.size == 1) media[0] else JSONArray(media))
                 put("option", option)
@@ -369,6 +376,12 @@ class Library(private val repo: MaRepository) {
     companion object {
         private const val PAGE = 500
         private const val PAGES_AT_ONCE = 4
+
+        /** Quanto si aspetta play_media di solito (vedi [playTimeoutMs]). */
+        const val PLAY_TIMEOUT_MS = 60_000L
+
+        /** Lo stesso col Music Assistant sul telefono (vedi [playTimeoutMs]). */
+        const val PHONE_PLAY_TIMEOUT_MS = 180_000L
 
         /** Le pagine degli elenchi del telefono: abbastanza per riempire lo schermo più volte. */
         const val PHONE_PAGE = 100

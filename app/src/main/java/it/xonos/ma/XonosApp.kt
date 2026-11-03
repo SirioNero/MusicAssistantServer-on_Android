@@ -63,7 +63,11 @@ class XonosApp : Application(), SingletonImageLoader.Factory {
             playerReady,
             MainScope(),
             phoneServer,
-        )
+        ).also {
+            // Il server avviato dallo schermo fuori dal keeper (fine del download, "Riprova"): il keeper lo sa, così non lo
+            // ferma mentre parte e lo ferma dopo, quando non serve più.
+            it.keepServer = { keeper.touch(ServerKeeper.Need.SCREEN) }
+        }
     }
 
     private val scope = MainScope()
@@ -164,6 +168,10 @@ class XonosApp : Application(), SingletonImageLoader.Factory {
         }
         scope.launch {
             repo.connection.collect { connection ->
+                // Cambiare Music Assistant ricollega Xonos: qui si sa sempre se quello salvato è il server sul telefono.
+                // Lì il primo play di una playlist lunga di Spotify aspetta il limite di Spotify, e ci vuole di più.
+                val onPhone = settings.load().homeUrl == server.url
+                library.playTimeoutMs = if (onPhone) Library.PHONE_PLAY_TIMEOUT_MS else Library.PLAY_TIMEOUT_MS
                 if (connection is Connection.Connected) failedStarts = 0
                 if (connection is Connection.Failed) {
                     // Solo se qualcuno ne ha bisogno: fermato dal keeper perché non serviva, resta fermo.

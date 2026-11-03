@@ -783,9 +783,12 @@ class PhoneModel(
         }
     }
 
-    /** Aspetta che il telefono sia un lettore di Music Assistant: appena aperta l'app ci vuole un attimo. */
+    /**
+     * Aspetta che il telefono sia un lettore di Music Assistant: appena aperta l'app ci vuole un attimo. Col server sul
+     * telefono di più: fermato perché nessuno lo usava, riparte quando si torna nell'app.
+     */
     private suspend fun awaitReady() {
-        withTimeoutOrNull(READY_TIMEOUT_MS) { ready.first { it } }
+        withTimeoutOrNull(if (onPhoneServer) PHONE_READY_TIMEOUT_MS else READY_TIMEOUT_MS) { ready.first { it } }
             ?: throw MaException("Il lettore del telefono non è pronto", problem = Problem.NOT_CONNECTED)
     }
 
@@ -1080,6 +1083,12 @@ class PhoneModel(
 
     // ---------- Music Assistant sul telefono ----------
 
+    /**
+     * Avvisa chi tiene acceso il server sul telefono (ServerKeeper) che lo si avvia qui, fuori da lui (alla fine del
+     * download, "Riprova"): un suo arresto in arrivo non deve fermarlo mentre parte, e dopo deve poterlo fermare.
+     */
+    var keepServer: () -> Unit = {}
+
     /** Xonos può far girare Music Assistant su questo telefono (a 64 bit), scaricandolo su richiesta. */
     val phoneServerAvailable: Boolean get() = phoneServer != null
 
@@ -1112,6 +1121,7 @@ class PhoneModel(
         phoneServerRetrying = true
         scope.launch {
             try {
+                keepServer()
                 if (server.start() && repo.connection.value !is Connection.Connected) repo.reconnect()
             } finally {
                 phoneServerRetrying = false
@@ -1178,6 +1188,7 @@ class PhoneModel(
         scope.launch {
             var connecting = false
             try {
+                keepServer()
                 if (!server.start()) {
                     page.phoneServerError = server.error.ifBlank { server.state.name }
                     return@launch
@@ -1482,6 +1493,9 @@ class PhoneModel(
         const val EVERYWHERE_PAUSE_MS = 1_000L
         const val CONNECT_TIMEOUT_MS = 20_000L
         const val READY_TIMEOUT_MS = 20_000L
+
+        /** Lo stesso col Music Assistant sul telefono, che può star ripartendo (vedi [awaitReady]). */
+        const val PHONE_READY_TIMEOUT_MS = 60_000L
         const val LYRICS_KEPT = 20
 
         /** Per quanto, dopo una modifica da qui, i brani di una playlist si chiedono senza cache. */

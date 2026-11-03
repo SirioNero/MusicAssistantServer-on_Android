@@ -5,11 +5,13 @@ import it.xonos.ma.server.ServerLines
 /**
  * Cosa dell'uscita del server sul telefono arriva nel logcat ([ServerLines]): un'uscita finta con le righe dei
  * pacchetti nuovi (XONOS_LOG), quelle dei pacchetti di prima (tutto il registro di Music Assistant, nel formato
- * LOG_FORMAT di xonos_server.py) e quello che Python scrive prima del registro. Le parole piantate nel registro non
- * devono arrivare al logcat; le righe fuori dal registro sì, e solo loro restano per il messaggio d'errore. Senza server.
+ * LOG_FORMAT di xonos_server.py), quello che Python scrive prima del registro e un errore di ffmpeg con un indirizzo. Le
+ * parole piantate nel registro non devono arrivare al logcat; le righe fuori dal registro sì (senza indirizzi), e solo
+ * loro restano per il messaggio d'errore. Senza server.
  */
 private val PLANTED = listOf(
     "Segreto Album", "Canzone Privata", "SECRET", "mario", "4uLU", "Pixel di Mario", "Rossi", "jf.example", "Piazza",
+    "Pa55wd", "nas.casa", "x.flac",
 )
 
 private val STREAM = """
@@ -17,6 +19,7 @@ Fatal: linker non trovato per libpython3.13.so
 Sistema Linux per Soloist non pronto: [Errno 28] No space left on device
 XONOS_LOG INFO Music Assistant pronto sul telefono
 XONOS_LOG WARNING Processore dei programmi Linux negli ultimi 60 s: soloist 16%, proot[soloist] 14%
+Error opening input file https://mario:Pa55wd@nas.casa/Music/Rossi/x.flac.
 2026-11-03 07:09:18,493.493 INFO (MainThread) [xonos] Music Assistant pronto sul telefono
 2026-11-03 07:09:18,493.493 INFO (MainThread) [music_assistant.player_queues] Fetching tracks to play for album Segreto Album
 2026-11-03 07:09:18,494.494 INFO (MainThread) [music_assistant.streams] Error while streaming:
@@ -58,8 +61,15 @@ fun main() {
     val leaks = out.filter { line -> PLANTED.any { line.contains(it, ignoreCase = true) } }
     check("Nessuna parola del registro di Music Assistant nel logcat", leaks.isEmpty(), leaks.joinToString(" | "))
 
-    val raw = STREAM.take(2) + STREAM.last { it.isNotBlank() }
+    // L'errore di ffmpeg (fuori dal registro) passa, ma senza l'indirizzo con nome utente, password e percorso.
+    val ffmpeg = "Error opening input file <url>"
+    val raw = STREAM.take(2) + ffmpeg + STREAM.last { it.isNotBlank() }
     check("Le righe fuori dal registro passano (anche dopo una riga XONOS_LOG)", out.take(2) == STREAM.take(2) && out.last() == raw.last())
+    check("Gli indirizzi delle righe fuori dal registro diventano <url>", ffmpeg in out, out.filter { it.startsWith("Error") }.joinToString(" | "))
+    check(
+        "Anche con lo schema in maiuscolo e in mezzo alla riga",
+        ServerLines().see("ffmpeg: HTTP://u:p@h/a b rtsp://cam/x") == "ffmpeg: <url> b <url>",
+    )
     check("Le righe XONOS_LOG passano senza il prefisso", "INFO Music Assistant pronto sul telefono" in out && "ERROR Music Assistant non risponde" in out)
     check("Una riga XONOS_LOG vuota non scrive niente", ServerLines().see("XONOS_LOG ") == null && out.none { it.isBlank() })
     check(

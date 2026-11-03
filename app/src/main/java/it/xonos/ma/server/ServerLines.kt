@@ -11,8 +11,9 @@ package it.xonos.ma.server
  *   ("2026-11-03 04:58:05,637.637 INFO (thread) [logger] testo"). Un record e le righe che lo seguono (tracce, testi su
  *   più righe) restano fuori. Dei record del logger "xonos" passano livello e prima riga; di avvisi ed errori degli
  *   altri solo il livello e la prima parte del nome del logger, senza il testo.
- * - Il resto (Python o il linker che non partono, prima che cominci il registro) passa, accorciato. Sono anche le sole
- *   righe che restano per il messaggio d'errore ([last]).
+ * - Il resto (Python o il linker che non partono, prima che cominci il registro; un programma che scrive qui per conto
+ *   suo, come ffmpeg) passa, accorciato e con "<url>" al posto degli indirizzi. Sono anche le sole righe che restano
+ *   per il messaggio d'errore ([last]).
  *
  * Le righe XONOS_STATE e XONOS_MULTICAST le guarda prima PhoneServer. Senza Android: il banco di prova
  * (ServerLinesCheck) la prova con un'uscita finta.
@@ -36,7 +37,9 @@ class ServerLines(private val keep: Int = LAST_LINES) {
         val record = RECORD.find(line)
         if (record == null) {
             if (inRecord || line.isBlank()) return null
-            val short = line.take(MAX)
+            // Gli indirizzi via: un programma che scrive qui per conto suo (ffmpeg: "Error opening input file
+            // https://utente:password@...") metterebbe nel logcat nome utente, password e il percorso del brano.
+            val short = line.replace(URL, "<url>").take(MAX)
             raw.addLast(short)
             while (raw.size > keep) raw.removeFirst()
             return short
@@ -74,5 +77,8 @@ class ServerLines(private val keep: Int = LAST_LINES) {
         private val SOURCE = Regex("""^[a-z_][a-z0-9_]*(?=\.|$)""")
         private val LOUD = setOf("WARNING", "ERROR", "CRITICAL")
         private const val OURS = "xonos"
+
+        /** Un indirizzo con il suo schema (https://, rtsp://...), fino al primo spazio. */
+        private val URL = Regex("""[a-z][a-z0-9+.-]*://\S+""", RegexOption.IGNORE_CASE)
     }
 }

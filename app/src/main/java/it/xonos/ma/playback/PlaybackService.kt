@@ -123,8 +123,13 @@ class PlaybackService : MediaLibraryService() {
             artwork::uriFor,
             { engine.lateMs },
             { onPhoneServer },
-            // Un play col Music Assistant sul telefono fermo (nessuno lo usava): lo si risveglia.
-            wake = { app.keeper.touch(Need.PLAYING) },
+            // Un play col Music Assistant sul telefono fermo (nessuno lo usava): lo si risveglia. Vale la pena aspettarlo
+            // solo se può ripartire: non col pacchetto da aggiornare, né quando Xonos ha smesso di provarci.
+            wake = {
+                app.keeper.touch(Need.PLAYING)
+                app.phoneServer?.installed == true && !app.phoneServerGivenUp
+            },
+            phoneServerFailed = { app.phoneServer?.state == PhoneServerControl.State.FAILED },
         ) { connection ->
             val context = settings.language.wrap(this)
             phoneServerProblem(context, connection) ?: describe(context, connection)

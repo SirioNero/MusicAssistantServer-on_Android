@@ -21,6 +21,7 @@ import argparse
 import asyncio
 import logging
 import os
+import random
 import signal
 import subprocess
 import sys
@@ -97,6 +98,8 @@ def main(argv: list[str] | None = None) -> int:
             said = now
         if now in ("failed", "stopped"):
             break
+    # Anche se Music Assistant si è fermato da solo (failed): se Python resta appeso all'uscita, la guardia lo chiude.
+    stopping.set()
     final = state()
     if final != said:
         _say(final if final != "failed" else f"failed {error()}")
@@ -172,10 +175,10 @@ def _line(text: str) -> None:
 
 def _stop_guard(stopping: threading.Event) -> None:
     """
-    Quando il server comincia a fermarsi (SIGTERM, o Xonos non c'è più) aspetta STOP_LIMIT_S secondi; se il processo
-    è ancora qui, SIGKILL ai programmi Linux rimasti e uscita. Xonos manderebbe SIGKILL dopo 15 s, ma può essere
-    congelato o morto, e Python può restare appeso alla fine a un thread che non finisce. Il thread parte subito e
-    aspetta: niente thread nuovi nel gestore di un segnale.
+    Quando il server comincia a fermarsi (SIGTERM, Xonos non c'è più, o Music Assistant si è fermato da solo) aspetta
+    STOP_LIMIT_S secondi; se il processo è ancora qui, SIGKILL ai programmi Linux rimasti e uscita. Xonos manderebbe
+    SIGKILL dopo 15 s, ma può essere congelato o morto, e Python può restare appeso alla fine a un thread che non
+    finisce. Il thread parte subito e aspetta: niente thread nuovi nel gestore di un segnale.
     """
     stopping.wait()
     time.sleep(STOP_LIMIT_S)
@@ -250,6 +253,13 @@ def _tools_through_linker() -> None:
         def __init__(self, args, *rest, **kwargs):  # type: ignore[no-untyped-def]
             if not kwargs.get("shell"):
                 args = through(args)
+                # Un nostro programma senza stderr lo eredita da Python, cioè il tubo verso Xonos e il logcat: così
+                # ffmpeg_image di Music Assistant (stderr=None) ci scriveva i suoi errori con l'indirizzo del file, per
+                # WebDAV anche nome utente e password. Allora va in /dev/null, come per i programmi Linux. stderr è il
+                # 5° argomento dopo args; through() dà sempre un elenco nuovo, quindi si guarda il programma.
+                ours = isinstance(args, list) and args[:1] == [linker]
+                if ours and len(rest) < 5 and kwargs.get("stderr") is None:
+                    kwargs["stderr"] = subprocess.DEVNULL
             super().__init__(args, *rest, **kwargs)
 
     subprocess.Popen = Popen  # type: ignore[misc]
@@ -542,11 +552,12 @@ def _watch_cpu() -> None:
     """
     Ogni CPU_EVERY_S secondi scrive nel registro quanto processore hanno usato nel frattempo (100% = un core intero),
     per nome: python (questo processo: Music Assistant), soloist, pulseaudio e i loro proot (con i risvegli al secondo
-    di proot: ogni chiamata di sistema che intercetta lo sveglia), ffmpeg e ffprobe, app (Xonos). Serve a capire, dal
-    registro di una persona, cosa pesa sul telefono. Guarda ogni CPU_SAMPLE_S secondi: Music Assistant avvia un Soloist
-    o un ffmpeg per brano, e uno finito tra due righe conta lo stesso. Senza programmi Linux e con poco processore la
-    riga si scrive solo ogni CPU_QUIET_EVERY_S (quanto costa il server a riposo). Se Python ha usato almeno
-    PROFILE_ABOVE di un core, una riga in più dice dove (_profile).
+    di proot: ogni chiamata di sistema che intercetta lo sveglia), ffmpeg e ffprobe, app (Xonos: solo nelle build di
+    prova, nelle release Android nasconde a Python il /proc dell'app). Serve a capire, dal registro di una persona,
+    cosa pesa sul telefono. Guarda ogni CPU_SAMPLE_S secondi: Music Assistant avvia un Soloist o un ffmpeg per brano,
+    e uno finito tra due righe conta lo stesso. Senza programmi Linux e con poco processore la riga si scrive solo ogni
+    CPU_QUIET_EVERY_S (quanto costa il server a riposo). Se Python ha usato almeno PROFILE_ABOVE di un core, una riga
+    in più dice dove (_profile).
     """
     try:
         ticks = os.sysconf("SC_CLK_TCK") or 100
@@ -887,9 +898,11 @@ def _where(frame: object) -> str:
 
 def _loop_sample(ident: int | None = None, seconds: float = PROFILE_SECONDS) -> str:
     """
-    Per [seconds], ogni PROFILE_EVERY_S, dove si trova il thread [ident] (di base quello del ciclo di Music
+    Per [seconds], in media ogni PROFILE_EVERY_S, dove si trova il thread [ident] (di base quello del ciclo di Music
     Assistant): "ciclo al lavoro in 45% di 190 occhiate: 12% json/encoder.py:iterencode < ...; 8% ...".
-    Le occhiate in cui aspetta (PROFILE_IDLE) non contano.
+    Le occhiate in cui aspetta (PROFILE_IDLE) non contano. L'intervallo è a caso tra metà e una volta e mezza
+    PROFILE_EVERY_S: con un intervallo fisso, chi guarda si agganciava a un ciclo che lavora a ritmo simile (prende il
+    GIL quando il ciclo si mette ad aspettare) e lo vedeva sempre fermo.
     """
     ident = _loop_ident if ident is None else ident
     if ident is None:
@@ -898,7 +911,7 @@ def _loop_sample(ident: int | None = None, seconds: float = PROFILE_SECONDS) -> 
     looks = busy = 0
     end = time.monotonic() + seconds
     while time.monotonic() < end:
-        time.sleep(PROFILE_EVERY_S)
+        time.sleep(PROFILE_EVERY_S * random.uniform(0.5, 1.5))  # noqa: S311 - non serve un caso sicuro
         frame = sys._current_frames().get(ident)  # noqa: SLF001
         if frame is None:
             break
@@ -921,19 +934,20 @@ def _loop_sample(ident: int | None = None, seconds: float = PROFILE_SECONDS) -> 
 def _cgroups() -> str:
     """
     In quale gruppo (cgroup) sta Python e in quale l'app che l'ha avviato, e su quali processori può girare: dice se
-    Android, quando congela l'app, congela anche il server (stesso gruppo uid_<n>/pid_<n>).
+    Android, quando congela l'app, congela anche il server (stesso gruppo uid_<n>/pid_<n>). Nelle release Android
+    nasconde a Python il /proc dell'app: allora si giudica dal gruppo di Python, se è quello dell'app (pid_<app>).
     """
 
-    def read(path: str) -> str:
+    def read(path: str) -> tuple[str, bool]:
         try:
             with open(path, encoding="utf-8", errors="replace") as file:
-                return " | ".join(line.strip() for line in file if line.strip())[:300]
+                return " | ".join(line.strip() for line in file if line.strip())[:300], True
         except OSError as err:
-            return f"non leggibile ({type(err).__name__})"
+            return f"non leggibile ({type(err).__name__})", False
 
     parent = os.getppid()
-    mine = read("/proc/self/cgroup")
-    theirs = read(f"/proc/{parent}/cgroup")
+    mine, mine_read = read("/proc/self/cgroup")
+    theirs, theirs_read = read(f"/proc/{parent}/cgroup")
     cpus = "?"
     try:
         with open("/proc/self/status", encoding="utf-8", errors="replace") as file:
@@ -942,7 +956,12 @@ def _cgroups() -> str:
                     cpus = line.split(":", 1)[1].strip()
     except OSError:
         pass
-    same = "uguali" if mine == theirs else "diversi"
+    if mine_read and theirs_read:
+        same = "uguali" if mine == theirs else "diversi"
+    else:
+        # "0::/uid_10193/pid_7746 | ...": il gruppo dell'app è pid_<app>, come parte intera del percorso.
+        parts = {part for line in mine.split(" | ") for part in line.split(":", 2)[-1].split("/")}
+        same = "uguali, dal gruppo di Python" if mine_read and f"pid_{parent}" in parts else "non si sa"
     return f"Gruppi (cgroup) di Python: {mine}; dell'app (pid {parent}): {theirs} ({same}); processori: {cpus}"
 
 
@@ -1065,6 +1084,7 @@ def _setup_logging(data_dir: str, log_level: str) -> None:
     root.setLevel(logging.INFO)
     logging.addLevelName(VERBOSE_LOG_LEVEL, "VERBOSE")
     logging.captureWarnings(True)
+    _errors_in_file()
     _log_file = os.path.join(data_dir, "musicassistant.log")
     file_handler = RotatingFileHandler(_log_file, maxBytes=LOG_FILE_BYTES, backupCount=1)
     file_handler.setFormatter(logging.Formatter(LOG_FORMAT))
@@ -1078,6 +1098,48 @@ def _setup_logging(data_dir: str, log_level: str) -> None:
     logging.getLogger("urllib3.connectionpool").setLevel(logging.ERROR)
     logging.getLogger("music_assistant").setLevel(log_level.upper())
     root._xonos = True  # type: ignore[attr-defined]
+
+
+def _errors_in_file() -> None:
+    """
+    Gli errori che Python scriverebbe da sé su stderr, cioè nel logcat, con i testi di Music Assistant: un record
+    del registro che non si riesce a scrivere ("--- Logging error ---" con i suoi argomenti, titoli e uri), un errore
+    non preso in un thread o nel programma, un errore ignorato (unraisable). Vanno solo in musicassistant.log, con il
+    logger di base e non con quello di Xonos (il filtro di stderr li lascia fuori), come fa il __main__ di Music
+    Assistant, che qui non gira.
+    """
+    logging.raiseExceptions = False
+    root = logging.getLogger()
+
+    def uncaught(exc_type, exc_value, exc_traceback) -> None:  # type: ignore[no-untyped-def]
+        root.error("Errore non preso nel programma", exc_info=(exc_type, exc_value, exc_traceback))
+
+    def uncaught_in_thread(args) -> None:  # type: ignore[no-untyped-def]
+        if args.exc_type is SystemExit:
+            return
+        name = args.thread.name if args.thread is not None else "?"
+        root.error(
+            "Errore non preso nel thread %s", name, exc_info=(args.exc_type, args.exc_value, args.exc_traceback)
+        )
+
+    def unraisable(hook) -> None:  # type: ignore[no-untyped-def]
+        # Dell'oggetto si tiene solo il testo: tenerlo oltre la chiamata lo farebbe rivivere (sta per essere tolto).
+        try:
+            try:
+                where = hook.err_msg or "Exception ignored in"
+                if hook.object is not None:
+                    where = f"{where}: {hook.object!r}"
+            except Exception:  # noqa: BLE001 - un repr che non va
+                where = hook.err_msg or "Exception ignored"
+            root.error(
+                "Errore ignorato da Python: %s", where, exc_info=(hook.exc_type, hook.exc_value, hook.exc_traceback)
+            )
+        except Exception:  # noqa: BLE001, S110 - il registro stesso non va: niente da fare
+            pass
+
+    sys.excepthook = uncaught
+    threading.excepthook = uncaught_in_thread
+    sys.unraisablehook = unraisable
 
 
 def _for_xonos(record: logging.LogRecord) -> bool:

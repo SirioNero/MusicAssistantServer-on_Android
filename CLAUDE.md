@@ -924,7 +924,7 @@ per area) e una revisione avversaria; analisi in `scratchpad/analisi-ottimizza` 
   cgroup di Python e dell'app (se uguali, congelando l'app si congela anche il server) e «proot: seccomp lo aiuta /
   NON lo aiuta» (`proot -v 1` nella prova di ptrace: senza seccomp ogni chiamata di sistema si ferma in proot).
 - **Processore nel registro**: «Processore negli ultimi 60 s: python N%, soloist N%, proot[soloist] N% (N risvegli/s),
-  pulseaudio N%, ffmpeg N%, app N%» ogni minuto se gira un programma Linux o il totale è almeno 5%, sennò ogni 15
+  pulseaudio N%, ffmpeg N%, app N%» ("app" solo nella build di prova: nella release /proc dell'app è nascosto a Python) ogni minuto se gira un programma Linux o il totale è almeno 5%, sennò ogni 15
   minuti (il costo a riposo). Sopra il 20% di Python (al massimo ogni 10 minuti) una riga «Python al N% …»: thread
   (da /proc/self/task, non pthread_getcpuclockid, che su bionic con un thread finito chiude il processo), lavori di
   Music Assistant in corso (solo il tipo, mai i nomi), dove sta il ciclo (occhiate ogni 20 ms per 4 s).
@@ -944,7 +944,10 @@ per area) e una revisione avversaria; analisi in `scratchpad/analisi-ottimizza` 
   al riavvio il servizio si carica con l'account salvato senza chiamare /me; un WARNING per blocco con le richieste
   degli ultimi 5 minuti per tipo e per chi (bg, play, user), e una riga INFO se sono più di 100 in 5 minuti; il
   messaggio `xonos_rate_limited` dice quanti minuti mancano (9 lingue); ricerca con limite 10 per tipo (una richiesta
-  invece di tre). Il blocco è misurato con time.monotonic (si ferma col telefono in sospensione).
+  invece di tre). Il blocco si misura con CLOCK_BOOTTIME (`_xonos_clock`: time.monotonic su Android si ferma col
+  telefono in sospensione); un altro Client ID cancella anche il blocco in memoria (`xonos_mark`); l'account salvato è
+  provvisorio finché /me non risponde (`_xonos_user_unconfirmed`). Con la riproduzione nel limite il primo play di una
+  playlist grande non in cache può durare di più: col server sul telefono `Library.playTimeoutMs` è 180 s.
 - **App**: la pagina dell'artista e il menu dell'auto non scaricano più tutti i brani all'apertura (cartella
   «Tutti i brani» caricata quando si apre: `ArtistPage.tracks` null = non ancora); la ricerca in tutti i servizi parte
   dopo 1 s senza scrivere (la libreria sempre dopo 350 ms). Sendspin: `Identity.modernWire` (server sul telefono o
@@ -958,6 +961,16 @@ per area) e una revisione avversaria; analisi in `scratchpad/analisi-ottimizza` 
   26): Bouncy Castle o una versione propria. Cambia una volta l'id del lettore (coda e impostazioni del telefono da
   capo su ogni Music Assistant) e va fatto anche in myCar. Il server sul telefono non ne ha bisogno (aiosendspin
   10.2.1 fissato). Dettagli in `sendspin.md` dell'analisi; da decidere con l'utente.
+- **Dalla revisione avversaria** (4 aree, un verificatore per area): ffmpeg delle copertine (`ffmpeg_image`) ereditava
+  lo stderr di Python e un suo errore portava nel logcat l'indirizzo WebDAV con utente e password e il percorso del
+  brano: ora i programmi avviati col linker senza stderr vanno in /dev/null, e `ServerLines` maschera gli indirizzi
+  (`<url>`); `logging.raiseExceptions = False` e le eccezioni non prese (thread, main, unraisable) solo nel file; il
+  campionatore del profilo con intervallo variabile (si agganciava al ciclo e lo vedeva fermo); la riga dei cgroup nella
+  release giudica dal gruppo di Python; la guardia dei 12 s anche dopo failed/stopped. App: `MaPlayer.wake` dice se il
+  server può partire (sennò errore subito come prima) e l'attesa si ferma se il server finisce in FAILED; nessun errore
+  mostrato dopo una pausa o uno stop della persona; `PhoneModel.keepServer` prima degli avvii diretti (download, Riprova);
+  attesa del lettore 60 s col server sul telefono; in SendspinClient la sessione si assegna solo se il ciclo è ancora
+  attivo (un ciclo vecchio cancellato poteva far ignorare tutti i messaggi di quello nuovo).
 - **Da portare in myCar**: `Logged` e i log del motore, `MaPlayer.wake` (no-op), `awaitReady` che dà Boolean, Menu
   dell'artista, SendspinClient (`modernWire`, `server/error`, Outcome.kind). La riga del CLAUDE.md di myCar che dice
   che Soloist «non gira sul telefono» è superata (gira sotto proot nel server di Xonos).

@@ -5,6 +5,9 @@ package it.xonos.ma.data
  * dopo (il comando a Music Assistant, la sua risposta, Sendspin, l'uscita audio, la musica che esce) scrive quanti ms
  * sono passati. Così dal registro di una persona si vede dove va il tempo tra un brano e l'altro.
  *
+ * La musica "fuori" è quella scritta sull'uscita; si sente più tardi, dopo il buffer e il resto della strada
+ * (altoparlante, Bluetooth): quando, lo dice [heard], con i tempi dell'uscita.
+ *
  * Senza Android: si prova sulla JVM. Si legge da più thread (principale, rete, audio); tocco e musica fuori arrivano
  * dal thread principale.
  */
@@ -49,6 +52,12 @@ object SkipTrace {
         if (current.endsAt != null && now > current.endsAt) return null
         return (now - current.at).takeIf { it in 0..WINDOW_MS }
     }
+
+    /**
+     * La musica del salto si sente fra [inMs] ms (meno di zero: si sente già da tanto): i ms dal tocco a quel momento,
+     * per la riga "musica udibile"; null senza un salto in corso.
+     */
+    fun heard(inMs: Long): Long? = sinceTouch()?.let { it + inMs }
 
     /** ", N ms dal tocco" per le righe del registro, o niente senza un salto in corso. */
     fun suffix(): String = sinceTouch()?.let { ", $it ms dal tocco" }.orEmpty()

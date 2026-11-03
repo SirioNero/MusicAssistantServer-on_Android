@@ -73,6 +73,13 @@ interface PcmOutput {
     /** Dove va il suono (altoparlante, Bluetooth A2DP...), per il registro; null se non si sa. */
     val route: String? get() = null
 
+    /**
+     * L'uscita fisica in uso (l'id che le dà Android): su un'uscita nuova verso la stessa si usa il ritardo misurato
+     * poco prima, invece di aspettare il suo primo tempo vero (vedi [AudioEngine]). Null se non si sa, o se un'uscita
+     * nuova non parte subito (fino ad Android 11 l'AudioTrack aspetta il buffer pieno): allora si aspetta, come prima.
+     */
+    val device: Int? get() = null
+
     fun setGain(gain: Float)
 
     /** Smette subito di suonare e butta ciò che ha in coda; si può chiamare da qualsiasi thread. */
@@ -129,6 +136,11 @@ class PcmDecoder(private val channels: Int, private val bitDepth: Int) : AudioDe
  * All'avvio invece non si salta niente: se l'uscita ci ha messo più del margine chiesto al server,
  * l'inizio del brano si suona lo stesso, un po' dopo ([lateMs]), e il ritardo si recupera piano.
  *
+ * Un'uscita nuova (a ogni brano, salto e ripresa) dice quando suona davvero solo dopo un paio di decimi di secondo. La
+ * prima volta la si apre con del silenzio e la musica aspetta quel momento ([prime]); poi, sulla stessa uscita fisica,
+ * si parte subito con il ritardo misurato la volta prima. Se la stima sbaglia, il primo tempo vero lo dice e lo si
+ * assorbe piano, senza saltare niente.
+ *
  * I metodi pubblici si chiamano dal thread della rete, in ordine di arrivo dei messaggi.
  */
 class AudioEngine(
@@ -176,6 +188,22 @@ class AudioEngine(
     // L'uscita ha già detto quando suona davvero, da quando è aperta (prima i tempi sono stime), e quando la si è aperta.
     private var timed = false
     private var openedAt = 0L
+
+    // Il ritardo dopo il buffer (mixer, altoparlante o Bluetooth) misurato al primo tempo vero di ogni uscita, per uscita
+    // fisica, e quando: un'uscita nuova verso la stessa, entro [MEASURED_US], parte subito con questa stima. Solo dal
+    // thread audio.
+    private class Measured(val latencyUs: Long, val at: Long)
+    private val measured = HashMap<Int, Measured>()
+
+    // La stima con cui è partita l'uscita aperta adesso (null: ha aspettato il primo tempo vero, o non c'era).
+    private var guessUs: Long? = null
+    /** La riga «Avvio a» di questa uscita è già scritta: i pezzi buttati prima del primo suono non la ripetono. */
+    private var startLogged = false
+
+    // Il primo fotogramma di musica scritto prima del primo tempo vero e quando si pensava di sentirlo: il primo tempo
+    // vero dirà quando si sente davvero (-1: niente da dire).
+    private var firstMusicFrame = -1L
+    private var firstMusicGuess = 0L
     private var silence = ShortArray(0)
     private var statSince = 0L
     private var statBlocks = 0
@@ -368,6 +396,9 @@ class AudioEngine(
         smoothedErrorUs = 0.0
         lateUs = 0
         timed = false
+        guessUs = null
+        startLogged = false
+        firstMusicFrame = -1
     }
 
     private fun checkStarved() {
@@ -422,6 +453,9 @@ class AudioEngine(
         smoothedErrorUs = 0.0
         lateUs = 0
         timed = false
+        guessUs = null
+        startLogged = false
+        firstMusicFrame = -1
         openedAt = clock()
         created.play()
         // Dopo play: prima l'uscita non sa ancora dove va.
@@ -434,10 +468,23 @@ class AudioEngine(
         val format = format ?: return
         val out = ensureOutput(format) ?: return
         val fresh = framesWritten == 0L
-        if (fresh && !prime(out, gen)) return
+        if (fresh) {
+            // Con il ritardo misurato poco fa sulla stessa uscita si parte subito, a stima; senza, si aspetta il primo
+            // tempo vero dell'uscita con del silenzio. Una volta per uscita: se il primo pezzo è tutto buttato (in ritardo
+            // di più di [MAX_LATE_US]), il prossimo è ancora il primo, ma la stima resta quella.
+            if (guessUs == null) guessUs = knownLatency(out)
+            if (guessUs == null && !prime(out, gen)) return
+        }
+        // La riga d'avvio una volta sola per uscita: un buco della rete proprio all'inizio non riempie il registro.
+        val announce = fresh && !startLogged
+        if (fresh) startLogged = true
 
-        // Il ritardo dell'avvio si recupera piano, meno della correzione dolce più sotto.
-        if (!fresh && lateUs > 0) lateUs = max(0L, lateUs - (frames * 1_000_000L / out.sampleRate * CATCH_UP).toLong())
+        // Il ritardo dell'avvio si recupera piano, meno della correzione dolce più sotto; un anticipo (scoperto al primo
+        // tempo vero, dopo una partenza a stima) allo stesso modo nell'altro senso.
+        if (!fresh && lateUs != 0L) {
+            val step = (frames * 1_000_000L / out.sampleRate * CATCH_UP).toLong()
+            lateUs = if (lateUs > 0) max(0L, lateUs - step) else min(0L, lateUs + step)
+        }
         var target = filter.toClient(timestampUs) + lateUs
         // Il primo tempo vero dell'uscita da quando è aperta: fin lì quando si sente era una stima. Un Bluetooth
         // sospeso (l'autoradio dopo una pausa) può restare fermo più di quanto [prime] aspetta, e il ritardo che si
@@ -445,18 +492,42 @@ class AudioEngine(
         val firstStamp = !timed && out.presentationTimeUs(framesWritten) != null
         if (firstStamp) {
             timed = true
-            Log.i(TAG, "Uscita audio: primo tempo vero dopo ${(clock() - openedAt) / 1000} ms${out.route?.let { " ($it)" }.orEmpty()}${SkipTrace.suffix()}")
+            firstTimes(out)
         }
         var error = heardAt(out) - target // positivo: siamo in ritardo
-        report(error, fresh)
+        // All'avvio la musica si sentirà al momento giusto se si è in anticipo (prima il silenzio), subito se in ritardo.
+        val heard = target + max(error, 0L)
+        if (!fresh || announce) report(error, fresh, heard)
+        if (fresh) {
+            if (!timed) firstMusicGuess = heard else if (announce) heardLine(heard - clock())
+        }
         var start = 0
         var count = frames
-        // Prima del primo tempo vero (per [UNTIMED_GRACE_US] al massimo) "in ritardo" è solo una stima: un'uscita
-        // ferma che riparte sembra in ritardo. Non si salta né si accelera: il primo tempo vero dirà quanto.
-        val guessed = !fresh && !timed && error > 0 && clock() - openedAt < UNTIMED_GRACE_US
+        // Prima del primo tempo vero (per [UNTIMED_GRACE_US] al massimo) quando si sente è solo una stima: un'uscita
+        // ferma che riparte sembra in ritardo, una nuova che prende di colpo l'audio dal suo buffer sembra in anticipo.
+        // Non si salta, non si aspetta e non si corregge: il primo tempo vero dirà quanto. Più di [HARD_US] in anticipo
+        // invece è un buco nei tempi del server, e lo si aspetta.
+        val guessed = !fresh && !timed && error > -HARD_US && clock() - openedAt < UNTIMED_GRACE_US
         if (guessed) {
             if (writeFrames(out, pcm, 0, frames, gen)) markAudio()
             return
+        }
+        if (firstStamp && !fresh && error < 0 && lateUs > 0) {
+            // Il primo tempo vero dice che si sente prima di quanto stimato all'avvio: c'è meno ritardo da recuperare.
+            // Se si è proprio in anticipo, il resto lo prende la correzione dolce: niente silenzio in mezzo alla musica.
+            val back = min(lateUs, -error)
+            lateUs -= back
+            target -= back
+            error += back
+            Log.i(TAG, "Inizio ${lateUs / 1000} ms dopo il momento giusto, non ${(lateUs + back) / 1000} come stimato")
+        }
+        if (firstStamp && !fresh && guessUs != null && error < -HARD_US) {
+            // Partiti a stima col ritardo misurato prima, il primo tempo vero dice che si sente molto prima: niente
+            // silenzio in mezzo alla musica (lo farebbe l'attesa qui sotto). Si tiene l'anticipo e lo si recupera piano.
+            lateUs += error
+            target += error
+            Log.i(TAG, "Inizio ${-error / 1000} ms prima del momento giusto (la stima era più lunga): si recupera piano")
+            error = 0
         }
         if (fresh || abs(error) > HARD_US || (firstStamp && error > 0)) {
             // All'avvio, o dopo un buco della rete: ci si allinea in un colpo solo.
@@ -465,7 +536,10 @@ class AudioEngine(
                 // L'uscita ci ha messo più del margine chiesto al server: l'inizio del brano non si
                 // salta, lo si suona un po' dopo (fino a [MAX_LATE_US]) e si recupera piano.
                 val late = min(error, max(0L, MAX_LATE_US - lateUs))
-                Log.i(TAG, "Inizio ${(lateUs + late) / 1000} ms dopo il momento giusto: non si salta, si recupera piano")
+                // Al primo tempo vero dopo una partenza a stima di solito manca poco: la riga solo se cambia qualcosa.
+                if (announce || late >= 1_000) {
+                    Log.i(TAG, "Inizio ${(lateUs + late) / 1000} ms dopo il momento giusto: non si salta, si recupera piano")
+                }
                 lateUs += late
                 target += late
                 error -= late
@@ -490,7 +564,55 @@ class AudioEngine(
                 return
             }
         }
+        if (fresh && !timed) firstMusicFrame = framesWritten
         if (writeFrames(out, pcm, start, count, gen)) markAudio()
+    }
+
+    /** Il ritardo misurato poco fa sulla stessa uscita fisica, se c'è (vedi [measured]). */
+    private fun knownLatency(out: PcmOutput): Long? {
+        val device = out.device ?: return null
+        val last = measured[device] ?: return null
+        if (clock() - last.at > MEASURED_US || out.playedFrames() == null) return null
+        return last.latencyUs
+    }
+
+    /**
+     * Al primo tempo vero dell'uscita: il ritardo dopo il buffer, che si tiene per la prossima uscita nuova verso la
+     * stessa uscita fisica, e quando si sente davvero la musica scritta prima, a stima.
+     */
+    private fun firstTimes(out: PcmOutput) {
+        val now = clock()
+        val latency = measure(out, now)
+        val heard = firstMusicFrame.takeIf { it >= 0 }?.let { out.presentationTimeUs(it) }
+        val versus = heard?.let {
+            val ms = (it - firstMusicGuess) / 1000
+            ", la musica si sente ${abs(ms)} ms ${if (ms >= 0) "dopo la" else "prima della"} stima"
+        }.orEmpty()
+        Log.i(
+            TAG,
+            "Uscita audio: primo tempo vero dopo ${(now - openedAt) / 1000} ms${out.route?.let { " ($it)" }.orEmpty()}" +
+                "${latency?.let { ", ritardo dopo il buffer ${it / 1000} ms" }.orEmpty()}$versus${SkipTrace.suffix()}",
+        )
+        if (heard != null) heardLine(heard - now)
+        firstMusicFrame = -1
+    }
+
+    /**
+     * Il ritardo dopo il buffer: quando si sente il prossimo fotogramma, meno adesso e meno l'audio ancora nel buffer
+     * dell'uscita. Lo si tiene per l'uscita fisica in uso, se l'uscita la sa dire.
+     */
+    private fun measure(out: PcmOutput, now: Long): Long? {
+        val at = out.presentationTimeUs(framesWritten) ?: return null
+        val played = out.playedFrames() ?: return null
+        val latency = (at - now - max(0L, framesWritten - played) * 1_000_000L / out.sampleRate).coerceAtLeast(0L)
+        if (latency > MAX_LATE_US) return null
+        out.device?.let { measured[it] = Measured(latency, now) }
+        return latency
+    }
+
+    /** Dopo un salto: quando si sente la musica, in ms dal tocco (fra [inUs], dopo il buffer e il resto della strada). */
+    private fun heardLine(inUs: Long) {
+        SkipTrace.heard(inUs / 1000)?.let { Log.i(TAG, "Salto: musica udibile $it ms dopo il tocco") }
     }
 
     /** Toglie ([delta] negativo) o ripete singoli campioni, a distanza regolare l'uno dall'altro. */
@@ -515,12 +637,18 @@ class AudioEngine(
         return result
     }
 
-    /** Ogni tanto nei log: quanto è lontano l'ascolto dal momento voluto dal server. */
-    private fun report(error: Long, fresh: Boolean) {
+    /** Ogni tanto nei log: quanto è lontano l'ascolto dal momento voluto dal server; all'avvio quando si sentirà ([heard]). */
+    private fun report(error: Long, fresh: Boolean, heard: Long) {
         val now = clock()
         if (fresh) {
             // L'attesa iniziale non è uno scarto: le statistiche partono da dopo l'allineamento.
-            Log.i(TAG, "Avvio a ${error / 1000} ms dal momento giusto${SkipTrace.suffix()}")
+            val guess = guessUs
+            val how = when {
+                timed -> ""
+                guess != null -> " (stima col ritardo dell'uscita misurato prima, ${guess / 1000} ms)"
+                else -> " (stima)"
+            }
+            Log.i(TAG, "Avvio a ${error / 1000} ms dal momento giusto, si sente fra ${(heard - now) / 1000} ms$how${SkipTrace.suffix()}")
             statSince = now
             statBlocks = 0
             statSum = 0
@@ -557,7 +685,8 @@ class AudioEngine(
     /**
      * Apre l'uscita con un po' di silenzio, finché non sa dire quando suona davvero. Il silenzio in
      * coda resta poco ([PRIME_AHEAD_US]) se l'uscita dice quanto ha già suonato: tutto quello che c'è
-     * in coda quando arriva la musica, la musica lo deve aspettare.
+     * in coda quando arriva la musica, la musica lo deve aspettare. Non serve con il ritardo misurato
+     * poco prima sulla stessa uscita fisica ([knownLatency]).
      */
     private fun prime(out: PcmOutput, gen: Int): Boolean {
         val step = framesFor(PRIME_STEP_US, out.sampleRate).toInt()
@@ -575,10 +704,15 @@ class AudioEngine(
         return true
     }
 
-    /** Quando si sentirà il prossimo campione scritto; mai prima di adesso, anche se l'uscita è rimasta a secco. */
+    /**
+     * Quando si sentirà il prossimo campione scritto; mai prima di adesso, anche se l'uscita è rimasta a secco. Prima
+     * del primo tempo vero è una stima: con il ritardo misurato prima ([guessUs]) l'audio ancora nel buffer più quello.
+     */
     private fun heardAt(out: PcmOutput): Long {
         val now = clock()
-        val estimate = out.presentationTimeUs(framesWritten) ?: (now + out.latencyUs)
+        val estimate = out.presentationTimeUs(framesWritten)
+            ?: guessUs?.let { guess -> out.playedFrames()?.let { now + max(0L, framesWritten - it) * 1_000_000L / out.sampleRate + guess } }
+            ?: (now + out.latencyUs)
         return max(estimate, now + MIN_LATENCY_US)
     }
 
@@ -646,6 +780,9 @@ class AudioEngine(
 
         /** Quanto si aspetta il primo tempo vero dell'uscita prima di fidarsi delle stime (vedi [render]). */
         const val UNTIMED_GRACE_US = 5_000_000L
+
+        /** Fin quando vale il ritardo misurato su un'uscita fisica per partire subito su una nuova: 10 minuti. */
+        const val MEASURED_US = 600_000_000L
 
         /** Quanto in fretta si recupera il ritardo dell'avvio: 0,4% (la correzione dolce arriva allo 0,5%). */
         const val CATCH_UP = 0.004

@@ -1,13 +1,17 @@
 package harness
 
+import it.xonos.ma.data.SkipTrace
 import it.xonos.ma.sendspin.AudioEngine
 import it.xonos.ma.sendspin.PcmDecoder
 import it.xonos.ma.sendspin.PcmOutput
 import it.xonos.ma.sendspin.StreamFormat
 import it.xonos.ma.sendspin.TimeFilter
+import java.io.PrintStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.Collections
 import kotlin.math.abs
+import kotlin.math.max
 
 /**
  * L'inizio di un brano, senza server: il motore audio riceve pacchetti che vanno ascoltati fra
@@ -16,9 +20,25 @@ import kotlin.math.abs
  * suoi tempi solo dopo un po' e ha il suo ritardo (altoparlante, Bluetooth). Ogni campione porta
  * il suo numero: così si sa se l'inizio del brano si è sentito o è stato saltato, quando, e se la
  * posizione che il telefono mostra (quella del server meno [AudioEngine.lateMs]) è quella giusta.
+ *
+ * Poi un salto: un secondo stream sullo stesso motore, con un'uscita nuova verso la stessa uscita fisica. Da Android 12
+ * parte subito col ritardo misurato sulla prima, senza aspettare i suoi tempi: il primo suono non deve arrivare più
+ * tardi di quanto il ritardo dell'uscita supera il margine (più 30 ms), niente saltato e niente silenzio in mezzo alla
+ * musica. Anche quando la seconda uscita è più lenta o più veloce della stima. E la riga «musica udibile» del registro
+ * dice quando si sente davvero.
  */
 fun main() {
     var failures = 0
+    // Le righe «Salto: musica udibile» del registro (lo stub di Log scrive su System.out, con println(Any?)).
+    val original = System.out
+    System.setOut(
+        object : PrintStream(original, true, "UTF-8") {
+            override fun println(x: Any?) {
+                super.println(x)
+                (x as? String)?.let { HEARD.find(it) }?.let { heardLines += it.groupValues[1].toLong() }
+            }
+        },
+    )
     class Case(val label: String, val lead: Long, val ready: Long, val latency: Long, val hold: Long = 0)
     val cases = listOf(
         Case("Wi-Fi, altoparlante", 300, 100, 60),
@@ -38,16 +58,74 @@ fun main() {
             if (!ok) failures++
             println(
                 "${if (ok) "OK " else "NO "} ${c.label} (margine ${c.lead} ms): primo suono ${r.firstSoundMs} ms dopo il momento " +
-                    "del server, saltati ${r.skippedMs} ms d'inizio e ${r.gapMs} ms dopo; dopo ${r.afterS} s indietro di ${r.behindMs} ms, " +
-                    "il telefono lo sa (${r.lateMs} ms)",
+                    "del server, saltati ${r.skippedMs} ms d'inizio e ${r.gapMs} ms dopo, silenzio in mezzo ${r.silenceMs} ms; dopo " +
+                    "${r.afterS} s indietro di ${r.behindMs} ms, il telefono lo sa (${r.lateMs} ms)",
+            )
+        }
+    }
+    // Il salto: il primo stream misura il ritardo dell'uscita, il secondo (un'uscita nuova) lo usa. [hold2] e [latency2]:
+    // la seconda uscita parte più tardi o ha un ritardo diverso da quello misurato (la stima sbaglia). [seconds]: quanto
+    // dura il secondo stream (la correzione dolce di un anticipo, mezzo per cento, vuole più tempo).
+    class Skip(
+        val label: String,
+        val lead: Long,
+        val ready: Long,
+        val latency: Long,
+        val hold2: Long = 0,
+        val latency2: Long = latency,
+        val seconds: Long = 8,
+    )
+    val skips = listOf(
+        Skip("come sul telefono dell'utente: altoparlante", 165, 190, 140),
+        Skip("Wi-Fi, altoparlante", 300, 100, 60),
+        Skip("Bluetooth più lento del margine", 165, 250, 300),
+        Skip("rete mobile, Bluetooth", 600, 200, 250),
+        Skip("la seconda uscita parte 100 ms dopo la stima", 165, 190, 140, hold2 = 100),
+        Skip("la seconda uscita è 80 ms più veloce della stima", 165, 190, 140, latency2 = 60, seconds = 16),
+        Skip("Bluetooth: la seconda uscita più veloce della stima, sopra il margine", 165, 250, 300, latency2 = 150),
+    )
+    for (android12 in listOf(false, true)) {
+        println(if (android12) "Salto, da Android 12: parte subito col ritardo misurato" else "Salto, fino ad Android 11: aspetta i tempi dell'uscita, come prima")
+        for (c in skips) {
+            val run = runSkip(c.lead * 1000, c.ready * 1000, c.latency * 1000, android12, c.hold2 * 1000, c.latency2 * 1000, c.seconds * 1000)
+            val (first, second) = run.first to run.second
+            // Niente saltato né silenzio in mezzo alla musica, nei due stream; la posizione mostrata è quella che si sente.
+            val clean = first.skippedMs == 0L && first.gapMs == 0L && first.silenceMs == 0L && second.skippedMs == 0L &&
+                second.gapMs == 0L && second.silenceMs == 0L && abs(second.behindMs - second.lateMs) <= 50
+            // Il primo suono: non più tardi di quanto l'uscita (con la sua partenza lenta) supera il margine, più 30 ms.
+            val limit = max(0L, c.latency2 + c.hold2 - c.lead) + 30
+            // «Musica udibile» nel registro: quando si sente davvero il primo campione, dal tocco (al ms, più l'arrotondamento).
+            val heardOk = run.heardLogged != null && abs(run.heardLogged - run.heardTrue) <= 3
+            val ok = clean && heardOk && (!android12 || second.firstSoundMs <= limit)
+            if (!ok) failures++
+            println(
+                "${if (ok) "OK " else "NO "} ${c.label} (margine ${c.lead} ms): primo suono ${second.firstSoundMs} ms dopo il momento del " +
+                    "server${if (android12) " (al massimo $limit)" else ""}, prima uscita ${first.firstSoundMs} ms; saltati ${second.skippedMs} ms " +
+                    "d'inizio e ${second.gapMs} ms dopo, silenzio in mezzo ${second.silenceMs} ms (prima uscita ${first.skippedMs}, " +
+                    "${first.gapMs} e ${first.silenceMs}); dopo ${second.afterS} s indietro di ${second.behindMs} ms, il telefono lo sa " +
+                    "(${second.lateMs} ms); musica udibile ${run.heardLogged} ms dopo il tocco nel registro, davvero ${run.heardTrue}",
             )
         }
     }
     println(if (failures == 0) "Tutto bene" else "Qualcosa non va: $failures")
-    System.exit(0)
+    System.exit(if (failures == 0) 0 else 1)
 }
 
-private class Result(val skippedMs: Long, val gapMs: Long, val firstSoundMs: Long, val afterS: Long, val behindMs: Long, val lateMs: Long)
+private class Result(
+    val skippedMs: Long,
+    val gapMs: Long,
+    val silenceMs: Long,
+    val firstSoundMs: Long,
+    val afterS: Long,
+    val behindMs: Long,
+    val lateMs: Long,
+)
+
+/** Un salto: i due stream, e quando si sente il primo campione del secondo, in ms dal tocco: nel registro e davvero. */
+private class SkipRun(val first: Result, val second: Result, val heardLogged: Long?, val heardTrue: Long)
+
+private val HEARD = Regex("Salto: musica udibile (-?\\d+) ms")
+private val heardLines: MutableList<Long> = Collections.synchronizedList(mutableListOf())
 
 private const val RATE = 48_000
 private const val CHUNK_FRAMES = 960 // 20 ms
@@ -56,10 +134,61 @@ private const val RUN_MS = 20_000L
 private fun run(leadUs: Long, readyUs: Long, latencyUs: Long, android12: Boolean, holdUs: Long): Result {
     val output = TimedOutput(RATE, readyUs, latencyUs, startFrames = if (android12) RATE * 40 / 1000 else RATE / 4, holdUs = holdUs)
     val engine = AudioEngine({ _, _ -> output }, { f -> PcmDecoder(f.channels, f.bitDepth) }, TimeFilter())
+    val result = stream(engine, { output }, leadUs, RUN_MS, 2_000)
+    engine.release()
+    return result
+}
+
+/**
+ * Un salto: un primo stream di qualche secondo, la fine, e un secondo stream su un'uscita nuova verso la stessa uscita
+ * fisica (da Android 12 con un id: si può usare il ritardo misurato sulla prima). La seconda uscita parte [hold2Us] più
+ * tardi e ha il ritardo [latency2Us]: diversi da quelli della prima, la stima sbaglia.
+ */
+private fun runSkip(
+    leadUs: Long,
+    readyUs: Long,
+    latencyUs: Long,
+    android12: Boolean,
+    hold2Us: Long,
+    latency2Us: Long,
+    secondMs: Long,
+): SkipRun {
+    val outputs = mutableListOf<TimedOutput>()
+    val engine = AudioEngine(
+        { _, _ ->
+            val second = outputs.isNotEmpty()
+            TimedOutput(
+                RATE, readyUs, if (second) latency2Us else latencyUs,
+                startFrames = if (android12) RATE * 40 / 1000 else RATE / 4,
+                holdUs = if (second) hold2Us else 0,
+                device = if (android12) 7 else null,
+            ).also { synchronized(outputs) { outputs += it } }
+        },
+        { f -> PcmDecoder(f.channels, f.bitDepth) },
+        TimeFilter(),
+    )
+    val last = { synchronized(outputs) { outputs.last() } }
+    val first = stream(engine, last, leadUs, 4_000, 1_500)
+    // Il tocco, poi stream/end e subito stream/start del brano dopo (qui senza l'attesa di Music Assistant).
+    heardLines.clear()
+    SkipTrace.touch()
+    val touchedAt = now()
+    engine.end()
+    val second = stream(engine, last, leadUs, secondMs, 2_000)
+    val heardTrue = (last().firstSoundAt - touchedAt) / 1000
+    engine.release()
+    return SkipRun(first, second, heardLines.lastOrNull(), heardTrue)
+}
+
+/**
+ * Uno stream di [durationMs] che va ascoltato da [leadUs] dopo adesso; [settleMs] dopo l'ultimo pacchetto guarda cosa si
+ * sente sull'uscita del momento ([output]).
+ */
+private fun stream(engine: AudioEngine, output: () -> TimedOutput, leadUs: Long, durationMs: Long, settleMs: Long): Result {
     engine.startStream(StreamFormat("pcm", RATE, 1, 16))
     // Il server manda subito qualche secondo in anticipo, poi il resto man mano.
     val start = now() + leadUs
-    val total = (RUN_MS * 1000 / 20_000).toInt()
+    val total = (durationMs * 1000 / 20_000).toInt()
     var sent = 0
     while (sent < total) {
         val ts = start + sent * 20_000L
@@ -70,20 +199,20 @@ private fun run(leadUs: Long, readyUs: Long, latencyUs: Long, android12: Boolean
         engine.audio(ts, chunk(sent * CHUNK_FRAMES))
         sent++
     }
-    Thread.sleep(2_000)
+    Thread.sleep(settleMs)
     // Il campione che si sente adesso, e quello che il server vorrebbe che si sentisse.
+    val out = output()
     val at = now()
-    val heard = output.frameHeardAt(at)
+    val heard = out.frameHeardAt(at)
     val wanted = (at - start) * RATE / 1_000_000
-    val late = engine.lateMs
-    engine.release()
     return Result(
-        skippedMs = (output.firstSample - 1) * 1000L / RATE,
-        gapMs = output.gapFrames() * 1000L / RATE,
-        firstSoundMs = (output.firstSoundAt - start) / 1000,
+        skippedMs = (out.firstSample - 1) * 1000L / RATE,
+        gapMs = out.gapFrames() * 1000L / RATE,
+        silenceMs = out.silenceAfterMusic * 1000L / RATE,
+        firstSoundMs = (out.firstSoundAt - start) / 1000,
         afterS = (at - start) / 1_000_000,
         behindMs = if (heard < 0) -1 else (wanted - heard) * 1000 / RATE,
-        lateMs = late,
+        lateMs = engine.lateMs,
     )
 }
 
@@ -100,8 +229,8 @@ private fun now() = System.nanoTime() / 1000
  * Un'uscita come un AudioTrack: comincia a suonare solo quando ha [startFrames] fotogrammi (di
  * solito il buffer intero, 250 ms), poi consuma in tempo reale, fa sentire ogni campione
  * [latencyUs] dopo e dice i suoi tempi solo [readyUs] dopo la partenza. Con [holdUs] resta ferma ancora quel
- * tempo prima di partire (un Bluetooth sospeso che si risveglia). Ricorda il primo campione di musica scritto e
- * quale campione della musica si sente a ogni momento.
+ * tempo prima di partire (un Bluetooth sospeso che si risveglia). Ricorda il primo campione di musica scritto, il
+ * silenzio scritto dopo (un buco nella musica) e quale campione della musica si sente a ogni momento.
  */
 private class TimedOutput(
     override val sampleRate: Int,
@@ -110,13 +239,18 @@ private class TimedOutput(
     private val bufferFrames: Int = sampleRate / 4,
     override val startFrames: Int = bufferFrames,
     private val holdUs: Long = 0,
+    override val device: Int? = null,
 ) : PcmOutput {
     override val channels = 1
     @Volatile private var firstWriteAt = -1L
     @Volatile private var written = 0L
     @Volatile private var interrupted = false
     @Volatile var firstSample = -1
-    @Volatile var firstSoundAt = -1L
+    @Volatile private var firstMusicFrame = -1L
+    @Volatile var silenceAfterMusic = 0L
+
+    /** Quando si sente il primo campione di musica (-1: non ancora scritto, o l'uscita non è ancora partita). */
+    val firstSoundAt: Long get() = if (firstMusicFrame < 0 || firstWriteAt < 0) -1 else presentation(firstMusicFrame)
 
     // Dove sono finiti i campioni di musica: (fotogramma scritto, numero del campione), per pezzi.
     private val marks = mutableListOf<Pair<Long, Int>>()
@@ -141,8 +275,10 @@ private class TimedOutput(
             synchronized(marks) { marks += written to value }
             if (firstSample < 0) {
                 firstSample = value
-                firstSoundAt = presentation(written)
+                firstMusicFrame = written
             }
+        } else if (firstSample >= 0) {
+            silenceAfterMusic += frames
         }
         written += frames
         return frames

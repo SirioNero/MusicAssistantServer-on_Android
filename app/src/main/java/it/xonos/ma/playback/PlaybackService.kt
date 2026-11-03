@@ -313,6 +313,10 @@ class PlaybackService : MediaLibraryService() {
             // Senza i campi che la specifica di Sendspin ha tolto: Music Assistant non segna più il telefono come non
             // conforme. Solo dove si sa che li legge altrove: dalla 2.10.8, e il server sul telefono (2.10.8).
             modernWire = onPhoneServer || atLeast((app.repo.connection.value as? Connection.Connected)?.server?.version, 2, 10, 8),
+            // Col server sul telefono l'audio arriva dritto dal server Sendspin di Music Assistant (127.0.0.1:8927), senza
+            // il proxy /sendspin che ripete ogni pacchetto in Python. Il suo account è amministratore: il legame fra
+            // token e lettore che fa il proxy non serve. Se la porta diretta non va, SendspinClient torna al proxy.
+            direct = onPhoneServer && app.phoneServer?.installed == true,
         )
     }
 

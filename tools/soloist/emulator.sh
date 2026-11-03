@@ -9,6 +9,8 @@ WORK=${WORK:-/tmp/soloist}
 PKG=it.xonos.ma
 REPORT="$OUT/emulator.txt"
 LAST="$OUT/last.txt"
+# I controlli che fanno fallire il passo (il filtro di ioctl di proot, sotto); il resto è un resoconto.
+FAILED=0
 mkdir -p "$OUT"
 : > "$REPORT"
 say() { echo "$@" | tee -a "$REPORT"; }
@@ -63,6 +65,37 @@ run "le librerie di Soloist dentro proot" $P "${GUEST[@]}" /lib64/ld-linux-x86-6
 run "Soloist --version dentro proot" $P "${GUEST[@]}" "$SOLOIST" --version
 # Come un programma glibc dentro proot vede le interfacce di rete: Soloist le elenca per l'annuncio mDNS.
 run "le interfacce di rete viste da glibc dentro proot" $P "${GUEST[@]}" /opt/ifaddrs-test
+# SIOCGIFINDEX (if_nametoindex): Android la nega alle app per le interfacce vere, dentro proot la risolve proot. Il
+# filtro di seccomp di app/native/proot.sh deve continuare a fermare il programma per lei (ioctl-test conta le fermate).
+# (\s* alla fine: un eventuale \r del logcat non conta.)
+say "SIOCGIFINDEX: $(grep -Ec '^SIOCGIFINDEX: .* = [0-9]+\s*$' "$LAST") interfacce con l'indice, $(grep -c '^SIOCGIFINDEX: .* errore' "$LAST") con un errore"
+if grep -Eq '^SIOCGIFINDEX: lo = 1\s*$' "$LAST"; then
+  say "SIOCGIFINDEX: ok"
+else
+  say "SIOCGIFINDEX: PROBLEMA, lo senza indice"
+  FAILED=1
+fi
+# proot ferma i programmi solo per gli ioctl che tratta (app/native/proot.sh): FIONREAD, che PulseAudio fa a ogni
+# domanda sui tempi, va dritto al kernel; TCGETS2, SIOCGIFINDEX e FICLONE si fermano ancora. Con "-v 1" proot dice se
+# seccomp lo aiuta: se il kernel rifiutasse il filtro, proot fermerebbe i programmi a ogni chiamata di sistema.
+run "ioctl dentro proot (il filtro di seccomp guarda il comando)" $P -v 1 "${GUEST[@]}" /opt/ioctl-test
+if grep -q 'ptrace acceleration (seccomp mode 2' "$LAST"; then
+  say "seccomp: proot lo usa (ok)"
+else
+  say "seccomp: PROBLEMA, proot non lo usa"
+  FAILED=1
+fi
+if grep -Eq '^ioctl: filtro ok\s*$' "$LAST" && grep -Eq '^fine: 0\s*$' "$LAST"; then
+  say "ioctl: ok"
+else
+  say "ioctl: PROBLEMA (sopra)"
+  FAILED=1
+fi
 # PulseAudio come lo avvia Music Assistant, un suono nel tubo, poi Soloist con PulseAudio (inside.sh).
 run "PulseAudio e Soloist dentro proot" $P "${GUEST[@]}" /bin/busybox sh /opt/xonos-test.sh
-exit 0
+if [ "$FAILED" = 0 ]; then
+  say "== controlli del filtro di ioctl: tutti passati"
+else
+  say "== controlli del filtro di ioctl: PROBLEMA (sopra)"
+fi
+exit "$FAILED"

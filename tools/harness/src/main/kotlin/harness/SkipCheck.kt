@@ -114,16 +114,19 @@ fun main() = runBlocking {
         val again = SkipTrace.musicOut()
         now += 2_000 // l'uscita dice i suoi tempi veri poco dopo: conta ancora
         val late = SkipTrace.sinceTouch()
+        val heard = SkipTrace.heard(190) // e la musica si sente 190 ms dopo
         now += 4_000 // poi una pausa o un play non sono più del salto
         val after = SkipTrace.sinceTouch()
+        val heardAfter = SkipTrace.heard(190)
         SkipTrace.touch()
         now += SkipTrace.WINDOW_MS + 1 // un tocco senza musica fuori vale al massimo 30 s
         val stale = SkipTrace.sinceTouch()
         SkipTrace.clock = real
         check(
-            "Orologio del salto: ms dal tocco, musica fuori una volta, poi chiuso",
-            sent == 300L && out == 1_500L && again == null && late == 3_500L && after == null && stale == null,
-            "mando $sent, fuori $out, di nuovo $again, uscita $late, dopo $after, vecchio $stale",
+            "Orologio del salto: ms dal tocco, musica fuori una volta, udibile, poi chiuso",
+            sent == 300L && out == 1_500L && again == null && late == 3_500L && heard == 3_690L && after == null &&
+                heardAfter == null && stale == null,
+            "mando $sent, fuori $out, di nuovo $again, uscita $late, udibile $heard, dopo $after e $heardAfter, vecchio $stale",
         )
     }
 
@@ -141,6 +144,10 @@ fun main() = runBlocking {
     val lastSkip = Window(start = 7, size = 5, queue = 12, current = 10)
     // Il primo brano della coda, con la finestra intera dopo.
     val first = Window(start = 0, size = 51, queue = 100, current = 0)
+    // Una coda di un brano solo.
+    val single = Window(start = 0, size = 1, queue = 1, current = 0)
+    // La coda dice meno brani di quello in corso (il numero non è ancora arrivato): da lì non si sa dov'è la fine.
+    val unknown = Window(start = 10, size = 1, queue = 0, current = 10)
 
     fun next(w: Window, repeat: String, shown: Int = w.current - w.start, skipping: Boolean = false): SkipPlan.Step {
         val q = w.view(shown, repeat, skipping)
@@ -167,14 +174,20 @@ fun main() = runBlocking {
     expect("brano dopo nella finestra, ripeti uno (Media3 naviga come senza ripeti)", next(big, "one"), Jump(11))
     expect("brano dopo nella finestra, ripeti tutto", next(big, "all"), Jump(11))
     expect("finestra ridotta, ripeti spento: senza indice, ma il brano dopo è noto", next(reduced, "off"), Jump(11))
-    expect("finestra ridotta, ripeti uno: decide Music Assistant", next(reduced, "one"), Next)
-    expect("finestra ridotta, ripeti tutto (Media3 ripete il brano in corso): decide Music Assistant", next(reduced, "all"), Next)
+    // Con ripeti uno e ripeti tutto il brano dopo è quello che darebbe next di Music Assistant (con un salto ripeti uno
+    // non conta), ma senza il suo secondo di attesa.
+    expect("finestra ridotta, ripeti uno: il brano dopo, come Music Assistant", next(reduced, "one"), Jump(11))
+    expect("finestra ridotta, ripeti tutto (Media3 ripete il brano in corso): il brano dopo, come Music Assistant", next(reduced, "all"), Jump(11))
     expect("ultimo brano della finestra (non della coda), ripeti spento: senza indice, ma il brano dopo è noto", next(edge, "off"), Jump(61))
-    expect("ultimo brano della finestra (non della coda), ripeti uno: decide Music Assistant", next(edge, "one"), Next)
+    expect("ultimo brano della finestra (non della coda), ripeti uno: il brano dopo, come Music Assistant", next(edge, "one"), Jump(61))
     expect("ultimo brano della coda, ripeti spento: decide Music Assistant", next(last, "off"), Next)
     expect("ultimo brano della coda, ripeti uno: decide Music Assistant", next(last, "one"), Next)
-    expect("ultimo brano della coda, ripeti tutto: decide Music Assistant (non il primo della finestra, il 7)", next(last, "all"), Next)
-    expect("ultimo della finestra (non della coda), ripeti tutto: decide Music Assistant (non il 57)", next(edge, "all"), Next)
+    expect("ultimo brano della coda, ripeti tutto: il primo della coda, come Music Assistant (non il primo della finestra, il 7)", next(last, "all"), Jump(0))
+    expect("ultimo della finestra (non della coda), ripeti tutto: il brano dopo (non il 57)", next(edge, "all"), Jump(61))
+    expect("coda di un brano solo, ripeti tutto: lo stesso da capo, come Music Assistant", next(single, "all"), Jump(0))
+    expect("coda di un brano solo, ripeti uno: decide Music Assistant", next(single, "one"), Next)
+    expect("coda di un brano solo, ripeti spento: decide Music Assistant", next(single, "off"), Next)
+    expect("coda più corta del brano mostrato (non ancora aggiornata), ripeti tutto: decide Music Assistant", next(unknown, "all"), Next)
     // Durante un salto Media3 mostra già il brano chiesto (11), Music Assistant è ancora sul 10.
     expect("durante un salto: dal brano mostrato", next(big, "off", shown = 4, skipping = true), Jump(12))
     expect("durante un salto all'ultimo brano, ripeti tutto: al primo della coda", next(lastSkip, "all", shown = 4, skipping = true), Jump(0))
@@ -188,17 +201,23 @@ fun main() = runBlocking {
     expect("nei primi 3 s, ripeti uno", previous(big, "one", 1_000), Jump(9))
     expect("finestra ridotta, nei primi 3 s, ripeti spento: il brano prima, che la finestra non ha", previous(reduced, "off", 1_000), Jump(9))
     expect("finestra ridotta, dopo 3 s: da capo", previous(reduced, "off", 20_000), Restart)
-    expect("finestra ridotta, nei primi 3 s, ripeti uno: decide Music Assistant", previous(reduced, "one", 1_000), Previous)
-    expect("finestra ridotta, nei primi 3 s, ripeti tutto: decide Music Assistant", previous(reduced, "all", 1_000), Previous)
+    // previous di Music Assistant va al brano prima con ogni ripeti, e dal primo resta sul primo: lo stesso, senza il suo
+    // secondo di attesa.
+    expect("finestra ridotta, nei primi 3 s, ripeti uno: il brano prima, come Music Assistant", previous(reduced, "one", 1_000), Jump(9))
+    expect("finestra ridotta, nei primi 3 s, ripeti tutto: il brano prima, come Music Assistant", previous(reduced, "all", 1_000), Jump(9))
+    expect("finestra ridotta, dopo 3 s, ripeti uno: da capo", previous(reduced, "one", 20_000), Restart)
+    expect("nei primi 3 s, ripeti tutto: il brano prima", previous(big, "all", 1_000), Jump(9))
     expect("primo brano della coda, nei primi 3 s: da capo", previous(first, "off", 1_000), Restart)
+    expect("primo brano della coda, ripeti uno, nei primi 3 s: da capo", previous(first, "one", 1_000), Restart)
     expect(
-        "primo brano della coda, ripeti tutto (Media3 va all'ultimo della finestra): decide Music Assistant, non il 50",
+        "primo brano della coda, ripeti tutto (Media3 va all'ultimo della finestra): il primo, come Music Assistant (non il 50)",
         previous(first, "all", 1_000),
-        Previous,
+        Jump(0),
     )
     expect("primo brano della coda, ripeti tutto, dopo 3 s: da capo", previous(first, "all", 20_000), Restart)
     expect("brano prima chiesto per nome (seekToPreviousMediaItem), finestra ridotta", previous(reduced, "off", 20_000, mediaItem = true), Jump(9))
-    expect("brano prima chiesto per nome, primo della coda: decide Music Assistant", previous(first, "off", 1_000, mediaItem = true), Previous)
+    expect("brano prima chiesto per nome, ripeti tutto, finestra ridotta", previous(reduced, "all", 20_000, mediaItem = true), Jump(9))
+    expect("brano prima chiesto per nome, primo della coda: il primo, come Music Assistant", previous(first, "off", 1_000, mediaItem = true), Jump(0))
     // Durante un salto: avanti appena premuto (Media3 mostra l'11, posizione 0) e poi indietro.
     expect("durante un salto: dal brano mostrato", previous(big, "off", 0, shown = 4, skipping = true), Jump(10))
     expect(

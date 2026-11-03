@@ -33,11 +33,16 @@ cp -a "$WORK/x86_64/." "$ROOT/opt/soloist/"
 cp -L "$(command -v busybox)" "$ROOT/usr/bin/busybox"
 ln -sf busybox "$ROOT/usr/bin/sh"
 cp tools/soloist/inside.sh "$ROOT/opt/xonos-test.sh"
-# Il programma che dice come un programma glibc vede le interfacce di rete (ifaddrs-test.c), compilato con la
-# glibc di Ubuntu 24.04 come quella del sistema di prova (quella del runner vuole processori più nuovi).
+# I programmi che dicono come un programma glibc vede le interfacce di rete (ifaddrs-test.c) e quali ioctl si fermano
+# in proot (ioctl-test.c), compilati con la glibc di Ubuntu 24.04 come quella del sistema di prova (quella del runner
+# vuole processori più nuovi).
 docker run --rm -v "$PWD/tools/soloist:/src:ro" -v "$ROOT/opt:/out" ubuntu:24.04 sh -c \
-  'apt-get -qq update >/dev/null && apt-get -qq install -y gcc libc6-dev >/dev/null && gcc -O2 -o /out/ifaddrs-test /src/ifaddrs-test.c' \
-  && say "ifaddrs-test compilato" || say "ifaddrs-test NON compilato"
+  'apt-get -qq update >/dev/null && apt-get -qq install -y gcc libc6-dev >/dev/null &&
+   gcc -O2 -o /out/ifaddrs-test /src/ifaddrs-test.c; gcc -O2 -o /out/ioctl-test /src/ioctl-test.c' \
+  || say "compilazione dei programmi di prova: uscita $?"
+for t in ifaddrs-test ioctl-test; do
+  [ -x "$ROOT/opt/$t" ] && say "$t compilato" || say "$t NON compilato"
+done
 REL=$(cd "$WORK/x86_64" && find . -type f -name soloist | head -n 1)
 echo "/opt/soloist/${REL#./}" > "$WORK/soloist-path"
 say "== sistema di prova: $(du -sh "$ROOT" | cut -f1), Soloist in $(cat "$WORK/soloist-path")"

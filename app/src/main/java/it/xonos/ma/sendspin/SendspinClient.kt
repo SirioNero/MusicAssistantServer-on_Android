@@ -29,6 +29,9 @@ import okio.ByteString
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
+import java.io.IOException
+import java.net.InetSocketAddress
+import java.net.Socket
 import java.net.URI
 import java.nio.ByteBuffer
 import kotlin.math.abs
@@ -43,11 +46,16 @@ import kotlin.math.abs
  *
  * Parla la variante in chiaro del protocollo, che Music Assistant accetta dai lettori: la connessione
  * è comunque autenticata dal token, e cifrata quando l'indirizzo è https.
+ *
+ * Col Music Assistant sul telefono stesso si collega invece alla porta di Sendspin, senza il proxy (vedi
+ * [Identity.direct]).
  */
 class SendspinClient(
     private val http: OkHttpClient,
     private val engine: AudioEngine,
     private val identity: () -> Identity,
+    /** La porta del server Sendspin di Music Assistant (aiosendspin), per la connessione diretta. Le prove ne usano altre. */
+    private val directPort: Int = DIRECT_PORT,
     private val onVolumeChanged: (Int, Boolean) -> Unit,
 ) {
 
@@ -71,6 +79,14 @@ class SendspinClient(
          * telefono come lettore non conforme. Resta spento per i server più vecchi: prima della 2.10 li volevano.
          */
         val modernWire: Boolean = false,
+        /**
+         * Music Assistant è su questo telefono: l'audio arriva dalla porta di Sendspin ([DIRECT_PORT], solo su
+         * 127.0.0.1) invece che dal proxy /sendspin, che in Python ripete ogni pacchetto da 25 ms in una seconda
+         * WebSocket. Il proxy in più chiede il token e lega il lettore all'account: conta solo per gli account con un
+         * elenco di lettori permessi, e quello di Xonos sul telefono è amministratore. Se la porta diretta non va si
+         * torna al proxy. Vale solo per un indirizzo di questo telefono (127.0.0.1, localhost).
+         */
+        val direct: Boolean = false,
     )
 
     enum class Phase { STOPPED, CONNECTING, READY }
@@ -82,6 +98,12 @@ class SendspinClient(
 
     /** Il ciclo di connessione sta solo aspettando il prossimo tentativo (dopo molti errori fino a 30 s). */
     @Volatile private var backingOff = false
+
+    /**
+     * Il Music Assistant per cui la porta diretta non va (vedi [Identity.direct]): fino alla fine del servizio si usa
+     * il proxy. null: nessuno.
+     */
+    @Volatile private var proxyOnly: String? = null
 
     private val _phase = MutableStateFlow(Phase.STOPPED)
 
@@ -118,11 +140,21 @@ class SendspinClient(
 
     private suspend fun connectLoop(baseUrl: String, token: String) {
         var failures = 0
-        var direct = false
+        // Music Assistant 2.7.0: /sendspin non c'è ancora sulla porta dell'interfaccia, solo la porta di Sendspin.
+        var oldServer = false
+        // Da quando la porta diretta non arriva al server (System.nanoTime(); 0: arriva). Vedi [Identity.direct].
+        var missedSince = 0L
+        // Questa volta il proxy al posto della porta diretta.
+        var tryProxy = false
         while (true) {
             _phase.value = Phase.CONNECTING
-            val url = if (direct) directUrl(baseUrl) else MaClient.websocketUrl(baseUrl, "/sendspin")
-            val current = Session(token, authenticate = !direct)
+            val id = identity()
+            val wantDirect = id.direct && proxyOnly != baseUrl && local(baseUrl)
+            val direct = oldServer || (wantDirect && !tryProxy)
+            // Il proxy al posto della porta diretta: se lui arriva a suonare, si guarda se lei è ancora chiusa.
+            val fallback = wantDirect && tryProxy
+            val url = if (direct) directUrl(baseUrl, directPort) else MaClient.websocketUrl(baseUrl, "/sendspin")
+            val current = Session(id, token, direct)
             // Col lock di start() e stop(), e solo se questo ciclo vale ancora: uno vecchio, fermato mentre non era in
             // attesa, si metterebbe al posto della sessione di quello nuovo, che non riceverebbe più niente.
             val context = currentCoroutineContext()
@@ -130,11 +162,21 @@ class SendspinClient(
                 context.ensureActive()
                 session = current
             }
+            val probe = if (fallback) {
+                scope.launch {
+                    current.awaitReady()
+                    checkDirectPort(baseUrl)
+                }
+            } else {
+                null
+            }
             val outcome = try {
                 current.run(url)
             } catch (e: CancellationException) {
                 current.close(goodbye = false)
                 throw e
+            } finally {
+                probe?.cancel()
             }
             // Finita senza che la WebSocket si chiudesse (il server non ha risposto all'hello, o ha detto di no): la si
             // chiude qui, o a ogni giro ne restava aperta un'altra verso Music Assistant.
@@ -142,19 +184,59 @@ class SendspinClient(
             if (session === current) session = null
             _phase.value = Phase.CONNECTING
             engine.connectionLost()
+            // La porta diretta non è arrivata a suonare, e non perché il server rifiuta questo lettore (lo farebbe anche
+            // attraverso il proxy, che porta allo stesso server Sendspin).
+            val directMiss = direct && wantDirect && !outcome.wasReady && !outcome.refused
+            // Appena collegati, o dopo una connessione andata bene: Music Assistant che parte apre la porta di Sendspin
+            // qualche secondo dopo l'API (sul computer 6 s; il proxy aspetta fino a 5 s la sua). Si riprova presto.
+            var quick = false
             when {
-                outcome.httpCode == 404 && !direct && url.startsWith("ws://") -> {
+                outcome.httpCode == 404 && !direct && !wantDirect && url.startsWith("ws://") -> {
                     // Music Assistant 2.7.0 non aveva ancora /sendspin sulla porta dell'interfaccia.
                     Log.i(TAG, "Nessun /sendspin${Logged.text(" su $baseUrl", "")}: provo la porta diretta di Sendspin")
-                    direct = true
+                    oldServer = true
                     continue
                 }
-                outcome.wasReady -> failures = 0
-                else -> failures++
+                directMiss && outcome.httpCode != null -> {
+                    // Sulla porta risponde un server web che non è Sendspin: non cambierà.
+                    proxyOnly = baseUrl
+                    missedSince = 0L
+                    Log.w(TAG, "Sendspin: la porta diretta risponde HTTP ${outcome.httpCode}, uso /sendspin finché il servizio è acceso")
+                    continue
+                }
+                directMiss && failures == 0 -> {
+                    val now = System.nanoTime()
+                    if (missedSince == 0L) {
+                        missedSince = now
+                        Log.i(TAG, "Sendspin: la porta diretta non risponde ancora (${outcome.kind}), riprovo")
+                    }
+                    if (now - missedSince >= DIRECT_PATIENCE_MS * 1_000_000L) {
+                        Log.w(TAG, "Sendspin: la porta diretta non risponde da ${(now - missedSince) / 1_000_000_000L} s (${outcome.kind}), provo /sendspin")
+                        missedSince = 0L
+                        tryProxy = true
+                        continue
+                    }
+                    quick = true
+                }
+                outcome.wasReady -> {
+                    failures = 0
+                    missedSince = 0L
+                    tryProxy = false
+                }
+                else -> {
+                    // Non va nemmeno il proxy (Music Assistant fermo?): da qui solo la porta diretta, con le attese di
+                    // sempre, finché l'API non si ricollega e fa ripartire questo ciclo (vedi [start]). Non il proxy:
+                    // mentre Music Assistant riparte lui aspetta fino a 5 s la porta di Sendspin, e arrivato a suonare
+                    // terrebbe sul proxy tutta la connessione.
+                    failures++
+                    tryProxy = false
+                }
             }
-            _error.value = outcome.reason
-            // Nelle build vere solo il tipo: il testo può avere l'indirizzo del server (errori di rete di OkHttp).
-            Log.w(TAG, "Audio scollegato: ${Logged.text(outcome.reason, outcome.kind)}")
+            if (!quick) {
+                _error.value = outcome.reason
+                // Nelle build vere solo il tipo: il testo può avere l'indirizzo del server (errori di rete di OkHttp).
+                Log.w(TAG, "Audio scollegato: ${Logged.text(outcome.reason, outcome.kind)}")
+            }
             backingOff = true
             try {
                 delay(
@@ -162,6 +244,7 @@ class SendspinClient(
                         // Riprovare subito non cambia niente: lo deve cambiare chi gestisce Music Assistant. Si riprova
                         // comunque ogni tanto, e subito quando l'API si ricollega (vedi [start]).
                         outcome.refused -> REFUSED_RETRY_MS
+                        quick -> DIRECT_RETRY_MS
                         failures == 0 -> 1_000L
                         else -> (2_000L * failures).coerceAtMost(30_000L)
                     },
@@ -173,18 +256,41 @@ class SendspinClient(
     }
 
     /**
+     * Il proxy è arrivato a suonare dopo che la porta diretta non rispondeva. Se lei è chiusa anche adesso, con Music
+     * Assistant acceso (il proxy passa dal suo server Sendspin), non era il server che partiva: fino alla fine del
+     * servizio si usa il proxy. Se risponde, la prossima connessione la riprova.
+     */
+    private suspend fun checkDirectPort(baseUrl: String) {
+        val host = runCatching { URI(baseUrl.trim()).host }.getOrNull()?.removeSurrounding("[", "]") ?: return
+        val open = try {
+            Socket().use { it.connect(InetSocketAddress(host, directPort), PROBE_TIMEOUT_MS) }
+            true
+        } catch (e: IOException) {
+            false
+        }
+        // La sessione è finita mentre si guardava: forse si sta fermando Music Assistant, e la porta chiusa non dice niente.
+        currentCoroutineContext().ensureActive()
+        if (open) {
+            Log.i(TAG, "Sendspin: la porta diretta ora risponde, la uso dalla prossima connessione")
+        } else {
+            proxyOnly = baseUrl
+            Log.w(TAG, "Sendspin: la porta diretta resta chiusa, uso /sendspin finché il servizio è acceso")
+        }
+    }
+
+    /**
      * Com'è finita una connessione: [reason] per chi usa l'app, [kind] per il registro (senza indirizzi né testi del
      * server), [refused] se il server non vuole lettori come questo.
      */
     private class Outcome(val reason: String, val kind: String, val wasReady: Boolean, val httpCode: Int?, val refused: Boolean)
 
-    /** Una connessione, dall'apertura alla chiusura. */
-    private inner class Session(private val token: String, private val authenticate: Boolean) : WebSocketListener() {
+    /** Una connessione, dall'apertura alla chiusura; [direct]: alla porta di Sendspin, senza il proxy e il suo token. */
+    private inner class Session(private val id: Identity, private val token: String, private val direct: Boolean) : WebSocketListener() {
 
-        private val id = identity()
         private val done = CompletableDeferred<Outcome>()
         private val replies = Channel<LongArray>(capacity = 16)
         private val helloAnswered = CompletableDeferred<Unit>()
+        private val becameReady = CompletableDeferred<Unit>()
         @Volatile private var socket: WebSocket? = null
         @Volatile private var ready = false
         private var volume = id.volume
@@ -225,6 +331,9 @@ class SendspinClient(
             finish("Connessione chiusa", null)
         }
 
+        /** Aspetta che il server conosca il lettore e l'orologio sia allineato ([Phase.READY]). */
+        suspend fun awaitReady() = becameReady.await()
+
         /** Lascia andare la WebSocket senza saluti; non fa niente se è già chiusa. */
         fun abandon() {
             socket?.cancel()
@@ -238,6 +347,7 @@ class SendspinClient(
                     ready = true
                     _error.value = null
                     _phase.value = Phase.READY
+                    becameReady.complete(Unit)
                     Log.i(TAG, "Lettore pronto in Music Assistant")
                 }
                 delay(if (ready) SYNC_INTERVAL_MS else RETRY_SYNC_MS)
@@ -273,7 +383,7 @@ class SendspinClient(
         }
 
         override fun onOpen(webSocket: WebSocket, response: Response) {
-            if (authenticate) {
+            if (!direct) {
                 // Il proxy di Music Assistant vuole prima il token, poi parla Sendspin.
                 send(JSONObject().put("type", "auth").put("token", token).put("client_id", id.clientId))
             } else {
@@ -296,7 +406,8 @@ class SendspinClient(
                 "auth_ok" -> sendHello()
                 "server/hello" -> {
                     val name = Logged.text(" " + payload.optString("name"), "")
-                    Log.i(TAG, "Sendspin: server pronto$name, ruoli ${payload.optJSONArray("active_roles")}")
+                    val way = if (direct) ", porta diretta" else ""
+                    Log.i(TAG, "Sendspin: server pronto$name, ruoli ${payload.optJSONArray("active_roles")}$way")
                     helloAnswered.complete(Unit)
                 }
                 // Il server non accetta questa connessione: per esempio un Music Assistant che vuole solo lettori
@@ -461,7 +572,19 @@ class SendspinClient(
 
         /** Il motivo di server/error nel registro è una parola ("malformed"): non di più. */
         const val REASON_CHARS = 40
+
+        /** La porta del server Sendspin di Music Assistant (aiosendspin). */
         const val DIRECT_PORT = 8927
+
+        /**
+         * La porta diretta che non risponde si riprova presto, per al massimo [DIRECT_PATIENCE_MS]; poi il proxy. Largo:
+         * passare al proxy mentre Music Assistant parte lascerebbe tutta la connessione sul proxy.
+         */
+        const val DIRECT_RETRY_MS = 500L
+        const val DIRECT_PATIENCE_MS = 20_000L
+
+        /** Quanto aspetta la prova della porta diretta (vedi [checkDirectPort]): è su questo telefono. */
+        const val PROBE_TIMEOUT_MS = 1_000
         const val CLOCK_JUMP_US = 1_000_000L
 
         fun now(): Long = System.nanoTime() / 1000
@@ -473,10 +596,16 @@ class SendspinClient(
             return (0 until roles.length()).any { roles.optString(it).substringBefore('@') == "player" }
         }
 
-        /** La porta del server Sendspin, per le versioni senza /sendspin sulla porta dell'interfaccia. */
-        fun directUrl(baseUrl: String): String {
-            val host = runCatching { URI(baseUrl).host }.getOrNull() ?: baseUrl
-            return "ws://$host:$DIRECT_PORT/sendspin"
+        /** La porta del server Sendspin: per le versioni senza /sendspin sulla porta dell'interfaccia, e sul telefono. */
+        fun directUrl(baseUrl: String, port: Int): String {
+            val host = runCatching { URI(baseUrl.trim()).host }.getOrNull() ?: baseUrl
+            return "ws://$host:$port/sendspin"
+        }
+
+        /** L'indirizzo è questo telefono: 127.0.0.1 (o un altro 127.x), localhost, ::1. */
+        fun local(baseUrl: String): Boolean {
+            val host = runCatching { URI(baseUrl.trim()).host }.getOrNull()?.lowercase() ?: return false
+            return host == "localhost" || host.startsWith("127.") || host == "[::1]" || host == "::1"
         }
 
         fun utf8Limit(text: String, bytes: Int): String {

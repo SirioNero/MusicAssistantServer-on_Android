@@ -319,15 +319,18 @@ async def _pulse_commands(server: Any, rounds: int = 5) -> tuple[bool, str]:
 
 async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
     """
-    La sessione di Soloist che resta accesa tra un brano e l'altro (_soloist_live in prepare.py).
+    La sessione di Soloist che resta accesa tra un brano e l'altro (_soloist_live e _soloist_connect in prepare.py).
 
     Col codice vero di Music Assistant (SoloistBackend, PulseAudio, il tubo, il ritmo di lettura) e un finto Soloist
-    (xonos_fake_soloist.py, avviato col Python del pacchetto al posto del programma di Spotify): un brano, un salto a un
-    altro, una ripresa a 1 s (Soloist in pausa è più avanti: deve ripartire dal punto chiesto), lo spegnimento dopo la
-    pausa, la fine naturale di un brano, un cambio annullato a metà (Soloist si spegne), un Soloist che non accetta
-    salti (allora si riparte da capo) e i salti riprovati dopo un po' quando ne sono falliti due. L'audio che arriva
-    deve essere sempre e solo del brano chiesto, dal secondo chiesto: il finto Soloist scrive un valore per brano e per
-    secondo, e a ogni pausa lascia nel tubo un po' del brano di prima.
+    (xonos_fake_soloist.py, avviato col Python del pacchetto al posto del programma di Spotify). Con un processo per
+    brano (--single-track): il salto riparte da capo (Soloist vero si chiude a un play di un altro brano), la ripresa a
+    1 s resta sullo stesso processo e parte dal punto chiesto (Soloist in pausa è più avanti), lo spegnimento dopo la
+    pausa, la fine naturale. In modalità Spotify Connect: il salto sullo stesso processo, la ripresa, la fine naturale
+    con l'autoplay e senza (Soloist resta acceso e il brano dopo suona sulla stessa sessione), un cambio annullato a metà
+    (Soloist si spegne), un Soloist che non accetta salti (allora si riparte da capo), i salti riprovati dopo un po'
+    quando ne sono falliti due, e la modalità Spotify Connect che non parte (allora un processo per brano). L'audio che
+    arriva deve essere sempre e solo del brano chiesto, dal secondo chiesto: il finto Soloist scrive un valore per brano
+    e per secondo, e a ogni pausa lascia nel tubo un po' del brano di prima.
     """
     from array import array  # noqa: PLC0415
     from types import SimpleNamespace  # noqa: PLC0415
@@ -375,8 +378,18 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
         async def ensure_fresh(self, _consent: bool, **_kwargs: Any) -> Path:
             return Path(python)
 
-    real_manager = solo.SoloistBinaryManager
-    real_park = solo._XONOS_PARK_S
+    real = {
+        name: getattr(solo, name)
+        for name in (
+            "SoloistBinaryManager",
+            "_XONOS_PARK_S",
+            "_XONOS_SWITCH_S",
+            "_JUMP_TIMEOUT_S",
+            "_XONOS_RETRY_S",
+            "_XONOS_CONNECT",
+            "_XONOS_CONNECT_LOGIN_S",
+        )
+    }
     solo.SoloistBinaryManager = FakeManager
     plain_args = backend._session_args
     # come modulo, come xonos_server: nel pacchetto il codice di Xonos può esserci solo compilato (.pyc)
@@ -419,112 +432,195 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
     def alive(run: Any) -> bool:
         return run is not None and run._proc is not None and run._proc.returncode is None
 
+    async def drop() -> None:
+        """Spegne il Soloist acceso: il prossimo brano parte con un processo nuovo (e le variabili d'ambiente nuove)."""
+        backend._xonos_cancel_park()
+        async with backend._run_lock:
+            if (left := backend._run) is not None:
+                await left.stop()
+                backend._run = None
+
     failed: list[str] = []
 
     def check(what: str, ok: bool, seen: Any = "") -> None:
         if not ok:
             failed.append(f"{what} ({seen})" if seen != "" else what)
 
-    a, b, c, d, e, f, g, h, i = (f"spotify:track:xonos{x}" for x in "abcdefghi")
-    first_a = first_b = first_r = first_g = first_h = first_i = -1.0
-    real_switch = solo._XONOS_SWITCH_S
-    real_jump = solo._JUMP_TIMEOUT_S
-    real_retry = solo._XONOS_RETRY_S
+    a, b, c, d, e, g, j, k, m, n, o, p, q = (f"spotify:track:xonos{x}" for x in "abcdegjkmnopq")
+    f, h = "spotify:track:xonosshortf", "spotify:track:xonosshorth"
+    first: dict[str, float] = {}
     try:
         os.environ["XONOS_FAKE_LEAK"] = "1"
         os.environ["XONOS_FAKE_DURATION_MS"] = "30000"
-        first_a, values, _ = await take(a, "a", seconds=1.5)
+
+        # --- un processo per brano (--single-track), come in Music Assistant ---
+        solo._XONOS_CONNECT = False
+        first["da capo"], values, _ = await take(a, "a", seconds=1.5)
         run = backend._run
         check("audio del primo brano", values == {mark(a)}, values)
         check("in pausa e acceso dopo lo stream", alive(run) and run.xonos_parked)
-        first_b, values, _ = await take(b, "b", seconds=3.0)
-        check("salto sullo stesso processo", backend._run is run and alive(run))
-        check("solo audio del brano saltato", values == {mark(b)}, values)
-        check("salto dall'inizio del brano", early == {0}, early)
-        # il resto della pausa è entrato nel tubo (sennò le prove "solo audio del brano..." non dicono niente)
-        rests = [r for r in records if "finto soloist: resto " in r]
-        check("resto della pausa nel tubo", any(not r.endswith(" 0") for r in rests), rests)
+        first["salto da capo"], values, _ = await take(b, "b", seconds=3.0)
+        run_b = backend._run
+        check(
+            "salto con un processo per brano: da capo",
+            run_b is not run and not alive(run) and values == {mark(b)} and early == {0},
+            (values, early),
+        )
+        check("salto da capo senza tentativi", backend._xonos_failures["salto"] == 0, backend._xonos_failures)
         # Soloist in pausa è oltre i 3 s (letti, più il tubo e il resto della pausa): la ripresa a 1 s deve partire
         # da lì, non dal punto in cui Soloist si era fermato
         solo._XONOS_PARK_S = 1.0
-        first_r, values, _ = await take(b, "b", seek=1, seconds=1.0)
-        check("ripresa sullo stesso processo", backend._run is run, backend._run)
+        first["ripresa"], values, _ = await take(b, "b", seek=1, seconds=1.0)
+        check("ripresa sullo stesso processo", backend._run is run_b, backend._run)
         check("solo audio del brano ripreso", values == {mark(b)}, values)
         check("ripresa dal punto chiesto", early == {1}, early)
+        # il resto della pausa è entrato nel tubo (sennò le prove "solo audio del brano..." non dicono niente)
+        rests = [r for r in records if "finto soloist: resto " in r]
+        check("resto della pausa nel tubo", any(not r.endswith(" 0") for r in rests), rests)
         await asyncio.sleep(2.5)
-        check("spento dopo la pausa", backend._run is None and not alive(run))
-        solo._XONOS_PARK_S = real_park
-        os.environ["XONOS_FAKE_DURATION_MS"] = "2500"
-        _, values, got = await take(c, "c", seconds=10, duration=3)
+        check("spento dopo la pausa", backend._run is None and not alive(run_b))
+        solo._XONOS_PARK_S = real["_XONOS_PARK_S"]
+        _, values, got = await take(f, "f", seconds=10, duration=3)
         await asyncio.sleep(0.5)
-        check("fine naturale del brano", got > 0 and values == {mark(c)} and backend._run is None, (got, values))
+        check("fine naturale del brano", got > 0 and values == {mark(f)} and backend._run is None, (got, values))
+
+        # --- modalità Spotify Connect: una sessione sola ---
+        solo._XONOS_CONNECT = True
+        first["Connect da capo"], values, _ = await take(c, "c", seconds=1.5)
+        run = backend._run
+        check(
+            "Spotify Connect: primo brano",
+            run is not None and run._xonos_connect and values == {mark(c)} and early == {0},
+            (getattr(run, "_xonos_connect", None), values, early),
+        )
+        rests_before = len([r for r in records if "finto soloist: resto " in r])
+        first["Connect salto"], values, _ = await take(d, "d", seconds=3.0)
+        check(
+            "Spotify Connect: salto sullo stesso processo",
+            backend._run is run and alive(run) and values == {mark(d)} and early == {0},
+            (values, early),
+        )
+        rests = [r for r in records if "finto soloist: resto " in r][rests_before:]
+        check("Spotify Connect: resto della pausa nel tubo", any(not r.endswith(" 0") for r in rests), rests)
+        first["Connect ripresa"], values, _ = await take(d, "d", seek=1, seconds=1.0)
+        check(
+            "Spotify Connect: ripresa dal punto chiesto",
+            backend._run is run and values == {mark(d)} and early == {1},
+            (values, early),
+        )
+        # fine naturale con l'autoplay: Soloist passa a un altro brano, va in pausa e resta acceso
+        _, values, got = await take(h, "h", seconds=10, duration=3)
+        await asyncio.sleep(0.5)
+        check("Spotify Connect: fine naturale, solo il brano", got > 0 and values == {mark(h)}, (got, values))
+        check("Spotify Connect: acceso dopo la fine", backend._run is run and alive(run) and run.xonos_parked)
+        first["Connect dopo la fine"], values, _ = await take(e, "e", seconds=1.0)
+        check(
+            "Spotify Connect: brano dopo sulla stessa sessione",
+            backend._run is run and values == {mark(e)} and early == {0},
+            (values, early),
+        )
+        # fine naturale senza autoplay: Soloist si ferma alla fine del brano, in pausa
+        await drop()
+        os.environ["XONOS_FAKE_AUTOPLAY"] = "0"
+        _, values, got = await take(f, "f", seconds=10, duration=3)
+        await asyncio.sleep(0.5)
+        run = backend._run
+        check(
+            "Spotify Connect senza autoplay: fine del brano",
+            got > 0 and values == {mark(f)} and alive(run) and run.xonos_parked,
+            (got, values, run),
+        )
+        os.environ.pop("XONOS_FAKE_AUTOPLAY")
         # un cambio annullato a metà (il brano chiesto si carica piano): Soloist si spegne, il brano dopo da capo
-        os.environ["XONOS_FAKE_DURATION_MS"] = "30000"
+        await drop()
         os.environ["XONOS_FAKE_DELAY_PLAY"] = "1500"
-        await take(d, "d", seconds=1.0)
-        run_d = backend._run
-        cancelled = asyncio.create_task(take(e, "e", seconds=1.0))
+        await take(g, "g", seconds=1.0)
+        run_g = backend._run
+        cancelled = asyncio.create_task(take(j, "j", seconds=1.0))
         await asyncio.sleep(0.3)
         cancelled.cancel()
         with suppress(asyncio.CancelledError):
             await cancelled
         for _ in range(40):
-            if backend._run is None and not alive(run_d):
+            if backend._run is None and not alive(run_g):
                 break
             await asyncio.sleep(0.05)
-        check("spento dopo un cambio annullato", backend._run is None and not alive(run_d), backend._run)
+        check("spento dopo un cambio annullato", backend._run is None and not alive(run_g), backend._run)
         os.environ.pop("XONOS_FAKE_DELAY_PLAY")
         # un Soloist che non accetta salti: dopo l'attesa si riparte da capo, e il fallimento si conta
         os.environ["XONOS_FAKE_NO_JUMP"] = "1"
         solo._XONOS_SWITCH_S = 2.0
         solo._JUMP_TIMEOUT_S = 2.0
-        await take(f, "f", seconds=1.0)
-        run_f = backend._run
-        first_g, values, _ = await take(g, "g", seconds=1.0)
-        check("da capo dopo un salto rifiutato", backend._run is not run_f and values == {mark(g)}, values)
+        await take(k, "k", seconds=1.0)
+        run_k = backend._run
+        first["da capo dopo un salto rifiutato"], values, _ = await take(m, "m", seconds=1.0)
+        check("da capo dopo un salto rifiutato", backend._run is not run_k and values == {mark(m)}, values)
         check("salto rifiutato contato", backend._xonos_failures["salto"] == 1, backend._xonos_failures)
         # due salti falliti di fila: per un po' niente tentativi (si riparte subito da capo)...
         backend._xonos_failures["salto"] = 2
-        backend._xonos_failed_at["salto"] = time.monotonic()
-        run_g = backend._run
-        first_h, values, _ = await take(h, "h", seconds=1.0)
+        failed_at = backend._xonos_failed_at["salto"] = time.monotonic()
+        run_m = backend._run
+        first["senza tentativo"], values, _ = await take(n, "n", seconds=1.0)
         check(
             "niente tentativi dopo due salti falliti",
-            backend._run is not run_g and values == {mark(h)} and first_h < 1.9,
-            (first_h, values),
+            backend._run is not run_m
+            and values == {mark(n)}
+            and backend._xonos_retries["salto"] == 0
+            and backend._xonos_failed_at["salto"] == failed_at,
+            (values, backend._xonos_retries, backend._xonos_failed_at),
         )
         # ... e passato quel tempo si riprova
         solo._XONOS_RETRY_S = 0.0
-        first_i, values, _ = await take(i, "i", seconds=1.0)
+        first["tentativo dopo un po'"], values, _ = await take(o, "o", seconds=1.0)
         check(
             "salto riprovato dopo un po'",
-            values == {mark(i)}
-            and first_i >= 2.0
+            values == {mark(o)}
+            and first["tentativo dopo un po'"] >= 2.0
             and backend._xonos_failures["salto"] == 2
             and backend._xonos_retries["salto"] == 1,
-            (first_i, backend._xonos_failures, backend._xonos_retries),
+            (first["tentativo dopo un po'"], backend._xonos_failures, backend._xonos_retries),
+        )
+        os.environ.pop("XONOS_FAKE_NO_JUMP")
+        # la modalità Spotify Connect che non entra in Spotify: un processo per brano, e per un po' resta così
+        await drop()
+        os.environ["XONOS_FAKE_CONNECT_FAIL"] = "1"
+        solo._XONOS_CONNECT_LOGIN_S = 1.5
+        first["ripiego"], values, _ = await take(p, "p", seconds=1.0)
+        run = backend._run
+        check(
+            "Spotify Connect che non parte: un processo per brano",
+            values == {mark(p)} and run is not None and not run._xonos_connect,
+            (values, getattr(run, "_xonos_connect", None)),
+        )
+        check(
+            "Spotify Connect che non parte: per un po' niente tentativi",
+            backend._xonos_connect_blocked_until > time.monotonic() and backend._xonos_connect_fails == 1,
+            (backend._xonos_connect_blocked_until, backend._xonos_connect_fails),
+        )
+        await drop()
+        _, values, _ = await take(q, "q", seconds=1.0)
+        check(
+            "dopo il ripiego un processo per brano",
+            values == {mark(q)} and not backend._run._xonos_connect,
+            values,
         )
     except Exception as err:  # noqa: BLE001 - nel risultato, con le ultime righe del motore
         failed.append(repr(err))
     finally:
         log.removeHandler(keep)
-        for key in ("XONOS_FAKE_LEAK", "XONOS_FAKE_DURATION_MS", "XONOS_FAKE_NO_JUMP", "XONOS_FAKE_DELAY_PLAY"):
+        for key in (
+            "XONOS_FAKE_LEAK",
+            "XONOS_FAKE_DURATION_MS",
+            "XONOS_FAKE_NO_JUMP",
+            "XONOS_FAKE_DELAY_PLAY",
+            "XONOS_FAKE_AUTOPLAY",
+            "XONOS_FAKE_CONNECT_FAIL",
+        ):
             os.environ.pop(key, None)
-        solo.SoloistBinaryManager = real_manager
-        solo._XONOS_PARK_S = real_park
-        solo._XONOS_SWITCH_S = real_switch
-        solo._JUMP_TIMEOUT_S = real_jump
-        solo._XONOS_RETRY_S = real_retry
-        backend._xonos_cancel_park()
-        async with backend._run_lock:
-            if (left := backend._run) is not None:
-                await left.stop()
-                backend._run = None
-    detail = (
-        f"primo audio: da capo {first_a:.2f} s, salto {first_b:.2f} s, ripresa {first_r:.2f} s,"
-        f" da capo dopo un salto rifiutato {first_g:.2f} s, senza tentativo {first_h:.2f} s,"
-        f" tentativo dopo un po' {first_i:.2f} s"
-    )
+        for name, value in real.items():
+            setattr(solo, name, value)
+        await drop()
+    detail = "primo audio: " + ", ".join(f"{what} {seconds:.2f} s" for what, seconds in first.items())
     if failed:
         detail += "; non va: " + ", ".join(failed) + " | motore: " + " / ".join(records[-15:])
     return not failed, detail

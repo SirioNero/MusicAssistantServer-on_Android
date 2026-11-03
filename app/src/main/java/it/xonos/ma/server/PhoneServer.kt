@@ -255,7 +255,10 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
                         }
                     }
                 } else {
-                    Log.i(TAG, line)
+                    // Le righe INFO e DEBUG di Music Assistant sono già nel suo registro (musicassistant.log): nel logcat
+                    // riempivano il buffer e coprivano quelle di Xonos, che "Condividi il registro" prende da lì (sul
+                    // telefono dell'utente ne restavano 20 s). Avvisi, errori e tracce restano anche nel logcat.
+                    if (!QUIET.containsMatchIn(line)) Log.i(TAG, line)
                     last.addLast(line)
                     if (last.size > LAST_LINES) last.removeFirst()
                 }
@@ -322,6 +325,9 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
     companion object {
         const val URL = "http://127.0.0.1:8095"
         private const val TAG = "XonosServer"
+
+        /** Una riga INFO o DEBUG del registro di Music Assistant ("2026-11-03 04:58:05,637.637 INFO (music-assistant) ..."). */
+        private val QUIET = Regex("^\\d{4}-\\d\\d-\\d\\d \\S+ (INFO|DEBUG) \\(")
         private const val LINKER = "/system/bin/linker64"
         /** Android 10: da qui le app non avviano più i programmi che scaricano (W^X). */
         private const val W_X_SDK = 29

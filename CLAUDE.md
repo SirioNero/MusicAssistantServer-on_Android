@@ -67,7 +67,7 @@ prima di cominciare: le cose scritte qui sono già state verificate, non vanno r
   (F-Droid rifiuta quel blocco). Build riproducibili: il workflow "Riproducibile" compila la release
   come F-Droid (la loro immagine `fdroidserver:buildserver-trixie`, OpenJDK 21, Gradle del wrapper,
   senza `tools/`) e la confronta byte per byte con l'APK della release tolta la firma: per la 0.1.38, la
-  0.1.42, la 0.1.49, la 0.1.50 e la 0.1.52 identici. Così la ricetta ha `Binaries` e `AllowedAPKSigningKeys` (SHA-256 del certificato
+  0.1.42, la 0.1.49, la 0.1.50, la 0.1.52 e la 0.1.53 identici (la 0.1.53: da confermare, lanciato il 3 novembre). Così la ricetta ha `Binaries` e `AllowedAPKSigningKeys` (SHA-256 del certificato
   `18ef3fc3…2c836`): F-Droid pubblica l'APK con la nostra firma e si passa da GitHub/Obtainium a F-Droid
   senza disinstallare. Dopo ogni release va lanciato a mano "Riproducibile": una versione non identica
   F-Droid non la pubblica. Il modello delle richieste di fdroiddata vuole in `commit` l'hash completo e
@@ -604,6 +604,37 @@ di Xonos suona dal server sul telefono; la release ridotta con R8, da capo come 
     vero», «Avvio a N ms», «musica fuori N ms dopo il tocco». "Condividi il registro del server sul telefono" ora
     aggiunge in fondo «Registro di Xonos» (`logcat -d -s Xonos:V AndroidRuntime:E`, ultime 64 K). Le modifiche a
     data/, sendspin/, playback/ vanno portate in myCar.
+  - **Il registro dell'utente con la 0.1.53** (3 novembre 2026): il salto sulla sessione accesa non riesce MAI con
+    Soloist vero: `play(uri)` di un altro brano a un Soloist `--single-track` lo chiude ("websocket connection closed",
+    0,09 s dopo). La ripresa (stesso brano) invece va: 0,10 s. Quindi ogni avanti ripartiva da capo: Soloist fermato
+    0,2 s, avvio 1,5–2,6 s (dentro Spotify 0,8–1,7 s, il brano suona 0,55–0,83 s), poi «dal sink ripartito, primo audio
+    in 1,0 s e primo secondo intero in 1,0 s» (il primo secondo arriva tutto insieme dopo 1 s: un buffer di 1 s in
+    Soloist o in PulseAudio, da capire), «brano pronto» 2,8–3,7 s dopo play_index; poi Sendspin 0,16 s di anticipo e
+    l'uscita del telefono («primo tempo vero dopo 181 ms», avvio 228 ms in ritardo). In tutto circa 3,5 s dal tocco.
+    Nel registro condiviso le righe di Xonos coprivano solo gli ultimi 20 s: il logcat era pieno di XonosServer.
+  - **Soloist in modalità Spotify Connect** (`_soloist_connect` in prepare.py, pacchetto 2.10.8-9, Xonos 0.1.54; scelta
+    dell'utente, che accetta di vedere il telefono tra i dispositivi Spotify Connect del suo account come "Xonos").
+    `--single-track` è fatto per un brano e via ("plays that one item ... and exits", README del servizio Spotify di
+    MA); senza, Soloist è un dispositivo Spotify Connect (così lo usa il plugin Spotify Connect di MA, che fa
+    `activate` + `play(uri)` e annota che un `play` senza activate suona sul posto senza passare la riproduzione alle app).
+    `_xonos_fresh_run`: Soloist parte senza `--single-track` (`_xonos_connect_args`, `--device-name Xonos`), accesso
+    entro 8 s (`_XONOS_CONNECT_LOGIN_S`), poi `_xonos_connect_play`: casuale e ripeti spenti e `play(uri)` senza
+    activate. I salti sono `play(uri)` sulla sessione accesa (`xonos_switch`); a fine brano Soloist non esce: se passa a
+    un altro brano (autoplay) o si ferma alla fine (`_xonos_near_end`: posizione a meno di 3 s dalla fine, o audio letto
+    a meno di 5 s) il brano è finito (`_xonos_item_ended`), Soloist va in pausa (`_xonos_hold`) e il brano dopo suona
+    sulla stessa sessione. Se in modalità Spotify Connect non parte, quel brano e i prossimi vanno con un processo per
+    brano per 30 minuti (raddoppiati a ogni fallimento, fino a 16 ore). Con un processo per brano il salto non si prova
+    più (si chiuderebbe): riparte da capo; la ripresa sì. In modalità Spotify Connect il "dispositivo non attivo" non
+    ferma niente (`_observe_device_active`): se un'altra app prende l'account, Soloist va in pausa e si ferma la coda
+    come prima. Per 15 s dopo un avvio o un cambio le righe di Soloist vanno nel registro a INFO
+    (`_XONOS_ENGINE_LOG_S`). Il finto Soloist ora fa le due modalità: con `--single-track` un play di un altro brano lo
+    chiude (come il vero); senza, parte senza brano, cambia brano, a fine brano passa all'autoplay
+    (`XONOS_FAKE_AUTOPLAY=0`: si ferma alla fine) e non esce; `XONOS_FAKE_CONNECT_FAIL=1` non entra mai; i brani con
+    "short" nell'uri durano 2,5 s. Provato in locale il finto (le due modalità) e in CI `soloist-sessione` con le due
+    modalità. **Non provato con Spotify vero**: che Soloist senza `--single-track` rientri da solo con l'abbinamento
+    salvato, che `play(uri)` senza activate suoni, cosa fa a fine brano, e se il primo secondo arriva prima dopo un
+    salto (la sessione PulseAudio resta aperta). Nell'app: le righe INFO e DEBUG di Music Assistant non vanno più nel
+    logcat (sono già in musicassistant.log), così «Registro di Xonos» nella condivisione tiene più minuti.
   - **PhoneServer**: XONOS_PROOT e XONOS_PROOT_LOADER dalla cartella delle librerie, XONOS_DNS_FILE
     (`<dati>/resolv.conf`: i DNS della rete in uso più 1.1.1.1 e 8.8.8.8, riscritto con un NetworkCallback), il
     MulticastLock del Wi-Fi solo tra `XONOS_MULTICAST on` e `off` (permesso CHANGE_WIFI_MULTICAST_STATE).

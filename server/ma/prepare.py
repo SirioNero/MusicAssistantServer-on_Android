@@ -2507,6 +2507,10 @@ _XONOS_DEVICE_NAME: Final[str] = "Xonos"
 # fine del brano, non una pausa chiesta dall'app di Spotify
 _XONOS_END_MS: Final[int] = 3000
 _XONOS_END_READ_S: Final[float] = 5.0
+# Xonos: un brano ricominciato da Soloist alla sua fine si riconosce anche dall'audio letto (le posizioni di Soloist
+# possono arrivare di rado), solo se davanti al brano c'erano almeno tanti secondi: nei brani corti una posizione
+# normale può restare indietro di oltre 1 s rispetto a quanto letto (il primo secondo arriva tutto insieme)
+_XONOS_READ_FLOOR_S: Final[float] = 15.0
 # Xonos: per quanto, dopo un avvio o un cambio di brano, le righe di Soloist vanno nel registro (sennò solo in debug)
 _XONOS_ENGINE_LOG_S: Final[float] = 15.0
 # Xonos: in modalità Spotify Connect, audio letto oltre la durata del brano di tanto: il brano ricomincia (ripeti acceso da
@@ -3044,6 +3048,8 @@ LIVE_RUN_METHODS = '''    # ---- Xonos: la sessione che resta accesa tra un bran
             self._started.set()
         self._seek_confirmed = asyncio.Event()
         self._position_ms = None
+        # Xonos: la posizione più avanti del brano di prima non vale per questo (_xonos_restarted)
+        self._xonos_peak_ms = None
         self._engine_playing = False
         self._item_over = False
         self._xonos_holding = False
@@ -3289,11 +3295,13 @@ LIVE_RUN_METHODS = '''    # ---- Xonos: la sessione che resta accesa tra un bran
         Whether the engine started this same item over at its end (Spotify Connect mode): the item is over.
 
         It happens when the item was also in the engine's queue (played with play(uri) while queued): at its end the
-        engine moves to the queued copy, with the same uri, so no track change is seen. Without this the run would hand
-        over the item's opening again until _xonos_overrun (5 s more). It needs the furthest position seen for this
-        item (outside switches) near its end, a jump back of at least a second to its start, and at least half of the
-        item's audio already read (not wall time: the engine writes ahead and the first second comes at once): a late
-        position of the item before cannot look like a restart.
+        engine moves to the queued copy, with the same uri, maybe with no track change. Without this the run would hand
+        over the item's opening again until _xonos_overrun (5 s more). It needs the item at its end, a jump back of at
+        least a second to its start, and at least half of the item's audio already read (not wall time: the engine
+        writes ahead and the first second comes at once), so a late position of the item before cannot look like a
+        restart. The end is the furthest position seen for this item (outside switches) or, as the engine may report
+        positions rarely, the audio read (the engine is never behind it), the latter only when at least
+        _XONOS_READ_FLOOR_S were ahead: on a short item a normal position can lag what was read by more than a second.
         """
         if (
             not self._xonos_connect
@@ -3302,16 +3310,18 @@ LIVE_RUN_METHODS = '''    # ---- Xonos: la sessione che resta accesa tra un bran
             or self._xonos_parked
             or self._xonos_switching
             or not self._duration_ms
-            or peak_ms is None
         ):
             return False
         expected_s = max(0.0, (self._duration_ms - self._seek_target_ms) / 1000)
-        return (
-            peak_ms >= self._duration_ms - _XONOS_END_MS
-            and position_ms < _XONOS_END_MS
-            and peak_ms - position_ms >= 1000
-            and self._read_bytes / _BYTES_PER_SECOND >= expected_s / 2
-        )
+        read_s = self._read_bytes / _BYTES_PER_SECOND
+        if peak_ms is not None and peak_ms >= self._duration_ms - _XONOS_END_MS:
+            reached = peak_ms
+        elif expected_s >= _XONOS_READ_FLOOR_S and read_s >= expected_s - _XONOS_END_READ_S:
+            # Xonos: nessuna posizione vicino alla fine (Soloist può darne di rado): vale l'audio letto
+            reached = max(peak_ms or 0, self._seek_target_ms + int(read_s * 1000))
+        else:
+            return False
+        return position_ms < _XONOS_END_MS and reached - position_ms >= 1000 and read_s >= expected_s / 2
 
     def _xonos_track_restarted(self) -> bool:
         """

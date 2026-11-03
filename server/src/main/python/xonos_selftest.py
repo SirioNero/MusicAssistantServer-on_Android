@@ -1271,6 +1271,20 @@ async def _preload_cases(
             values == {mark(eight)} and 0 < got <= 4.5 * FIFO_BYTES_PER_S,
             (round(got / FIFO_BYTES_PER_S, 2), values, records[count:][-4:]),
         )
+        # lo stesso con un Soloist che dice la posizione di rado e passa alla copia senza track_changed (brani "sparse",
+        # 16 s): la fine si riconosce dall'audio letto
+        nine = "spotify:track:xonossparsepre9"
+        run = backend._run
+        if run is not None and run._client is not None:
+            await run._client.add_to_queue(nine, await_result=True)
+        count = len(records)
+        _, values, got = await take(nine, "pre9", seconds=40, duration=16)
+        check(
+            "precarico: posizioni rare, lo stesso brano in coda non si ripete alla fine",
+            values == {mark(nine)} and 15 * FIFO_BYTES_PER_S <= got <= 17.5 * FIFO_BYTES_PER_S
+            and since(count, "over at its end") and since(count, "senza track_changed"),
+            (round(got / FIFO_BYTES_PER_S, 2), values, records[count:][-4:]),
+        )
     finally:
         os.environ.pop("XONOS_FAKE_DELAY_PLAY", None)
         nexts.clear()

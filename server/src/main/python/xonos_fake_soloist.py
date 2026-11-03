@@ -26,7 +26,10 @@ Il sink di PulseAudio sospeso (Music Assistant lo sospende mentre aspetta, e qua
 tubo: il finto Soloist lo guarda dal socket dei comandi di PulseAudio (list-sinks) e intanto non scrive, come il vero
 Soloist che resta fermo quando PulseAudio non prende audio. Senza il socket dei comandi scrive sempre, come prima.
 
-I brani con "short" nell'uri durano 2,5 s, gli altri XONOS_FAKE_DURATION_MS (30 s di base). Altre variabili d'ambiente:
+I brani con "short" nell'uri durano 2,5 s, quelli con "sparse" 16 s, gli altri XONOS_FAKE_DURATION_MS (30 s di base).
+I brani con "sparse" mandano la posizione solo coi cambi di stato (niente position_sync ogni secondo), e a fine brano
+passano alla copia in coda dello stesso brano senza track_changed: così il Soloist vero potrebbe fare, e Xonos deve
+riconoscere lo stesso il brano ricominciato. Altre variabili d'ambiente:
 XONOS_FAKE_NO_JUMP=1 (in modalità Spotify Connect il play di un altro brano non fa niente), XONOS_FAKE_LEAK=1 (alla
 pausa smette di suonare, 0,2 s dopo scrive ancora fino a 0,2 s del brano nel tubo, riga "finto soloist: resto N", e solo
 allora conferma: chi svuotasse il tubo prima di aspettare la conferma se lo ritroverebbe nel brano dopo),
@@ -64,6 +67,7 @@ ROOM = 32768
 # alla pausa il resto arriva tanto dopo, poco prima della conferma
 LEAK_DELAY_S = 0.2
 SHORT_MS = 2500
+SPARSE_MS = 16000
 # un brano in coda da tanto è già caricato: skip_next lo fa partire subito (come Spotify, che scarica il brano dopo)
 PRELOAD_S = 0.5
 QUEUED_START_S = 0.05
@@ -127,7 +131,14 @@ class FakeSoloist:
     def duration_ms(self) -> int:
         if self.uri and "short" in self.uri:
             return SHORT_MS
+        if self.sparse:
+            return SPARSE_MS
         return int(os.environ.get("XONOS_FAKE_DURATION_MS", "30000"))
+
+    @property
+    def sparse(self) -> bool:
+        """Posizioni rare e niente track_changed per la copia in coda dello stesso brano."""
+        return bool(self.uri and "sparse" in self.uri)
 
     def item(self) -> dict | None:
         if self.uri is None:
@@ -317,7 +328,7 @@ class FakeSoloist:
             frames = self.write(CHUNK_FRAMES)
             self.position_ms += frames * 1000 / RATE
             await asyncio.sleep(0.005 if frames < CHUNK_FRAMES else 0)
-            if (now := time.monotonic()) - last_sync > 1:
+            if (now := time.monotonic()) - last_sync > 1 and not self.sparse:
                 last_sync = now
                 await self.send({"type": "position_sync", "position": self.position()})
             if self.position_ms < self.duration_ms:
@@ -334,9 +345,14 @@ class FakeSoloist:
             if self.queue or self.autoplay:
                 # Spotify Connect: a fine brano passa al primo della coda, sennò all'autoplay, e lo suona finché non lo
                 # si mette in pausa
-                self.uri = self.queue.pop(0)[0] if self.queue else AUTOPLAY
+                following = self.queue.pop(0)[0] if self.queue else AUTOPLAY
+                again = following == self.uri and self.sparse
+                self.uri = following
                 self.position_ms = 0.0
-                await self.send({"type": "track_changed", "item": self.item()})
+                if again:
+                    print("finto soloist: ricomincio la copia in coda senza track_changed", flush=True)
+                else:
+                    await self.send({"type": "track_changed", "item": self.item()})
                 await self.state()
                 await asyncio.sleep(0.3)
             else:

@@ -1043,13 +1043,26 @@ proot[soloist] 3–6%, ffmpeg 3–4%. Il blocco di un'ora di Spotify (0.1.53) er
   intercetta anche … ioctl» vale ora solo per quei comandi.
 - Dalla revisione avversaria (4 aree, un verificatore per area; proot pulito): dopo `add_to_queue` l'elenco della coda
   di prima si dimentica (`_xonos_upcoming = None`: un avanti subito dopo faceva play e lasciava il brano in coda); un
-  brano che Soloist ricomincia alla sua fine (la copia in coda, stesso uri) è finito (`_xonos_restarted` in
-  `_observe_position`; prima altri 5 s del suo inizio fino a `_xonos_overrun`; caso nell'autotest); AudioEngine: la riga
+  brano che Soloist ricomincia alla sua fine (la copia in coda, stesso uri) è finito, invece di altri 5 s del suo inizio
+  fino a `_xonos_overrun`: da un track_changed allo stesso uri vicino alla fine (`_xonos_track_restarted`) o da una
+  posizione tornata sotto i 3 s (`_xonos_restarted`: conta la posizione più avanti del brano fuori dai cambi, o l'audio
+  letto se le posizioni arrivano di rado e davanti c'erano almeno 15 s, `_XONOS_READ_FLOOR_S`), sempre con almeno metà
+  dell'audio del brano letto (non il tempo: Soloist scrive in anticipo e il primo secondo arriva tutto insieme); casi
+  pre8 e pre9 dell'autotest (pre9: il finto coi brani "sparse" manda la posizione solo coi cambi di stato e passa alla
+  copia senza track_changed); AudioEngine: la riga
   d'avvio una volta per uscita (`startLogged`: con la rete ferma all'avvio 163 righe, ora 4) e un anticipo scoperto al
   primo tempo vero dopo una partenza a stima si tiene e si recupera piano (`lateUs` anche negativo) invece di 449 ms di
   silenzio in mezzo alla musica; Sendspin diretto solo se il pacchetto del server è installato (un altro Music Assistant
   a 127.0.0.1:8095 con un tunnel aspettava 20 s). Da misurare sul telefono: a fine brano col brano dopo in coda si può
   perdere la coda del brano che finisce (il tubo, 0,19 s, o i 2 s di PulseAudio): lo dice «brano finito … (atteso …)».
+- Verificato in CI (Server MA, emulatore Android 14 x86_64): 19 prove su 19; col finto Soloist primo audio «Connect
+  avanti in coda» 0,29 s contro «Connect salto lento» 0,83 s (play di un brano non in coda, 600 ms di caricamento
+  finto), «Connect brano dopo pronto» 0,04 s; `pulse-livello` circa 1,96–1,99 s nel PulseAudio con pacat. Workflow
+  "Soloist": FIONREAD 3,3 µs e 0 fermate in proot, TCGETS2 99,7 µs e 2 fermate, SIOCGIFINDEX ancora tradotto,
+  accelerazione seccomp accesa. Una revisione avversaria del controllo del brano ripartito (3 angoli, un verificatore
+  per problema) ha confermato solo il caso delle posizioni rare (corretto sopra; nella CI di prima nessun caso passava
+  da `_xonos_restarted`); scartati il picco del brano di prima (ora azzerato comunque a ogni cambio), un track_changed
+  ripetuto alla riconnessione (lo manda solo il finto) e la soglia di metà audio coi brani corti.
 - Da portare in myCar (dopo che il suo motore ha quello della 0.1.53–0.1.55): AudioEngine (misura del ritardo), SkipPlan,
   SkipTrace.heard. Il resto è sul server.
 - Da decidere con l'utente (dall'analisi): primo tocco mandato subito (−0,25 s sul tocco singolo, +0,6–0,9 s su più

@@ -601,7 +601,8 @@ di Xonos suona dal server sul telefono; la release ridotta con R8, da capo come 
     verificatore per problema) ha trovato i guasti corretti qui sopra; nel finto Soloist il resto della pausa ora entra
     davvero nel tubo (lascia posto, `FIONREAD`) e arriva 0,2 s prima della conferma. Scartate dopo la verifica: soglia del buffer sotto 1 s (il pezzo da 1 s è il minimo di Music Assistant),
     `PULSE_LATENCY_MSEC` (taglia la fine dei brani), margine Sendspin più corto (il server butta i pacchetti in
-    ritardo), Soloist tenuto acceso a fine brano o la coda di Spotify Connect (con `--single-track` esce comunque).
+    ritardo), Soloist tenuto acceso a fine brano o la coda di Spotify Connect (con `--single-track` esce comunque;
+    in modalità Spotify Connect il motivo non vale più: la coda si usa dalla 0.1.56, sotto).
     Da decidere col registro: mandare subito il primo tocco (−0,4 s, ma un doppio tocco costa un cambio in più),
     avvisare Soloist del salto già al tocco, l'uscita del telefono tenuta calda tra un brano e l'altro.
     Nell'app (0.1.53): tocchi raccolti per 250 ms col server sul telefono (400 con gli altri); avanti e indietro senza
@@ -987,6 +988,64 @@ per area) e una revisione avversaria; analisi in `scratchpad/analisi-ottimizza` 
   LongListCheck, SearchCheck.
 - Non provato: tutto sul telefono (arresto e riavvio veri, Gearslip che aspetta il menu, memfd sotto GrapheneOS, il
   peso del processore dopo), Spotify vero (429, rinnovo del token), un Music Assistant con `allow_legacy_clients` spento.
+
+## Precarico e salti (0.1.56, ramo `claude/precarico`, pacchetto 2.10.8-11)
+
+Dal registro dell'utente con la 0.1.55 (3 novembre 2026, Spotify vero, rete mobile con Tailscale): la modalità
+Spotify Connect funziona (Soloist "restoring session", "became active device", play(uri) sulla sessione accesa); il
+salto si sente 1,64–1,83 s dopo il tocco (la riga «musica fuori» segna la scrittura, non l'udito): 0,25 s raccolta
+dei tocchi, circa 1,0 s il server, di cui 0,75–0,93 s Soloist che carica il brano («il brano suona»), 0,17 s di
+margine Sendspin, circa 0,2 s l'uscita nuova che dà il primo tempo vero. Il primo secondo intero arriva in 0,02 s
+dopo il cambio: la soglia di 1 s di Music Assistant non pesa più. Processore mentre suona: python 17–23%, soloist
+17–28%, pulseaudio 9–10%, proot[pulseaudio] 3–4% (circa 280 risvegli/s anche con memfd e srbchannel negoziati),
+proot[soloist] 3–6%, ffmpeg 3–4%. Il blocco di un'ora di Spotify (0.1.53) era partito aprendo un artista. Analisi
+(4 aree e un critico) in `scratchpad/analisi-ottimizza/dopo-0155-*.md` della sessione.
+- **Precarico** (`_soloist_preload` in prepare.py; voluto dall'utente: "quando inizio un brano, Soloist deve subito
+  scaricare quello dopo"). Soloist ha `add_to_queue`, `skip_next`, `get_queue` (risposta: evento `queue_changed` con le
+  voci context/queue/autoplay); niente comandi per togliere dalla coda né per precaricare. 1 s dopo l'inizio di un
+  brano in modalità Connect `_xonos_preload` trova il brano dopo di Music Assistant (`_xonos_next_uri`:
+  `player_queues.get_next_item`, niente con ripeti uno, solo brani Spotify di questa istanza) e, se la coda di Soloist
+  è vuota, lo mette in coda (una voce alla volta, `_xonos_queued_uri`). `xonos_mode()`: «ripresa» (stesso brano),
+  «pronto» (a fine brano Soloist è già passato da solo al brano in coda: seek(0) e resume, niente play), «coda» (il
+  brano chiesto è quello in coda ed è il primo: `skip_next` invece di play(uri); se finisce altrove o non si muove in
+  2 s, play(uri); dopo `_XONOS_TRIES` fallimenti niente precarico per la sessione), «salto» (play(uri)). Una voce
+  rimasta in coda (salto altrove) Soloist la suona alla fine del brano dopo: la fine si riconosce come prima e si passa
+  al brano vero; finché c'è, niente nuovo precarico. L'app Spotify mostra il brano in coda sul dispositivo «Xonos».
+  `_XONOS_PRELOAD` lo spegne. Righe: «avanti col brano in coda (precaricato) in N s», «brano dopo già pronto in
+  Soloist, ripresa in N s», «il brano dopo è nella coda di Soloist», «dentro il salto: +0.07 brano, +0.62 suona …;
+  PulseAudio: N ms all'inizio, audio nuovo da +N; proot N risvegli». **Non provato con Spotify vero**: che il brano in
+  coda sia davvero scaricato prima (lo dirà la riga «avanti col brano in coda» rispetto a «salto sulla sessione
+  accesa»), che `play(uri)` lasci la coda, che `skip_next` vada senza activate.
+- Server: `REALTIME_COLD_START_BANK` da 5 a 2 s sul telefono (Music Assistant aspettava 5 s di audio quando al brano
+  mancava meno di un minuto: ripresa o salto nell'ultimo minuto e brani corti, circa 3,5 s in più con Soloist a 1,1x);
+  play/skip_next a Soloist subito dopo la pausa e lo svuotamento del tubo insieme (col sink sospeso); ffmpeg con
+  `-flush_packets 0` per i pezzi da 1 s; «brano finito» con la durata attesa. Il finto Soloist fa coda, skip_next,
+  get_queue e non scrive nel tubo col sink sospeso; autotest: casi del precarico in `soloist-sessione`,
+  `soloist-brano-dopo` (la scelta del brano dopo col codice vero di Music Assistant), `pulse-livello`.
+- App: `AudioEngine` misura il ritardo dell'uscita dopo il buffer al primo tempo vero e, su un'uscita nuova dello stesso
+  dispositivo (Android 12+, misura di meno di 10 minuti), non aspetta più il primo tempo vero scrivendo silenzio
+  (`prime()`): parte dalla stima e corregge piano in tutte e due le direzioni (`StartCheckKt`: altoparlante da 215 a
+  0 ms). Righe: «Avvio a N ms dal momento giusto, si sente fra N ms», «Salto: musica udibile N ms dopo il tocco».
+  `SkipPlan`: avanti `Jump(showing+1)` con ogni ripeti, a fine coda ripeti tutto `Jump(0)`, indietro
+  `Jump(max(showing-1, 0))` (come Music Assistant; niente più l'attesa di 1 s di next/previous in quei casi).
+  Sendspin diretto col server sul telefono (`Identity.direct`, 127.0.0.1:8927 di aiosendspin, senza il proxy
+  `/sendspin` che rimandava ogni pezzo da 25 ms attraverso una seconda WebSocket in Python): all'avvio la porta si
+  riprova ogni 500 ms per 20 s, poi `/sendspin`; una risposta HTTP sulla porta o la porta chiusa: proxy finché il
+  servizio è acceso. In Docker Python dall'8,6 al 6,5% (lì il proxy comprime ancora). myCar resta sul proxy
+  (`MyCarBridge` accetta solo la porta di Music Assistant). PlayCheck: `DIRECT=1`, `DIRECT_PORT`, volume e muto.
+- proot: `filter_ioctl` in `app/native/proot.sh` (awk, deterministico, si ferma se il sorgente non è quello atteso;
+  `proot.sh --correzioni <src>` applica solo le correzioni al sorgente): il filtro seccomp guarda anche il comando di
+  ioctl e ferma il programma solo per SIOCGIFINDEX, FICLONE e i comandi del terminale (TCSETS+2, TCGETS2, TCSETS2…);
+  tutti gli altri (FIONREAD di PulseAudio) vanno dritti al kernel. Sull'host x86_64: FIONREAD da 2 fermate e 79,5 µs a
+  0 e 0,41 µs. CI "Soloist": `tools/soloist/ioctl-test.c` (fermate per ioctl con getrusage), SIOCGIFINDEX in
+  ifaddrs-test, `proot -v 1` con l'accelerazione; ora lo script dell'emulatore esce con 1 se un controllo fallisce.
+  Le impronte di libproot.so cambiano: dopo la release lanciare "Riproducibile". La frase «il proot di Termux
+  intercetta anche … ioctl» vale ora solo per quei comandi.
+- Da portare in myCar (dopo che il suo motore ha quello della 0.1.53–0.1.55): AudioEngine (misura del ritardo), SkipPlan,
+  SkipTrace.heard. Il resto è sul server.
+- Da decidere con l'utente (dall'analisi): primo tocco mandato subito (−0,25 s sul tocco singolo, +0,6–0,9 s su più
+  tocchi veloci), brano vecchio zitto al tocco, qualità Spotify "molto alta" invece di "senza perdita" (si prova dalle
+  impostazioni del servizio, senza aggiornare).
 
 ## Lingue
 

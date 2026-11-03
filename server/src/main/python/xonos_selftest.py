@@ -1258,6 +1258,19 @@ async def _preload_cases(
             and not since(count, "comando play spotify:track:xonospre1"),
             (values, early(), records[count:][-6:]),
         )
+        # lo stesso brano anche nella coda di Soloist (messo lì non da Xonos), suonato con play: alla sua fine Soloist
+        # ricomincia la copia in coda, con lo stesso uri. Il brano deve finire lì, non dopo altri 5 s del suo inizio.
+        eight = "spotify:track:xonosshortpre8"
+        run = backend._run
+        if run is not None and run._client is not None:
+            await run._client.add_to_queue(eight, await_result=True)
+        count = len(records)
+        _, values, got = await take(eight, "pre8", seconds=10, duration=3)
+        check(
+            "precarico: lo stesso brano in coda non si ripete alla fine",
+            values == {mark(eight)} and 0 < got <= 4.5 * FIFO_BYTES_PER_S,
+            (round(got / FIFO_BYTES_PER_S, 2), values, records[count:][-4:]),
+        )
     finally:
         os.environ.pop("XONOS_FAKE_DELAY_PLAY", None)
         nexts.clear()

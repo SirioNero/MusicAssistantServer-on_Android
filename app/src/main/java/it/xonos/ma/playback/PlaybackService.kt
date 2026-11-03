@@ -316,7 +316,7 @@ class PlaybackService : MediaLibraryService() {
             // Col server sul telefono l'audio arriva dritto dal server Sendspin di Music Assistant (127.0.0.1:8927), senza
             // il proxy /sendspin che ripete ogni pacchetto in Python. Il suo account è amministratore: il legame fra
             // token e lettore che fa il proxy non serve. Se la porta diretta non va, SendspinClient torna al proxy.
-            direct = onPhoneServer,
+            direct = onPhoneServer && app.phoneServer?.installed == true,
         )
     }
 

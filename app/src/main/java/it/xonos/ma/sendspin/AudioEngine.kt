@@ -197,6 +197,8 @@ class AudioEngine(
 
     // La stima con cui è partita l'uscita aperta adesso (null: ha aspettato il primo tempo vero, o non c'era).
     private var guessUs: Long? = null
+    /** La riga «Avvio a» di questa uscita è già scritta: i pezzi buttati prima del primo suono non la ripetono. */
+    private var startLogged = false
 
     // Il primo fotogramma di musica scritto prima del primo tempo vero e quando si pensava di sentirlo: il primo tempo
     // vero dirà quando si sente davvero (-1: niente da dire).
@@ -395,6 +397,7 @@ class AudioEngine(
         lateUs = 0
         timed = false
         guessUs = null
+        startLogged = false
         firstMusicFrame = -1
     }
 
@@ -451,6 +454,7 @@ class AudioEngine(
         lateUs = 0
         timed = false
         guessUs = null
+        startLogged = false
         firstMusicFrame = -1
         openedAt = clock()
         created.play()
@@ -466,13 +470,21 @@ class AudioEngine(
         val fresh = framesWritten == 0L
         if (fresh) {
             // Con il ritardo misurato poco fa sulla stessa uscita si parte subito, a stima; senza, si aspetta il primo
-            // tempo vero dell'uscita con del silenzio.
-            guessUs = knownLatency(out)
+            // tempo vero dell'uscita con del silenzio. Una volta per uscita: se il primo pezzo è tutto buttato (in ritardo
+            // di più di [MAX_LATE_US]), il prossimo è ancora il primo, ma la stima resta quella.
+            if (guessUs == null) guessUs = knownLatency(out)
             if (guessUs == null && !prime(out, gen)) return
         }
+        // La riga d'avvio una volta sola per uscita: un buco della rete proprio all'inizio non riempie il registro.
+        val announce = fresh && !startLogged
+        if (fresh) startLogged = true
 
-        // Il ritardo dell'avvio si recupera piano, meno della correzione dolce più sotto.
-        if (!fresh && lateUs > 0) lateUs = max(0L, lateUs - (frames * 1_000_000L / out.sampleRate * CATCH_UP).toLong())
+        // Il ritardo dell'avvio si recupera piano, meno della correzione dolce più sotto; un anticipo (scoperto al primo
+        // tempo vero, dopo una partenza a stima) allo stesso modo nell'altro senso.
+        if (!fresh && lateUs != 0L) {
+            val step = (frames * 1_000_000L / out.sampleRate * CATCH_UP).toLong()
+            lateUs = if (lateUs > 0) max(0L, lateUs - step) else min(0L, lateUs + step)
+        }
         var target = filter.toClient(timestampUs) + lateUs
         // Il primo tempo vero dell'uscita da quando è aperta: fin lì quando si sente era una stima. Un Bluetooth
         // sospeso (l'autoradio dopo una pausa) può restare fermo più di quanto [prime] aspetta, e il ritardo che si
@@ -485,9 +497,9 @@ class AudioEngine(
         var error = heardAt(out) - target // positivo: siamo in ritardo
         // All'avvio la musica si sentirà al momento giusto se si è in anticipo (prima il silenzio), subito se in ritardo.
         val heard = target + max(error, 0L)
-        report(error, fresh, heard)
+        if (!fresh || announce) report(error, fresh, heard)
         if (fresh) {
-            if (timed) heardLine(heard - clock()) else firstMusicGuess = heard
+            if (!timed) firstMusicGuess = heard else if (announce) heardLine(heard - clock())
         }
         var start = 0
         var count = frames
@@ -509,6 +521,14 @@ class AudioEngine(
             error += back
             Log.i(TAG, "Inizio ${lateUs / 1000} ms dopo il momento giusto, non ${(lateUs + back) / 1000} come stimato")
         }
+        if (firstStamp && !fresh && guessUs != null && error < -HARD_US) {
+            // Partiti a stima col ritardo misurato prima, il primo tempo vero dice che si sente molto prima: niente
+            // silenzio in mezzo alla musica (lo farebbe l'attesa qui sotto). Si tiene l'anticipo e lo si recupera piano.
+            lateUs += error
+            target += error
+            Log.i(TAG, "Inizio ${-error / 1000} ms prima del momento giusto (la stima era più lunga): si recupera piano")
+            error = 0
+        }
         if (fresh || abs(error) > HARD_US || (firstStamp && error > 0)) {
             // All'avvio, o dopo un buco della rete: ci si allinea in un colpo solo.
             smoothedErrorUs = 0.0
@@ -517,7 +537,7 @@ class AudioEngine(
                 // salta, lo si suona un po' dopo (fino a [MAX_LATE_US]) e si recupera piano.
                 val late = min(error, max(0L, MAX_LATE_US - lateUs))
                 // Al primo tempo vero dopo una partenza a stima di solito manca poco: la riga solo se cambia qualcosa.
-                if (fresh || late >= 1_000) {
+                if (announce || late >= 1_000) {
                     Log.i(TAG, "Inizio ${(lateUs + late) / 1000} ms dopo il momento giusto: non si salta, si recupera piano")
                 }
                 lateUs += late

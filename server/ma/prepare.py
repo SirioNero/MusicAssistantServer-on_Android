@@ -2252,6 +2252,19 @@ def _soloist_preload(root: Path) -> None:
     )
     _replace(
         backend,
+        '        """Confirm an armed seek once the engine reports at (or past) its target."""\n'
+        "        self._position_ms = position_ms\n",
+        '        """Confirm an armed seek once the engine reports at (or past) its target."""\n'
+        "        xonos_near_end = self._xonos_near_end()  # Xonos: prima di prendere la posizione nuova\n"
+        "        self._position_ms = position_ms\n"
+        "        if self._xonos_restarted(xonos_near_end, position_ms):\n"
+        "            # Xonos: Soloist ha ricominciato lo stesso brano alla sua fine (era anche nella sua coda): è finito\n"
+        '            self.logger.debug("Engine started %s over at its end; it has ended", self.spotify_uri)\n'
+        "            self._xonos_item_ended()\n"
+        "            return\n",
+    )
+    _replace(
+        backend,
         "        xonos_stop = time.monotonic()  # Xonos: il tempo per fermarlo, per il registro\n"
         "        self._stopped = True\n",
         "        xonos_stop = time.monotonic()  # Xonos: il tempo per fermarlo, per il registro\n"
@@ -3248,6 +3261,24 @@ LIVE_RUN_METHODS = '''    # ---- Xonos: la sessione che resta accesa tra un bran
         read_s = self._read_bytes / _BYTES_PER_SECOND
         return read_s > (self._duration_ms - self._seek_target_ms) / 1000 + _XONOS_OVERRUN_S
 
+    def _xonos_restarted(self, near_end_before: bool, position_ms: int) -> bool:
+        """
+        Whether the engine started this same item over at its end (Spotify Connect mode): the item is over.
+
+        It happens when the item was also in the engine's queue (played with play(uri) while queued): at its end the
+        engine moves to the queued copy, with the same uri, so no track change is seen. Without this the run would hand
+        over the item's opening again until _xonos_overrun (5 s more).
+        """
+        return (
+            self._xonos_connect
+            and self._started.is_set()
+            and not self._item_over
+            and not self._xonos_parked
+            and not self._xonos_switching
+            and near_end_before
+            and position_ms < _XONOS_END_MS
+        )
+
     def _xonos_near_end(self) -> bool:
         """Whether the item is at its end: by the engine's position, or by the audio read (Spotify Connect mode)."""
         if not self._duration_ms:
@@ -3341,6 +3372,9 @@ LIVE_RUN_METHODS = '''    # ---- Xonos: la sessione che resta accesa tra un bran
             # ricordato prima di mandarlo: se il precarico si ferma a metà, il brano in coda resta di Xonos
             backend._xonos_queued_uri = following
             backend._xonos_queued_run = self
+            # e l'elenco della coda di prima non vale più: senza, un avanti subito dopo (o una conferma che non arriva)
+            # vedrebbe la coda vuota e farebbe play(uri), lasciando il brano in coda, che ripartirebbe alla sua fine
+            self._xonos_upcoming = None
             client = self._client
             assert client is not None
             added: BaseException | None = None

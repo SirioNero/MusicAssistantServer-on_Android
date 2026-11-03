@@ -1041,6 +1041,15 @@ proot[soloist] 3–6%, ffmpeg 3–4%. Il blocco di un'ora di Spotify (0.1.53) er
   ifaddrs-test, `proot -v 1` con l'accelerazione; ora lo script dell'emulatore esce con 1 se un controllo fallisce.
   Le impronte di libproot.so cambiano: dopo la release lanciare "Riproducibile". La frase «il proot di Termux
   intercetta anche … ioctl» vale ora solo per quei comandi.
+- Dalla revisione avversaria (4 aree, un verificatore per area; proot pulito): dopo `add_to_queue` l'elenco della coda
+  di prima si dimentica (`_xonos_upcoming = None`: un avanti subito dopo faceva play e lasciava il brano in coda); un
+  brano che Soloist ricomincia alla sua fine (la copia in coda, stesso uri) è finito (`_xonos_restarted` in
+  `_observe_position`; prima altri 5 s del suo inizio fino a `_xonos_overrun`; caso nell'autotest); AudioEngine: la riga
+  d'avvio una volta per uscita (`startLogged`: con la rete ferma all'avvio 163 righe, ora 4) e un anticipo scoperto al
+  primo tempo vero dopo una partenza a stima si tiene e si recupera piano (`lateUs` anche negativo) invece di 449 ms di
+  silenzio in mezzo alla musica; Sendspin diretto solo se il pacchetto del server è installato (un altro Music Assistant
+  a 127.0.0.1:8095 con un tunnel aspettava 20 s). Da misurare sul telefono: a fine brano col brano dopo in coda si può
+  perdere la coda del brano che finisce (il tubo, 0,19 s, o i 2 s di PulseAudio): lo dice «brano finito … (atteso …)».
 - Da portare in myCar (dopo che il suo motore ha quello della 0.1.53–0.1.55): AudioEngine (misura del ritardo), SkipPlan,
   SkipTrace.heard. Il resto è sul server.
 - Da decidere con l'utente (dall'analisi): primo tocco mandato subito (−0,25 s sul tocco singolo, +0,6–0,9 s su più

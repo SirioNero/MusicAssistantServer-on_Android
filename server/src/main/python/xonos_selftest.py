@@ -321,19 +321,20 @@ async def _pulse_commands(server: Any, rounds: int = 5) -> tuple[bool, str]:
 
 
 async def _soloist_help(binary: Path) -> str:
-    """L'aiuto di Soloist (--help, poi -h), su una riga: le sue opzioni."""
+    """L'aiuto di Soloist (--help, poi quello dei comandi ctl), su una riga: opzioni e comandi."""
     lines: list[str] = []
-    for flag in ("--help", "-h"):
+    for args in (("--help",), ("ctl", "--help")):
+        flag = " ".join(args)
         try:
             proc = await asyncio.create_subprocess_exec(
-                str(binary), flag, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT
+                str(binary), *args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT
             )
             out, _ = await asyncio.wait_for(proc.communicate(), 20)
         except Exception as err:  # noqa: BLE001 - nel risultato
             lines.append(f"{flag}: {err!r}")
             continue
         lines.append(f"{flag} ({proc.returncode}): " + " | ".join(out.decode(errors="replace").split("\n")))
-    return " || ".join(lines)[:4000]
+    return " || ".join(lines)[:8000]
 
 
 async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:

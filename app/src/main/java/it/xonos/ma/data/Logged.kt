@@ -48,5 +48,8 @@ object Logged {
         override fun toString(): String = message.orEmpty()
     }
 
-    private val TYPE = Regex("""://([a-z_]+)/""")
+    /** Solo i tipi di Music Assistant: una ricerca come "http://mario/" non deve finire nel registro. */
+    private val TYPE = Regex(
+        """://(track|album|artist|playlist|radio|podcast|podcast_episode|audiobook|genre|folder)/"""
+    )
 }

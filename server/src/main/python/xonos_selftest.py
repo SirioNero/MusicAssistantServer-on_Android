@@ -6,7 +6,9 @@ xonos_server lo avvia dopo la partenza del server quando nella cartella dei dati
 si può: Music Assistant scarica Soloist (col consenso) e lo prova, avvia PulseAudio come per un brano, crea il
 "pipe sink" e ci passa un suono, poi accende Soloist con una chiave finta finché aspetta l'abbinamento.
 Poi lo ferma come lo ferma Music Assistant (AsyncProcess.close), guarda quanto processore usano proot e PulseAudio
-con dieci secondi di audio a tempo reale, e che PulseAudio si fermi quando non serve più.
+con dieci secondi di audio a tempo reale, con e senza la memoria condivisa di PulseAudio (memfd e srbchannel), e che
+PulseAudio si fermi quando non serve più. Prima di tutto, senza Spotify, il blocco di Spotify nel throttler di Music
+Assistant (spotify-blocco).
 Nel registro di Music Assistant: righe "XONOS_SELFTEST <prova> ok|fail <dettagli>" e alla fine
 "XONOS_SELFTEST fine <riuscite>/<prove>".
 """
@@ -14,10 +16,13 @@ Nel registro di Music Assistant: righe "XONOS_SELFTEST <prova> ok|fail <dettagli
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
+import re
 import signal
 import sys
+import threading
 import time
 from contextlib import suppress
 from pathlib import Path
@@ -28,6 +33,9 @@ SOLOIST_WAIT_S = 30
 GO_WAIT_S = 900
 FIFO_READ_S = 4
 CPU_AUDIO_S = 10
+# pulse-memfd: secondi di audio per ognuna delle due prove, e la latenza chiesta da pacat (pacchetti piccoli, come Soloist)
+PULSE_AB_S = 4
+PULSE_AB_LATENCY_MS = 20
 # Il tubo del pipe sink di Music Assistant: s32le, 44,1 kHz, stereo.
 FIFO_BYTES_PER_S = 44100 * 8
 
@@ -50,6 +58,21 @@ async def run(mass: Any) -> None:
         say("proot", False, "XONOS_PROOT non c'è (manca proot nell'app o il sistema Linux nel pacchetto)")
         LOGGER.info("XONOS_SELFTEST fine 0/1")
         return
+
+    # Il blocco di Spotify (Retry-After lungo) nel throttler di Music Assistant, con un servizio finto: un secondo.
+    try:
+        block_ok, detail = await _spotify_block()
+        say("spotify-blocco", block_ok, detail)
+    except Exception as err:  # noqa: BLE001
+        say("spotify-blocco", False, repr(err))
+
+    # Il profilo di Python che xonos_server scrive quando Python lavora tanto: thread, lavori di Music Assistant e
+    # dove sta il ciclo. Qui con un ciclo occupato a scrivere JSON e thread che nascono e finiscono: tre secondi.
+    try:
+        profile_ok, detail = await _profile_check(_server_module())
+        say("profilo", profile_ok, detail)
+    except Exception as err:  # noqa: BLE001
+        say("profilo", False, repr(err))
 
     binary = None
     try:
@@ -119,6 +142,12 @@ async def run(mass: Any) -> None:
             say("cpu-audio", flowing, detail)
         except Exception as err:  # noqa: BLE001
             say("cpu-audio", False, repr(err))
+        # Lo stesso con poca latenza, senza e con la memoria condivisa di PulseAudio: cosa cambia per proot.
+        try:
+            played, detail = await _pulse_memfd(server, sink, Path(mass.cache_path))
+            say("pulse-memfd", played, detail)
+        except Exception as err:  # noqa: BLE001
+            say("pulse-memfd", False, repr(err))
 
     if sink is not None:
         with suppress(Exception):
@@ -130,6 +159,122 @@ async def run(mass: Any) -> None:
         left = await _still_running("pulseaudio")
         say("pulseaudio-ferma", not left, f"processi rimasti: {len(left)}")
     LOGGER.info("XONOS_SELFTEST fine %d/%d", sum(results), len(results))
+
+
+async def _spotify_block() -> tuple[bool, str]:
+    """
+    Il blocco di Spotify nel throttler di Music Assistant (_spotify_limits in prepare.py), con un servizio finto.
+
+    Un primo 429 con Retry-After 3555 s: errore subito, coi minuti che mancano e i testi di Spotify, e chi usa il
+    throttler lo viene a sapere una volta. Poi una chiamata della riproduzione (BYPASS_THROTTLER) si ferma senza
+    chiamare il servizio. Fuori da un blocco la riproduzione non aspetta un blocco breve, ma prende un posto nel limite:
+    con un limite di 3 al secondo, 6 chiamate di fila ci mettono circa un secondo.
+    """
+    from music_assistant_models.errors import RateLimited, RetriesExhausted  # noqa: PLC0415
+
+    from music_assistant.helpers.throttle_retry import (  # noqa: PLC0415
+        BYPASS_THROTTLER,
+        ThrottlerManager,
+        throttle_with_retries,
+    )
+
+    class Service:
+        """Un servizio finto con il throttler di Music Assistant: conta le chiamate, la prima può ricevere un 429."""
+
+        def __init__(self, rate_limit: int, refuse_first: bool = False) -> None:
+            self.logger = logging.getLogger("xonos.selftest.throttle")
+            self.throttler = ThrottlerManager(rate_limit=rate_limit, period=1)
+            self.calls = 0
+            self.refuse_first = refuse_first
+
+        @throttle_with_retries
+        async def get(self) -> int:
+            self.calls += 1
+            if self.refuse_first and self.calls == 1:
+                raise RateLimited("429 finto", backoff_time=3555)
+            return self.calls
+
+    async def error_of(call: Any) -> BaseException | None:
+        try:
+            await call
+        except Exception as err:  # noqa: BLE001 - è quello che si guarda
+            return err
+        return None
+
+    def key(err: BaseException | None) -> str:
+        if err is None:
+            return "nessun errore"
+        args = getattr(err, "translation_args", None)
+        return f"{type(err).__name__} {getattr(err, 'translation_key', None)} {args} {getattr(err, 'translation_owner', None)}"
+
+    problems: list[str] = []
+    blocked = Service(2, refuse_first=True)
+    told: list[float] = []
+    blocked.throttler.xonos_on_block = told.append
+    blocked.throttler.xonos_owner = "provider.spotify"
+    first = await error_of(blocked.get())
+    wanted = isinstance(first, RetriesExhausted) and first.translation_key == "xonos_rate_limited"
+    if not (wanted and first.translation_args == [59] and first.translation_owner == "provider.spotify"):
+        problems.append(f"primo errore: {key(first)}")
+    if told != [3555]:
+        problems.append(f"avvisi del blocco: {told}")
+    token = BYPASS_THROTTLER.set(True)
+    try:
+        second = await error_of(blocked.get())
+        free = Service(3)
+        free.throttler.set_cooldown(30)  # un blocco breve: la riproduzione non lo aspetta
+        start = time.monotonic()
+        await free.get()
+        short = time.monotonic() - start
+        start = time.monotonic()
+        await asyncio.gather(*(free.get() for _ in range(5)))
+        burst = time.monotonic() - start
+    finally:
+        BYPASS_THROTTLER.reset(token)
+    if not (isinstance(second, RetriesExhausted) and second.translation_key == "xonos_rate_limited"):
+        problems.append(f"riproduzione durante il blocco: {key(second)}")
+    if blocked.calls != 1:
+        problems.append(f"il servizio chiamato {blocked.calls} volte invece di una")
+    if short > 0.5:
+        problems.append(f"la riproduzione ha aspettato un blocco breve ({short:.2f} s)")
+    if free.calls != 6 or burst < 0.8:
+        problems.append(f"fuori dal blocco: {free.calls} chiamate in {burst:.2f} s (attese 6 in circa 1 s)")
+    detail = (
+        f"429 con Retry-After 3555 s: {key(first)}, avvisi {told}; la riproduzione durante il blocco: {key(second)},"
+        f" chiamate al servizio {blocked.calls}; fuori dal blocco: blocco breve aspettato {short:.2f} s,"
+        f" 6 chiamate col limite di 3 al secondo in {burst:.2f} s"
+    )
+    return not problems, f"{'; '.join(problems)} | {detail}" if problems else detail
+
+
+async def _profile_check(module: Any) -> tuple[bool, str]:
+    """Il profilo di Python: il ciclo che lavora (json) si vede, e thread che nascono e finiscono non fermano niente."""
+    stop = time.monotonic() + 3
+    payload = [{"n": i, "items": list(range(30))} for i in range(200)]
+
+    async def busy() -> None:
+        while time.monotonic() < stop:
+            end = time.perf_counter() + 0.012
+            while time.perf_counter() < end:
+                json.dumps(payload)
+            await asyncio.sleep(0.008)
+
+    def churn() -> None:
+        while time.monotonic() < stop:
+            short = threading.Thread(target=lambda: sum(range(20000)), name="breve")
+            short.start()
+            short.join()
+
+    work = asyncio.create_task(busy())
+    threading.Thread(target=churn, daemon=True).start()
+    ticks = os.sysconf("SC_CLK_TCK") or 100
+    first = module._thread_ticks()
+    tasks = await asyncio.to_thread(module._running_tasks)
+    sample = await asyncio.to_thread(module._loop_sample, None, 2.0)
+    threads = module._threads_line(first, module._thread_ticks(), ticks, 2.0)
+    await work
+    ok = "json/encoder.py" in sample and "xonos_selftest" in sample and "ha risposto" in tasks
+    return ok, f"{threads} | {tasks} | {sample}"
 
 
 def _server_module() -> Any:
@@ -276,7 +421,190 @@ async def _cpu_with_audio(server: Any, sink: Any) -> tuple[bool, str]:
     expected = int(seconds * FIFO_BYTES_PER_S)
     ranked = sorted(used.items(), key=lambda item: -item[1])
     parts = ", ".join(f"{name} {100 * value / seconds:.0f}%" for name, value in ranked)
-    return received >= expected // 2, f"{parts}; letti {received} byte su {expected} in {seconds:.0f} s"
+    return received >= expected // 2, (
+        f"{parts}; letti {received} byte su {expected} in {seconds:.0f} s"
+        f" (pacat con la latenza predefinita; client.conf del sistema Linux: {_client_conf()})"
+    )
+
+
+def _client_conf() -> str:
+    """La memoria condivisa nel client.conf del sistema Linux del pacchetto (quello che usano pacat e Soloist)."""
+    path = Path(os.environ.get("XONOS_BIN", "")).parent / "rootfs" / "etc" / "pulse" / "client.conf"
+    try:
+        lines = [line.strip() for line in path.read_text().splitlines()]
+    except OSError as err:
+        return f"non letto ({err.strerror})"
+    return ", ".join(line for line in lines if line.startswith(("enable-shm", "enable-memfd"))) or "senza righe sulla memoria"
+
+
+async def _pulse_memfd(server: Any, sink: Any, cache: Path) -> tuple[bool, str]:
+    """
+    PulseAudio senza e con la memoria condivisa (memfd e srbchannel), col demone di Music Assistant.
+
+    pacat suona con poca latenza (--latency-msec=PULSE_AB_LATENCY_MS: pacchetti piccoli, come Soloist) per PULSE_AB_S
+    secondi, letti dal tubo come li legge Music Assistant: prima con un client.conf senza memoria condivisa (com'era il
+    sistema Linux del pacchetto prima), poi con quello del sistema Linux. Per ognuna: quanto processore usano
+    PulseAudio, pacat e i loro proot, quante volte al secondo si fermano i proot (cambi di contesto da /proc/<pid>/status:
+    ogni chiamata che proot intercetta ne costa almeno due), cosa dice PulseAudio dell'accordo (SHM, srbchannel) e
+    quanti memfd ha aperto pacat. Va bene se in tutte e due l'audio di pacat arriva nel tubo; i numeri servono a capire.
+    """
+    plain = cache / "selftest-client-noshm.conf"
+    plain.write_text("autospawn = no\nenable-shm = no\nenable-memfd = no\n")
+    # Le righe sull'accordo PulseAudio le scrive a livello debug: le prove di prima, che leggono il tubo senza freni (un
+    # "underrun" a ogni pacchetto), possono averlo fatto passare a info (_xonos_pulse_chatty in prepare.py). Qui il tubo
+    # si legge al ritmo di Music Assistant; poi PulseAudio si ferma (pulseaudio-ferma).
+    if (send := getattr(server._controller, "_cli_send", None)) is not None:
+        await asyncio.to_thread(send, "set-log-level 4")
+    played_both = True
+    parts: list[str] = []
+    for label, conf in (("senza memoria condivisa", plain), ("con quella del sistema Linux", None)):
+        played, detail = await _pulse_run(server, sink, conf)
+        played_both = played_both and played
+        parts.append(f"{label}: {detail}")
+    return played_both, " || ".join(parts)
+
+
+async def _pulse_run(server: Any, sink: Any, client_conf: Path | None) -> tuple[bool, str]:
+    """Una prova di _pulse_memfd: pacat per PULSE_AB_S secondi con il client.conf dato (None: quello del sistema Linux)."""
+    from music_assistant.helpers import pulse_capture  # noqa: PLC0415
+
+    module = _server_module()
+    loop = asyncio.get_running_loop()
+    ticks_per_s = os.sysconf("SC_CLK_TCK") or 100
+    env = server.child_env(sink.sink_name)
+    if client_conf is not None:
+        env["PULSE_CLIENTCONFIG"] = str(client_conf)
+    since = time.monotonic()
+    fd = os.open(sink.fifo_path, os.O_RDONLY | os.O_NONBLOCK)
+    # quello che è rimasto nel tubo dalle prove di prima: via, sennò sembrerebbe di questo pacat
+    with suppress(BlockingIOError):
+        for _ in range(64):
+            if not os.read(fd, 65536):
+                break
+    received = 0
+    sound = False
+    memfds = ("?", "?")
+    proc = None
+    feeder = None
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "pacat", "--raw", "--format=s16le", "--rate=44100", "--channels=2",
+            f"--latency-msec={PULSE_AB_LATENCY_MS}",
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+            env=env,
+        )
+
+        async def feed() -> None:
+            assert proc is not None and proc.stdin is not None
+            for _ in range((PULSE_AB_S + 3) * 10):
+                proc.stdin.write(os.urandom(44100 * 4 // 10))
+                await proc.stdin.drain()
+
+        feeder = asyncio.create_task(feed())
+        await asyncio.sleep(1)
+        before = _guest_usage(module)
+        started = loop.time()
+        while (elapsed := loop.time() - started) < PULSE_AB_S:
+            allowed = int(elapsed * FIFO_BYTES_PER_S * 1.1) - received
+            if allowed > 0:
+                try:
+                    chunk = os.read(fd, min(allowed, 65536))
+                except BlockingIOError:
+                    chunk = b""
+                received += len(chunk)
+                # il rumore di pacat, non il silenzio che il sink scrive quando nessuno suona
+                sound = sound or bool(chunk.strip(b"\0"))
+            await asyncio.sleep(0.02)
+        seconds = loop.time() - started
+        after = _guest_usage(module)
+        memfds = (_memfds(module, "pacat", proc.pid), _memfds(module, "pulseaudio"))
+    finally:
+        if feeder is not None:
+            feeder.cancel()
+            with suppress(BaseException):
+                await feeder
+        if proc is not None and proc.returncode is None:
+            proc.kill()
+            with suppress(Exception):
+                await asyncio.wait_for(proc.wait(), 5)
+        os.close(fd)
+    used: dict[str, list[float]] = {}
+    for pid, (name, ticks, switches) in after.items():
+        old = before.get(pid, (name, 0, 0))
+        total = used.setdefault(name, [0.0, 0.0])
+        total[0] += (ticks - old[1]) / ticks_per_s
+        total[1] += switches - old[2]
+    ranked = sorted(used.items(), key=lambda item: -item[1][0])
+    usage = ", ".join(
+        f"{name} {100 * cpu / seconds:.0f}%" + (f" ({switches / seconds:.0f} cambi/s)" if name.startswith("proot") else "")
+        for name, (cpu, switches) in ranked
+    )
+    said = [_pulse_text(line) for when, line in list(pulse_capture._xonos_pulse_seen) if when >= since]
+    agreed = "; ".join(line for line in said if "SHM" in line or "srbchannel" in line or "memory pool" in line)
+    if not agreed:
+        agreed = "nessuna riga sull'accordo"
+    expected = int(seconds * FIFO_BYTES_PER_S)
+    heard = "sì" if sound else "no"
+    return sound, (
+        f"{usage}; letti {received} byte su {expected} in {seconds:.0f} s, audio di pacat: {heard};"
+        f" PulseAudio: {agreed}; zone memfd di pacat {memfds[0]}, di pulseaudio {memfds[1]}"
+    )
+
+
+def _guest_usage(server: Any) -> dict[int, tuple[str, int, int]]:
+    """
+    I processi dei gruppi di proot: pid -> (nome, tick di processore, cambi di contesto). Un proot si chiama
+    proot[<programma che segue>]: ogni proot parte in un gruppo suo, col programma che segue.
+    """
+    groups = set(server._guest_groups)
+    processes = {pid: info for pid, info in server._processes().items() if info[1] in groups}
+    followed = {
+        group: os.path.basename(argv[0])
+        for argv, group, _ in processes.values()
+        if not os.path.basename(argv[0]).startswith("libproot")
+    }
+    found: dict[int, tuple[str, int, int]] = {}
+    for pid, (argv, group, ticks) in processes.items():
+        name = os.path.basename(argv[0])
+        if name.startswith("libproot"):
+            name = f"proot[{followed.get(group, '?')}]"
+        found[pid] = (name, ticks, _switches(pid))
+    return found
+
+
+def _switches(pid: int) -> int:
+    """I cambi di contesto di un processo (volontari e no), da /proc/<pid>/status; 0 se non si legge."""
+    try:
+        with open(f"/proc/{pid}/status") as file:
+            return sum(
+                int(line.split()[1])
+                for line in file
+                if line.startswith(("voluntary_ctxt_switches:", "nonvoluntary_ctxt_switches:"))
+            )
+    except (OSError, ValueError, IndexError):
+        return 0
+
+
+def _memfds(server: Any, name: str, group: int | None = None) -> str:
+    """
+    Quante zone di memoria condivisa di PulseAudio (memfd, "/memfd:pulseaudio" in /proc/<pid>/maps) ha il programma Linux
+    [name] (del gruppo [group], se c'è). In un chroot col PulseAudio del pacchetto: pacat 0 senza, 4 con.
+    """
+    for pid, (argv, owner, _) in server._processes().items():
+        if os.path.basename(argv[0]) == name and (group is None or owner == group):
+            try:
+                with open(f"/proc/{pid}/maps") as file:
+                    return str(sum("/memfd:" in line for line in file))
+            except OSError as err:
+                return f"non lette ({err.strerror})"
+    return "processo non trovato"
+
+
+def _pulse_text(line: str) -> str:
+    """Una riga di PulseAudio senza il livello, il thread e il file davanti ("D: [pulseaudio] protocol-native.c: ")."""
+    return re.sub(r"^[A-Z]: \[[^]]*\] [\w.-]+: ", "", line.strip())
 
 
 async def _pulse_commands(server: Any, rounds: int = 5) -> tuple[bool, str]:

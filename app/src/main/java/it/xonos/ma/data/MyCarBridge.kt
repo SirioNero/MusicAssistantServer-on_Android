@@ -15,6 +15,7 @@ import android.system.OsConstants
 import android.util.Log
 import it.xonos.ma.BuildConfig
 import it.xonos.ma.XonosApp
+import it.xonos.ma.phone.model.ServerKeeper
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
@@ -59,7 +60,9 @@ class MyCarBridge : Service() {
                 reply.writeInt(OK)
                 socket.writeToParcel(reply, Parcelable.PARCELABLE_WRITE_RETURN_VALUE)
             }.onFailure { e ->
-                Log.w(TAG, "Ponte per myCar verso $host:$port: ${e.message}")
+                // Indirizzo e testo dell'errore solo nella build di prova (vedi Logged).
+                val code = (e as? Refusal)?.code ?: OTHER
+                Log.w(TAG, "Ponte per myCar non aperto: $code" + Logged.text(" verso $host:$port: ${e.message}", ""))
                 reply.writeInt((e as? Refusal)?.code ?: OTHER)
                 reply.writeString(e.message ?: e.javaClass.simpleName)
             }
@@ -69,11 +72,25 @@ class MyCarBridge : Service() {
 
     override fun onBind(intent: Intent): IBinder = binder
 
+    private val app: XonosApp get() = applicationContext as XonosApp
+
+    // myCar si lega per il viaggio e si stacca qualche minuto dopo l'ultima connessione: intanto il Music Assistant sul
+    // telefono, se è quello di Xonos, resta acceso (vedi ServerKeeper).
+    override fun onCreate() {
+        super.onCreate()
+        app.keeper.hold(ServerKeeper.Need.MYCAR)
+    }
+
+    override fun onDestroy() {
+        app.keeper.release(ServerKeeper.Need.MYCAR)
+        super.onDestroy()
+    }
+
     /** La connessione verso [host]:[port], per myCar: l'altro capo di un socket locale. */
     private fun open(uid: Int, host: String, port: Int): ParcelFileDescriptor {
         val caller = packageManager.getPackagesForUid(uid).orEmpty().firstOrNull { isMyCar(this, it) }
             ?: throw Refusal(NOT_MYCAR, "il ponte è solo per myCar")
-        val urls = (applicationContext as XonosApp).settings.load().urls
+        val urls = app.settings.load().urls
         if (!allowed(urls, host, port)) throw Refusal(NOT_OURS, "$host:$port non è il Music Assistant di Xonos")
         val socket = Socket()
         try {
@@ -81,11 +98,15 @@ class MyCarBridge : Service() {
             socket.tcpNoDelay = true
         } catch (e: IOException) {
             runCatching { socket.close() }
+            // Il Music Assistant sul telefono non gira (fermo perché nessuno lo usava, o chiuso da Android): parte adesso.
+            // myCar intanto dice che il server sta partendo e riprova da sé.
+            val server = app.phoneServer
+            if (server != null && allowed(listOf(server.url), host, port)) app.keeper.touch(ServerKeeper.Need.MYCAR)
             throw Refusal(NO_ANSWER, "Music Assistant a $host:$port non risponde a Xonos (${e.message})")
         }
         val (mine, theirs) = ParcelFileDescriptor.createSocketPair()
         relay(socket, mine)
-        Log.i(TAG, "Ponte per $caller verso $host:$port")
+        Log.i(TAG, "Ponte per $caller verso Music Assistant (porta $port)")
         return theirs
     }
 

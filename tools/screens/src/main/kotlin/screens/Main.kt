@@ -388,17 +388,15 @@ private val SCENES = listOf(
         push(ItemPage(Catalog.album("emozioni")).apply { tracks = ready(EMOZIONI); started = true })
         addToPlaylist(EMOZIONI[0].uri)
     },
-    // L'artista mentre i servizi rispondono ancora: si vede la libreria, con le rotelle (senza i più
-    // ascoltati, che li danno solo i servizi).
+    // L'artista mentre i servizi rispondono ancora: si vede la libreria, con la rotella (senza i più
+    // ascoltati, che li danno solo i servizi). Tutti i brani non si sono ancora aperti: la riga senza quanti sono.
     "artist-more" to Scene {
         select(Tab.LIBRARY)
         push(
             ArtistPage(Catalog.artist("battisti")).apply {
                 top = ready(emptyList())
                 albums = ready(listOf("emozioni").map(Catalog::album))
-                tracks = ready(EMOZIONI)
                 albumsMore = true
-                tracksMore = true
                 started = true
             },
         )

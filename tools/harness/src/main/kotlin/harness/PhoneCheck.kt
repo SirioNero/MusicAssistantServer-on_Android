@@ -220,13 +220,21 @@ fun main(): Unit = runBlocking {
     model.start(artistPage)
     // Prima arriva la libreria, poi i servizi: si aspetta l'elenco intero.
     val artistAlbums = loaded { artistPage.albums.takeUnless { artistPage.albumsMore } }.orEmpty()
-    val artistTracks = loaded { artistPage.tracks.takeUnless { artistPage.tracksMore } }.orEmpty()
     check("Artista: album dal più recente", artistAlbums.firstOrNull()?.year == 2014 && artistAlbums.size == 5, artistAlbums.joinToString { "${it.name} ${it.year}" })
-    check("Artista: tutti i brani", artistTracks.size == 28)
+    // Tutti i brani si chiedono solo quando si aprono (con Spotify sono tre richieste per album).
+    check("Artista: tutti i brani non si chiedono aprendolo", artistPage.tracks == null)
     model.openArtistTracks(artistPage, "Tutti i brani", top = false)
     val list = model.page as ListPage
     model.start(list)
-    check("Artista: schermata dei brani", loaded { list.items }?.size == 28)
+    val artistTracks = loaded { list.items.takeUnless { list.more } }.orEmpty()
+    check("Artista: schermata dei brani", artistTracks.size == 28, "${artistTracks.size}")
+    check("Artista: i brani restano per la riga dell'artista", artistPage.tracks?.value?.size == 28)
+    model.back()
+    model.openArtistTracks(artistPage, "Tutti i brani", top = false)
+    val reopened = model.page as ListPage
+    model.start(reopened)
+    check("Artista: riaperti, gli stessi brani", loaded { reopened.items }?.size == 28)
+    model.back()
     model.play(artistTracks, 26, null)
     q = settle { it?.playing == true && it.current?.title == artistTracks[26].name }
     check("Brano 27 di 28: suonano lui e il successivo", q?.items == 2 && q.current?.title == artistTracks[26].name, "${q?.items} brani")

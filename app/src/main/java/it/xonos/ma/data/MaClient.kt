@@ -204,10 +204,18 @@ class MaClient(
 
     private val listener = object : WebSocketListener() {
         override fun onMessage(webSocket: WebSocket, text: String) {
-            try {
-                handle(traced("Xonos.json") { JSONObject(text) })
+            val msg = try {
+                traced("Xonos.json") { JSONObject(text) }
             } catch (e: Exception) {
-                Log.w(TAG, "Messaggio non valido da Music Assistant", e)
+                // Il testo dell'errore di org.json ha tutto il messaggio (una pagina di libreria, titoli e nomi): solo
+                // la classe e quanto è lungo.
+                Log.w(TAG, "Messaggio non valido da Music Assistant: ${e.javaClass.simpleName} (${text.length} caratteri)")
+                return
+            }
+            try {
+                handle(msg)
+            } catch (e: Exception) {
+                Log.w(TAG, "Errore nella gestione di un messaggio di Music Assistant", Logged.trace(e))
             }
         }
 
@@ -235,7 +243,7 @@ class MaClient(
             try {
                 onEvent?.invoke(msg.optString("event"), msg.str("object_id"), data)
             } catch (e: Exception) {
-                Log.w(TAG, "Errore nella gestione di un evento", e)
+                Log.w(TAG, "Errore nella gestione di un evento", Logged.trace(e))
             }
             return
         }
@@ -272,7 +280,7 @@ class MaClient(
                     try {
                         show(ArrayList(list))
                     } catch (e: Exception) {
-                        Log.w(TAG, "Errore mostrando un pezzo di elenco", e)
+                        Log.w(TAG, "Errore mostrando un pezzo di elenco", Logged.trace(e))
                     }
                 }
                 return

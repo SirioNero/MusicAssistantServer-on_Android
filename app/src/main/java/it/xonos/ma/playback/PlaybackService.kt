@@ -43,11 +43,13 @@ import it.xonos.ma.wrap
 import it.xonos.ma.BuildConfig
 import it.xonos.ma.R
 import it.xonos.ma.data.Connection
+import it.xonos.ma.data.Logged
 import it.xonos.ma.data.Problem
 import it.xonos.ma.data.MaException
 import it.xonos.ma.data.SkipTrace
 import it.xonos.ma.phone.MainActivity
 import it.xonos.ma.phone.model.PhoneServerControl
+import it.xonos.ma.phone.model.ServerKeeper.Need
 import it.xonos.ma.sendspin.AndroidAudio
 import it.xonos.ma.sendspin.AudioEngine
 import it.xonos.ma.sendspin.SendspinClient
@@ -121,6 +123,8 @@ class PlaybackService : MediaLibraryService() {
             artwork::uriFor,
             { engine.lateMs },
             { onPhoneServer },
+            // Un play col Music Assistant sul telefono fermo (nessuno lo usava): lo si risveglia.
+            wake = { app.keeper.touch(Need.PLAYING) },
         ) { connection ->
             val context = settings.language.wrap(this)
             phoneServerProblem(context, connection) ?: describe(context, connection)
@@ -174,7 +178,10 @@ class PlaybackService : MediaLibraryService() {
                 // una pausa non arrivata finisce. Non quando lo stato torna "in riproduzione" da solo (una pausa fallita).
                 if (playWhenReady && reason == Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST) engine.unsilence()
                 updateLocks()
+                updateEngaged()
             }
+
+            override fun onPlaybackStateChanged(playbackState: Int) = updateEngaged()
         })
         connectivity.registerDefaultNetworkCallback(networkCallback)
         getSystemService(AudioManager::class.java).registerAudioDeviceCallback(outputs, main)
@@ -183,6 +190,13 @@ class PlaybackService : MediaLibraryService() {
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession = session
 
     override fun onDestroy() {
+        // Il servizio se ne va (fermo e senza nessuno legato): da qui l'app può essere congelata in pochi secondi. Musica e
+        // auto non tengono più il server sul telefono; lo schermo e myCar sì, con le loro attese.
+        destroyed = true
+        outside.clear()
+        engaged = false
+        app.keeper.release(Need.PLAYING, 0)
+        app.keeper.release(Need.CAR, 0)
         app.playerReady.value = false
         runCatching { connectivity.unregisterNetworkCallback(networkCallback) }
         runCatching { getSystemService(AudioManager::class.java).unregisterAudioDeviceCallback(outputs) }
@@ -197,6 +211,75 @@ class PlaybackService : MediaLibraryService() {
         app.repo.release()
         scope.cancel()
         super.onDestroy()
+    }
+
+    /**
+     * Xonos tolto dai recenti: se la musica non suona Media3 ferma il servizio (e poi [onDestroy]). Lo schermo non serve
+     * più: senza musica, auto né myCar il server sul telefono si ferma subito, prima che Android congeli o chiuda l'app.
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        app.keeper.release(Need.SCREEN, 0)
+    }
+
+    /**
+     * I browser di prima (MediaBrowserCompat, come Gearslip) non dicono a Media3 quando se ne vanno: lo si sa qui,
+     * quando l'ultimo si stacca. Vero, così il prossimo che si lega passa da onRebind e, staccandosi, di nuovo da qui.
+     */
+    override fun onUnbind(intent: Intent?): Boolean {
+        if (intent?.action == LEGACY_BROWSER) {
+            outsideChanged { outside.removeAll { it.controllerVersion == MediaSession.ControllerInfo.LEGACY_CONTROLLER_VERSION } }
+        }
+        super.onUnbind(intent)
+        return true
+    }
+
+    /**
+     * Media3 rifà la notifica: qui si guarda, con la sua stessa prova, se la musica suona o sta per suonare. Quando smette
+     * di tenere il servizio in primo piano (10 minuti dopo la pausa) l'app può essere congelata: la musica non tiene più
+     * il server (di solito è già fermo: [Need.PLAYING] aspetta 8 minuti).
+     */
+    override fun onUpdateNotification(session: MediaSession, startInForegroundRequired: Boolean) {
+        // Prima Media3: è il metodo di base che disegna la notifica.
+        super.onUpdateNotification(session, startInForegroundRequired)
+        if (!::player.isInitialized || destroyed) return
+        updateEngaged()
+        if (foreground && !startInForegroundRequired && !engaged) app.keeper.release(Need.PLAYING, 0)
+        foreground = startInForegroundRequired
+    }
+
+    /** Media3 tiene il servizio in primo piano (l'ultima cosa che ha detto a [onUpdateNotification]). */
+    private var foreground = false
+
+    /** La coda suona o sta per suonare: la stessa prova di Media3 (play voluto, pronto o in caricamento; non IDLE). */
+    private var engaged = false
+
+    /** In [onDestroy]: sessione e lettore che si chiudono non devono tenere di nuovo il server. */
+    private var destroyed = false
+
+    /** Tiene o lascia il server sul telefono per la musica, quando cambia [engaged]. */
+    private fun updateEngaged() {
+        if (destroyed) return
+        val state = player.playbackState
+        val now = player.playWhenReady && (state == Player.STATE_READY || state == Player.STATE_BUFFERING)
+        if (now == engaged) return
+        engaged = now
+        if (now) app.keeper.hold(Need.PLAYING) else app.keeper.release(Need.PLAYING)
+    }
+
+    /**
+     * Chi comanda il lettore da fuori (Gearslip, l'autoradio col Bluetooth): finché c'è, il server sul telefono resta
+     * acceso. Non Xonos stesso (lo schermo, la notifica) né la ripresa dei media del sistema, che si lega anche lei.
+     */
+    private val outside = mutableSetOf<MediaSession.ControllerInfo>()
+
+    private fun outsideChanged(change: () -> Unit) {
+        if (destroyed) return
+        val before = outside.isNotEmpty()
+        change()
+        val after = outside.isNotEmpty()
+        if (before == after) return
+        if (after) app.keeper.hold(Need.CAR) else app.keeper.release(Need.CAR)
     }
 
     /** Come ci presentiamo a Music Assistant, deciso a ogni connessione (la rete può essere cambiata). */
@@ -222,6 +305,9 @@ class PlaybackService : MediaLibraryService() {
             minBufferMs = if (metered) 400 else 150,
             volume = settings.volume,
             muted = settings.muted,
+            // Senza i campi che la specifica di Sendspin ha tolto: Music Assistant non segna più il telefono come non
+            // conforme. Solo dove si sa che li legge altrove: dalla 2.10.8, e il server sul telefono (2.10.8).
+            modernWire = onPhoneServer || atLeast((app.repo.connection.value as? Connection.Connected)?.server?.version, 2, 10, 8),
         )
     }
 
@@ -276,13 +362,25 @@ class PlaybackService : MediaLibraryService() {
     private suspend fun awaitConnected() {
         val now = app.repo.connection.value
         // Niente da aspettare: senza un Music Assistant scelto, con un problema che non passa da solo (token, versione,
-        // indirizzo), col server sul telefono da aggiornare o fermo, o dopo un'attesa già andata a vuoto (ogni cartella
-        // aspetterebbe altri 20 s; quando arriva, browsedOffline torna falso).
+        // indirizzo), col server sul telefono da aggiornare o che Xonos non prova più ad avviare, o dopo un'attesa già
+        // andata a vuoto (ogni cartella aspetterebbe di nuovo; quando arriva, browsedOffline torna falso).
         if (now == Connection.NotConfigured || now is Connection.Connected || browsedOffline) return
         if (now is Connection.Failed && now.problem in LASTING) return
-        val server = app.phoneServer
-        if (server != null && onPhoneServer && (!server.installed || server.state == PhoneServerControl.State.FAILED)) return
-        val ok = withTimeoutOrNull(BROWSE_WAIT_MS) { app.repo.connection.first { it is Connection.Connected } } != null
+        val server = app.phoneServer?.takeIf { onPhoneServer }
+        val ok = if (server != null) {
+            if (!server.installed) return
+            // Fermo perché nessuno lo usava (o chiuso da Android): l'auto lo risveglia, e il menu aspetta che riparta.
+            app.keeper.touch(Need.CAR)
+            withTimeoutOrNull(PHONE_BROWSE_WAIT_MS) {
+                while (app.repo.connection.value !is Connection.Connected) {
+                    if (server.state == PhoneServerControl.State.FAILED && app.phoneServerGivenUp) return@withTimeoutOrNull false
+                    delay(PHONE_POLL_MS)
+                }
+                true
+            } == true
+        } else {
+            withTimeoutOrNull(BROWSE_WAIT_MS) { app.repo.connection.first { it is Connection.Connected } } != null
+        }
         if (!ok) browsedOffline = true
     }
 
@@ -296,7 +394,9 @@ class PlaybackService : MediaLibraryService() {
         if (app.settings.load().homeUrl != server.url) return null
         return when {
             !server.installed -> context.getString(R.string.phone_server_outdated)
-            server.state == PhoneServerControl.State.STARTING -> context.getString(R.string.phone_server_starting)
+            // Fermo perché non serviva: il prossimo bisogno (il play, il menu dell'auto) lo fa ripartire.
+            server.state == PhoneServerControl.State.STARTING || server.state == PhoneServerControl.State.STOPPED ->
+                context.getString(R.string.phone_server_starting)
             server.state == PhoneServerControl.State.FAILED ->
                 context.getString(R.string.phone_server_failed, server.error.ifBlank { server.state.name })
             else -> null
@@ -462,8 +562,19 @@ class PlaybackService : MediaLibraryService() {
         override fun onConnectAsync(
             session: MediaSession,
             controller: MediaSession.ControllerInfo,
-        ): ListenableFuture<MediaSession.ConnectionResult> =
-            Futures.immediateFuture(MediaSession.ConnectionResult.AcceptedResultBuilder(session).build())
+        ): ListenableFuture<MediaSession.ConnectionResult> {
+            val pkg = controller.packageName
+            if (pkg != this@PlaybackService.packageName && pkg != SYSTEM_UI) {
+                outsideChanged {
+                    if (outside.add(controller)) Log.i(TAG, "Comanda da fuori: $pkg")
+                }
+            }
+            return Futures.immediateFuture(MediaSession.ConnectionResult.AcceptedResultBuilder(session).build())
+        }
+
+        override fun onDisconnected(session: MediaSession, controller: MediaSession.ControllerInfo) {
+            outsideChanged { outside.remove(controller) }
+        }
 
         override fun onGetLibraryRoot(
             session: MediaLibrarySession,
@@ -494,7 +605,7 @@ class PlaybackService : MediaLibraryService() {
             try {
                 LibraryResult.ofItemList(tree.children(parentId).page(page, pageSize), params)
             } catch (e: Exception) {
-                Log.w(TAG, "Elenco $parentId non disponibile: ${e.message}")
+                Log.w(TAG, "Elenco ${Logged.id(parentId)} non disponibile: ${Logged.error(e)}")
                 LibraryResult.ofError(SessionError.ERROR_IO)
             }
         }
@@ -509,7 +620,7 @@ class PlaybackService : MediaLibraryService() {
             val results = try {
                 tree.search(query)
             } catch (e: Exception) {
-                Log.w(TAG, "Ricerca non riuscita: ${e.message}")
+                Log.w(TAG, "Ricerca non riuscita: ${Logged.error(e)}")
                 emptyList()
             }
             searches[query] = results
@@ -584,7 +695,7 @@ class PlaybackService : MediaLibraryService() {
             app.library.setFavorite(uri, item.mediaType ?: "track", item.provider, item.itemId, heart)
             SessionResult(SessionResult.RESULT_SUCCESS)
         } catch (e: Exception) {
-            Log.w(TAG, "Preferito non salvato: ${e.message}")
+            Log.w(TAG, "Preferito non salvato: ${Logged.error(e)}")
             player.showFavorite(item, !heart)
             SessionResult(SessionError.ERROR_UNKNOWN)
         }
@@ -607,6 +718,16 @@ class PlaybackService : MediaLibraryService() {
         /** Quanto aspetta il menu dell'auto che Xonos si colleghi a Music Assistant (vedi [awaitConnected]). */
         const val BROWSE_WAIT_MS = 20_000L
 
+        /** Lo stesso col Music Assistant sul telefono, che può dover ripartire (sull'emulatore circa 10 s). */
+        const val PHONE_BROWSE_WAIT_MS = 45_000L
+        const val PHONE_POLL_MS = 250L
+
+        /** I browser di prima, come Gearslip (MediaBrowserServiceCompat.SERVICE_INTERFACE). */
+        const val LEGACY_BROWSER = "android.media.browse.MediaBrowserService"
+
+        /** La ripresa dei media del sistema: si lega anche lei, ma non è qualcuno che ascolta. */
+        const val SYSTEM_UI = "com.android.systemui"
+
         /** I problemi di connessione che non passano da soli: il menu dell'auto non li aspetta. */
         val LASTING = setOf(
             Problem.BAD_TOKEN,
@@ -618,6 +739,24 @@ class PlaybackService : MediaLibraryService() {
         )
         const val QUEUE_WAIT_MS = 10_000L
         const val QUEUE_POLL_MS = 200L
+
+        /**
+         * Music Assistant è almeno [major].[minor].[patch]. Severo: una versione che non si legge ("?", una build di
+         * sviluppo "0.0.0") non lo è, e nemmeno una di prova della stessa ("2.10.8b1"); "2.11.0b7" sì.
+         */
+        fun atLeast(version: String?, major: Int, minor: Int, patch: Int): Boolean {
+            val match = VERSION.find(version.orEmpty()) ?: return false
+            val (a, b, c, rest) = match.destructured
+            val found = listOf(a.toInt(), b.toInt(), c.toInt())
+            val wanted = listOf(major, minor, patch)
+            for (i in 0..2) {
+                if (found[i] != wanted[i]) return found[i] > wanted[i]
+            }
+            // Uguale: solo se non è una versione di prova (niente dopo il terzo numero).
+            return rest.isBlank()
+        }
+
+        private val VERSION = Regex("^\\s*(\\d{1,4})\\.(\\d{1,4})\\.(\\d{1,6})(.*)$")
 
         /** Le uscite del telefono stesso: staccarle non c'entra con il Bluetooth o le cuffie. */
         val BUILT_IN_OUTPUTS = setOf(

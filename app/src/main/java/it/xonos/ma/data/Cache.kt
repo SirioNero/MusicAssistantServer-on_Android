@@ -18,7 +18,8 @@ class ScreenCache(private val dir: File?) {
         return try {
             JSONObject(file.readText())
         } catch (e: Exception) {
-            Log.w(TAG, "Cache illeggibile: $name", e)
+            // Senza l'errore: il testo di org.json avrebbe tutto il file (titoli della Home e della libreria).
+            Log.w(TAG, "Cache illeggibile: $name (${e.javaClass.simpleName})")
             file.delete()
             null
         }

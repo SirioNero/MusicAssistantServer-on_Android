@@ -35,13 +35,13 @@ class SoloistUnlock(private val repo: MaRepository, private val domain: String =
         if (System.currentTimeMillis() - lastUnlock < AGAIN_MS) return@withLock true
         val user = playingElsewhere(queueId)
         if (user != null) {
-            Log.i(TAG, "Spotify è occupato da $user: non si tocca")
+            Log.i(TAG, "Spotify è occupato da un altro lettore${Logged.text(" ($user)", "")}: non si tocca")
             return@withLock false
         }
         val services = try {
             (repo.command("config/providers") as? JSONArray).objects()
         } catch (e: MaException) {
-            Log.w(TAG, "Spotify occupato, ma i servizi non si possono vedere: ${e.message}")
+            Log.w(TAG, "Spotify occupato, ma i servizi non si possono vedere: ${Logged.error(e)}")
             return@withLock false
         }
         val ours = services.filter { it.str("domain") == domain }
@@ -49,11 +49,12 @@ class SoloistUnlock(private val repo: MaRepository, private val domain: String =
         if (targets.isEmpty()) return@withLock false
         for (service in targets) {
             val id = service.str("instance_id") ?: continue
-            Log.i(TAG, "Spotify occupato da un ascolto appeso: ricarico ${service.str("name") ?: id}")
+            // Il nome del servizio lo sceglie la persona: nelle build vere solo l'id.
+            Log.i(TAG, "Spotify occupato da un ascolto appeso: ricarico ${Logged.text(service.str("name") ?: id, id)}")
             try {
                 repo.command("config/providers/reload", RELOAD_TIMEOUT_MS) { put("instance_id", id) }
             } catch (e: MaException) {
-                Log.w(TAG, "Ricarica di $id non riuscita: ${e.message}")
+                Log.w(TAG, "Ricarica di $id non riuscita: ${Logged.error(e)}")
                 return@withLock false
             }
         }

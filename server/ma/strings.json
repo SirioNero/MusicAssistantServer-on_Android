@@ -22,7 +22,9 @@
     "provider.spotify.setup_flow.xonos_finishing.progress_text": "Music Assistant is starting Spotify with your account: it takes a few seconds. You can stay here.",
     "provider.spotify.setup_flow.xonos_user_not_registered.title": "Add this account to your Spotify app",
     "provider.spotify.setup_flow.xonos_user_not_registered.description": "Spotify doesn't let this account use your Spotify app yet. On developer.spotify.com open the app with the Client ID you entered, then **User Management**: add the name and email of the Spotify account you just signed in with and save (up to 5 accounts per app). Then come back here and press Next.",
-    "provider.spotify.errors.xonos_user_still_not_registered": "Spotify still doesn't let this account in. Check that the email is the one of this Spotify account, wait a minute and try again."
+    "provider.spotify.errors.xonos_user_still_not_registered": "Spotify still doesn't let this account in. Check that the email is the one of this Spotify account, wait a minute and try again.",
+    "common.errors.xonos_rate_limited": "Too many requests: the service asked Music Assistant to wait about {0} more minutes. After that it works again by itself.",
+    "provider.spotify.errors.xonos_rate_limited": "Spotify is refusing Music Assistant's requests for about {0} more minutes (too many in a short time). After that search and browsing work again by themselves; meanwhile the songs already in your Library can usually still be played."
   },
   "it": {
     "provider.spotify.setup_flow.xonos_client_id.title": "Il Client ID della tua app Spotify",
@@ -47,7 +49,9 @@
     "provider.spotify.setup_flow.xonos_finishing.progress_text": "Music Assistant sta avviando Spotify con il tuo account: ci vuole qualche secondo. Puoi restare qui.",
     "provider.spotify.setup_flow.xonos_user_not_registered.title": "Aggiungi questo account alla tua app Spotify",
     "provider.spotify.setup_flow.xonos_user_not_registered.description": "Spotify non fa ancora usare la tua app Spotify a questo account. Su developer.spotify.com apri l'app con il Client ID che hai scritto, poi **User Management**: aggiungi nome ed email dell'account Spotify con cui sei appena entrato e salva (al massimo 5 account per app). Poi torna qui e premi Avanti.",
-    "provider.spotify.errors.xonos_user_still_not_registered": "Spotify non fa ancora entrare questo account. Controlla che l'email sia quella di questo account Spotify, aspetta un minuto e riprova."
+    "provider.spotify.errors.xonos_user_still_not_registered": "Spotify non fa ancora entrare questo account. Controlla che l'email sia quella di questo account Spotify, aspetta un minuto e riprova.",
+    "common.errors.xonos_rate_limited": "Troppe richieste: il servizio ha chiesto a Music Assistant di aspettare ancora circa {0} minuti. Poi torna a funzionare da solo.",
+    "provider.spotify.errors.xonos_rate_limited": "Spotify rifiuta le richieste di Music Assistant ancora per circa {0} minuti (troppe in poco tempo). Poi ricerca e sfoglia tornano a funzionare da sole; intanto i brani già nella Libreria di solito si possono suonare."
   },
   "es": {
     "provider.spotify.setup_flow.xonos_client_id.title": "El Client ID de tu app de Spotify",
@@ -72,7 +76,9 @@
     "provider.spotify.setup_flow.xonos_finishing.progress_text": "Music Assistant está iniciando Spotify con tu cuenta: tarda unos segundos. Puedes quedarte aquí.",
     "provider.spotify.setup_flow.xonos_user_not_registered.title": "Añade esta cuenta a tu app de Spotify",
     "provider.spotify.setup_flow.xonos_user_not_registered.description": "Spotify todavía no deja que esta cuenta use tu app de Spotify. En developer.spotify.com abre la app con el Client ID que escribiste y luego **User Management**: añade el nombre y el correo de la cuenta de Spotify con la que acabas de entrar y guarda (hasta 5 cuentas por app). Después vuelve aquí y pulsa Siguiente.",
-    "provider.spotify.errors.xonos_user_still_not_registered": "Spotify todavía no deja entrar a esta cuenta. Comprueba que el correo sea el de esta cuenta de Spotify, espera un minuto y vuelve a intentarlo."
+    "provider.spotify.errors.xonos_user_still_not_registered": "Spotify todavía no deja entrar a esta cuenta. Comprueba que el correo sea el de esta cuenta de Spotify, espera un minuto y vuelve a intentarlo.",
+    "common.errors.xonos_rate_limited": "Demasiadas solicitudes: el servicio pidió a Music Assistant que espere unos {0} minutos más. Después vuelve a funcionar solo.",
+    "provider.spotify.errors.xonos_rate_limited": "Spotify rechaza las solicitudes de Music Assistant durante unos {0} minutos más (demasiadas en poco tiempo). Después, la búsqueda y la navegación vuelven a funcionar solas; mientras tanto, las canciones que ya están en tu Biblioteca normalmente se pueden reproducir."
   },
   "de": {
     "provider.spotify.setup_flow.xonos_client_id.title": "Die Client ID deiner Spotify-App",
@@ -97,7 +103,9 @@
     "provider.spotify.setup_flow.xonos_finishing.progress_text": "Music Assistant startet Spotify mit deinem Konto: Das dauert ein paar Sekunden. Du kannst hier bleiben.",
     "provider.spotify.setup_flow.xonos_user_not_registered.title": "Füge dieses Konto zu deiner Spotify-App hinzu",
     "provider.spotify.setup_flow.xonos_user_not_registered.description": "Spotify lässt dieses Konto deine Spotify-App noch nicht nutzen. Öffne auf developer.spotify.com die App mit der eingegebenen Client ID, dann **User Management**: Füge Name und E-Mail des Spotify-Kontos hinzu, mit dem du dich gerade angemeldet hast, und speichere (bis zu 5 Konten pro App). Komm dann hierher zurück und tippe auf Weiter.",
-    "provider.spotify.errors.xonos_user_still_not_registered": "Spotify lässt dieses Konto noch nicht herein. Prüfe, ob die E-Mail zu diesem Spotify-Konto gehört, warte eine Minute und versuche es erneut."
+    "provider.spotify.errors.xonos_user_still_not_registered": "Spotify lässt dieses Konto noch nicht herein. Prüfe, ob die E-Mail zu diesem Spotify-Konto gehört, warte eine Minute und versuche es erneut.",
+    "common.errors.xonos_rate_limited": "Zu viele Anfragen: Der Dienst hat Music Assistant gebeten, noch etwa {0} Minuten zu warten. Danach funktioniert er wieder von selbst.",
+    "provider.spotify.errors.xonos_rate_limited": "Spotify lehnt die Anfragen von Music Assistant noch etwa {0} Minuten lang ab (zu viele in kurzer Zeit). Danach funktionieren Suche und Durchsuchen wieder von selbst; bis dahin lassen sich Titel, die schon in deiner Bibliothek sind, meist trotzdem abspielen."
   },
   "fr": {
     "provider.spotify.setup_flow.xonos_client_id.title": "Le Client ID de votre app Spotify",
@@ -122,7 +130,9 @@
     "provider.spotify.setup_flow.xonos_finishing.progress_text": "Music Assistant démarre Spotify avec ton compte : cela prend quelques secondes. Tu peux rester ici.",
     "provider.spotify.setup_flow.xonos_user_not_registered.title": "Ajoutez ce compte à votre app Spotify",
     "provider.spotify.setup_flow.xonos_user_not_registered.description": "Spotify ne permet pas encore à ce compte d'utiliser votre app Spotify. Sur developer.spotify.com, ouvrez l'app avec le Client ID saisi, puis **User Management** : ajoutez le nom et l'e-mail du compte Spotify avec lequel vous venez de vous connecter et enregistrez (jusqu'à 5 comptes par app). Revenez ensuite ici et appuyez sur Suivant.",
-    "provider.spotify.errors.xonos_user_still_not_registered": "Spotify ne laisse toujours pas entrer ce compte. Vérifiez que l'e-mail est bien celui de ce compte Spotify, attendez une minute et réessayez."
+    "provider.spotify.errors.xonos_user_still_not_registered": "Spotify ne laisse toujours pas entrer ce compte. Vérifiez que l'e-mail est bien celui de ce compte Spotify, attendez une minute et réessayez.",
+    "common.errors.xonos_rate_limited": "Trop de requêtes : le service a demandé à Music Assistant d'attendre encore environ {0} minutes. Ensuite, il refonctionne tout seul.",
+    "provider.spotify.errors.xonos_rate_limited": "Spotify refuse les requêtes de Music Assistant pendant encore environ {0} minutes (trop en peu de temps). Ensuite, la recherche et la navigation refonctionnent toutes seules ; en attendant, les titres déjà dans votre Bibliothèque peuvent généralement être lus."
   },
   "pt_PT": {
     "provider.spotify.setup_flow.xonos_client_id.title": "O Client ID do seu app do Spotify",
@@ -147,7 +157,9 @@
     "provider.spotify.setup_flow.xonos_finishing.progress_text": "O Music Assistant está a iniciar o Spotify com a tua conta: demora alguns segundos. Podes ficar aqui.",
     "provider.spotify.setup_flow.xonos_user_not_registered.title": "Adicione esta conta à sua app Spotify",
     "provider.spotify.setup_flow.xonos_user_not_registered.description": "O Spotify ainda não deixa esta conta usar a sua app Spotify. Em developer.spotify.com abra a app com o Client ID que escreveu e depois **User Management**: adicione o nome e o e-mail da conta Spotify com que acabou de entrar e guarde (até 5 contas por app). Depois volte aqui e toque em Avançar.",
-    "provider.spotify.errors.xonos_user_still_not_registered": "O Spotify ainda não deixa entrar esta conta. Confirme que o e-mail é o desta conta Spotify, espere um minuto e tente de novo."
+    "provider.spotify.errors.xonos_user_still_not_registered": "O Spotify ainda não deixa entrar esta conta. Confirme que o e-mail é o desta conta Spotify, espere um minuto e tente de novo.",
+    "common.errors.xonos_rate_limited": "Pedidos a mais: o serviço pediu ao Music Assistant para esperar mais cerca de {0} minutos. Depois volta a funcionar sozinho.",
+    "provider.spotify.errors.xonos_rate_limited": "O Spotify está a recusar os pedidos do Music Assistant durante mais cerca de {0} minutos (demasiados em pouco tempo). Depois, a pesquisa e a navegação voltam a funcionar sozinhas; entretanto, as músicas que já estão na sua Biblioteca normalmente podem ser tocadas."
   },
   "el_GR": {
     "provider.spotify.setup_flow.xonos_client_id.title": "Το Client ID της εφαρμογής σας Spotify",
@@ -172,7 +184,9 @@
     "provider.spotify.setup_flow.xonos_finishing.progress_text": "Το Music Assistant ξεκινά το Spotify με τον λογαριασμό σου: χρειάζονται λίγα δευτερόλεπτα. Μπορείς να μείνεις εδώ.",
     "provider.spotify.setup_flow.xonos_user_not_registered.title": "Προσθέστε αυτόν τον λογαριασμό στην εφαρμογή σας Spotify",
     "provider.spotify.setup_flow.xonos_user_not_registered.description": "Το Spotify δεν επιτρέπει ακόμη σε αυτόν τον λογαριασμό να χρησιμοποιεί την εφαρμογή σας Spotify. Στο developer.spotify.com ανοίξτε την εφαρμογή με το Client ID που γράψατε και μετά **User Management**: προσθέστε το όνομα και το email του λογαριασμού Spotify με τον οποίο μόλις συνδεθήκατε και αποθηκεύστε (έως 5 λογαριασμοί ανά εφαρμογή). Μετά επιστρέψτε εδώ και πατήστε Επόμενο.",
-    "provider.spotify.errors.xonos_user_still_not_registered": "Το Spotify ακόμη δεν επιτρέπει την είσοδο σε αυτόν τον λογαριασμό. Ελέγξτε ότι το email είναι αυτού του λογαριασμού Spotify, περιμένετε ένα λεπτό και δοκιμάστε ξανά."
+    "provider.spotify.errors.xonos_user_still_not_registered": "Το Spotify ακόμη δεν επιτρέπει την είσοδο σε αυτόν τον λογαριασμό. Ελέγξτε ότι το email είναι αυτού του λογαριασμού Spotify, περιμένετε ένα λεπτό και δοκιμάστε ξανά.",
+    "common.errors.xonos_rate_limited": "Πάρα πολλά αιτήματα: η υπηρεσία ζήτησε από το Music Assistant να περιμένει περίπου {0} λεπτά ακόμη. Μετά θα λειτουργήσει ξανά μόνη της.",
+    "provider.spotify.errors.xonos_rate_limited": "Το Spotify απορρίπτει τα αιτήματα του Music Assistant για περίπου {0} λεπτά ακόμη (πάρα πολλά σε λίγο χρόνο). Μετά η αναζήτηση και η περιήγηση θα λειτουργήσουν ξανά μόνες τους· στο μεταξύ τα τραγούδια που είναι ήδη στη Βιβλιοθήκη σας συνήθως μπορούν να παιχτούν."
   },
   "ru_RU": {
     "provider.spotify.setup_flow.xonos_client_id.title": "Client ID вашего приложения Spotify",
@@ -197,7 +211,9 @@
     "provider.spotify.setup_flow.xonos_finishing.progress_text": "Music Assistant запускает Spotify с вашим аккаунтом: это займёт несколько секунд. Можно оставаться здесь.",
     "provider.spotify.setup_flow.xonos_user_not_registered.title": "Добавьте этот аккаунт в своё приложение Spotify",
     "provider.spotify.setup_flow.xonos_user_not_registered.description": "Spotify пока не разрешает этому аккаунту пользоваться вашим приложением Spotify. На developer.spotify.com откройте приложение с указанным Client ID, затем **User Management**: добавьте имя и email аккаунта Spotify, с которым вы только что вошли, и сохраните (до 5 аккаунтов на приложение). Затем вернитесь сюда и нажмите «Далее».",
-    "provider.spotify.errors.xonos_user_still_not_registered": "Spotify всё ещё не пускает этот аккаунт. Проверьте, что email принадлежит этому аккаунту Spotify, подождите минуту и попробуйте снова."
+    "provider.spotify.errors.xonos_user_still_not_registered": "Spotify всё ещё не пускает этот аккаунт. Проверьте, что email принадлежит этому аккаунту Spotify, подождите минуту и попробуйте снова.",
+    "common.errors.xonos_rate_limited": "Слишком много запросов: сервис попросил Music Assistant подождать ещё примерно {0} мин. Потом он снова заработает сам.",
+    "provider.spotify.errors.xonos_rate_limited": "Spotify отклоняет запросы Music Assistant ещё примерно {0} мин. (слишком много за короткое время). Потом поиск и просмотр снова заработают сами; а пока треки, которые уже есть в вашей Библиотеке, обычно можно воспроизводить."
   },
   "zh_CN": {
     "provider.spotify.setup_flow.xonos_client_id.title": "你的 Spotify 应用的 Client ID",
@@ -222,6 +238,8 @@
     "provider.spotify.setup_flow.xonos_finishing.progress_text": "Music Assistant 正在用你的账户启动 Spotify，需要几秒钟。你可以留在这里。",
     "provider.spotify.setup_flow.xonos_user_not_registered.title": "将此账号添加到你的 Spotify 应用",
     "provider.spotify.setup_flow.xonos_user_not_registered.description": "Spotify 还不允许此账号使用你的 Spotify 应用。在 developer.spotify.com 打开你填写的 Client ID 对应的应用，然后进入 **User Management**：添加你刚才登录的 Spotify 账号的名字和邮箱并保存（每个应用最多 5 个账号）。然后回到这里点按“下一步”。",
-    "provider.spotify.errors.xonos_user_still_not_registered": "Spotify 仍然不允许此账号进入。请检查邮箱是否属于此 Spotify 账号，等一分钟后再试。"
+    "provider.spotify.errors.xonos_user_still_not_registered": "Spotify 仍然不允许此账号进入。请检查邮箱是否属于此 Spotify 账号，等一分钟后再试。",
+    "common.errors.xonos_rate_limited": "请求过多：该服务要求 Music Assistant 再等待约 {0} 分钟。之后会自动恢复。",
+    "provider.spotify.errors.xonos_rate_limited": "Spotify 在接下来约 {0} 分钟内会拒绝 Music Assistant 的请求（短时间内请求过多）。之后搜索和浏览会自动恢复；在此期间，音乐库中已有的歌曲通常仍可播放。"
   }
 }

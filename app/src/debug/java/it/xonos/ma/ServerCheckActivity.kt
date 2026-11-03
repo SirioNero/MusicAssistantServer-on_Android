@@ -12,6 +12,7 @@ import it.xonos.ma.data.MaItem
 import it.xonos.ma.data.Services
 import it.xonos.ma.phone.model.ConnectionCheck
 import it.xonos.ma.phone.model.PhoneServerControl
+import it.xonos.ma.phone.model.ServerKeeper
 import it.xonos.ma.playback.PlaybackService
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
@@ -47,6 +48,8 @@ class ServerCheckActivity : Activity() {
         }
         setContentView(text)
         val app = application as XonosApp
+        // Finché la prova è aperta il server sul telefono serve: Xonos non lo deve fermare (vedi ServerKeeper).
+        app.keeper.hold(ServerKeeper.Need.SCREEN)
         val server = app.phoneServer
         if (server == null) {
             say("Su questo telefono Music Assistant non può girare (non è a 64 bit).")
@@ -155,7 +158,10 @@ class ServerCheckActivity : Activity() {
     override fun onDestroy() {
         open = false
         scope.cancel()
-        (application as XonosApp).let { if (it.phoneServer != null) it.repo.release() }
+        (application as XonosApp).let {
+            if (it.phoneServer != null) it.repo.release()
+            it.keeper.release(ServerKeeper.Need.SCREEN)
+        }
         super.onDestroy()
     }
 

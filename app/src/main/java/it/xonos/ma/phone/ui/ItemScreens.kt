@@ -184,8 +184,10 @@ internal fun ArtistScreen(page: ArtistPage, model: PhoneModel, host: Host) {
             if (page.albumsMore) {
                 item(key = "albums_more", contentType = "more") { More() }
             }
-            val tracks = page.tracks.value.orEmpty()
-            if (tracks.isNotEmpty()) {
+            // Tutti i brani si chiedono solo quando si aprono: fino ad allora la riga non dice quanti sono. Se poi non ce
+            // n'è nessuno, la riga sparisce.
+            val tracks = page.tracks?.value
+            if (tracks == null || tracks.isNotEmpty()) {
                 item(key = "all", contentType = "all") {
                     SectionTitle(allTitle)
                     Row(
@@ -194,11 +196,11 @@ internal fun ArtistScreen(page: ArtistPage, model: PhoneModel, host: Host) {
                     ) {
                         Icon(XIcons.Track, null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.width(16.dp))
-                        Text(tracksSummary(tracks), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                        if (page.tracksMore) {
-                            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                            Spacer(Modifier.width(8.dp))
-                        }
+                        Text(
+                            if (tracks != null) tracksSummary(tracks) else stringResource(R.string.see_all),
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.weight(1f),
+                        )
                         Icon(XIcons.Chevron, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
@@ -233,6 +235,10 @@ internal fun ListScreen(page: ListPage, model: PhoneModel, host: Host) {
                 itemsIndexed(items, key = { i, it -> "$i|${it.uri}" }, contentType = { _, _ -> "track" }) { i, item ->
                     ItemRow(item, model, { model.play(items, i, null) })
                 }
+            }
+            // Gli elenchi a pezzi (i brani di un artista): prima la libreria, poi i servizi.
+            if (page.more) {
+                item(key = "more", contentType = "more") { More() }
             }
         }
         TopBar(page.title, state, model)

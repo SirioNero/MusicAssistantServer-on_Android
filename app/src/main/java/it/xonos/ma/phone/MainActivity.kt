@@ -30,6 +30,7 @@ import it.xonos.ma.XonosApp
 import it.xonos.ma.data.Connection
 import it.xonos.ma.data.Settings
 import it.xonos.ma.describe as tell
+import it.xonos.ma.phone.model.ServerKeeper
 import it.xonos.ma.phone.ui.Host
 import it.xonos.ma.phone.ui.XonosScreen
 import it.xonos.ma.playback.PlaybackService
@@ -103,7 +104,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        // Finché l'app è in vista, il telefono è collegato a Music Assistant e il servizio (il lettore) è acceso.
+        // Finché l'app è in vista, il telefono è collegato a Music Assistant e il servizio (il lettore) è acceso. Il
+        // Music Assistant sul telefono, se Xonos usa quello, parte adesso (vedi ServerKeeper).
+        app.keeper.hold(ServerKeeper.Need.SCREEN)
         app.repo.acquire()
         app.phone.wake()
         val token = SessionToken(this, ComponentName(this, PlaybackService::class.java))
@@ -125,6 +128,12 @@ class MainActivity : ComponentActivity() {
         controller?.let(MediaController::releaseFuture)
         controller = null
         app.repo.release()
+        // Il server sul telefono resta acceso ancora qualche minuto (tornando subito non si aspetta l'avvio); di più durante
+        // l'accesso a un servizio nel browser o l'abbinamento di Soloist nell'app Spotify: il flusso vive in Music Assistant.
+        app.keeper.release(
+            ServerKeeper.Need.SCREEN,
+            if (app.phone.inSetupFlow) ServerKeeper.SETUP_SCREEN_MS else ServerKeeper.Need.SCREEN.graceMs,
+        )
         super.onStop()
     }
 

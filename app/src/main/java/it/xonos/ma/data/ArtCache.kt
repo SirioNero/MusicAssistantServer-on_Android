@@ -58,7 +58,7 @@ class ArtCache(private val dir: File, http: OkHttpClient, private val maxFiles: 
             prune()
             return file
         } catch (e: Exception) {
-            Log.w(TAG, "Copertina non scaricata: ${e.message}")
+            Log.w(TAG, "Copertina non scaricata: ${Logged.error(e)}")
             return null
         } finally {
             temp.delete()

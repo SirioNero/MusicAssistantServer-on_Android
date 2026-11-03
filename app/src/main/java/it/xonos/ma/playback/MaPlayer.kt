@@ -20,6 +20,7 @@ import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.SettableFuture
 import it.xonos.ma.data.Connection
+import it.xonos.ma.data.Logged
 import it.xonos.ma.data.Problem
 import it.xonos.ma.data.MaException
 import it.xonos.ma.data.MaImage
@@ -70,6 +71,11 @@ class MaPlayer(
     private val lateMs: () -> Long = { 0L },
     /** Vero se Music Assistant è quello sul telefono stesso: i salti si raccolgono per meno tempo (vedi [SkipSender]). */
     private val phoneServer: () -> Boolean = { false },
+    /**
+     * Risveglia il Music Assistant sul telefono, fermo perché nessuno lo usava (vedi [awaitReady]). Senza server sul
+     * telefono (myCar, che ha lo stesso motore) niente.
+     */
+    private val wake: () -> Unit = {},
     /** Cosa dire in auto di una connessione che non va, nella lingua scelta sul telefono. */
     private val describe: (Connection) -> String?,
 ) : SimpleBasePlayer(looper) {
@@ -129,6 +135,8 @@ class MaPlayer(
     private var pendingSkip: SettableFuture<Void?>? = null
     private val skips = SkipSender(scope, trace = true) { index ->
         try {
+            // Col server sul telefono fermo prima lo si risveglia; intanto i tocchi dopo si raccolgono come sempre.
+            if (phoneServer()) awaitReady()
             unlock.retrying(queueId) {
                 repo.command("player_queues/play_index") {
                     put("queue_id", queueId)
@@ -139,7 +147,7 @@ class MaPlayer(
             throw e
         } catch (e: Exception) {
             // Anche un salto che non riesce (Spotify occupato, servizio fermo) dice perché, in auto come per il play.
-            Log.w(TAG, "Salto a $index non riuscito: ${e.message}")
+            Log.w(TAG, "Salto a $index non riuscito: ${Logged.error(e)}")
             onFailure?.invoke(e)
         }
     }
@@ -357,7 +365,7 @@ class MaPlayer(
                     put("limit", BEHIND + AHEAD + 1)
                 } as? JSONArray
             } catch (e: Exception) {
-                Log.w(TAG, "Coda non disponibile: ${e.message}")
+                Log.w(TAG, "Coda non disponibile: ${Logged.error(e)}")
                 null
             } ?: return@launch
             window = items.objects().mapNotNull(QueueItem::from)
@@ -426,7 +434,7 @@ class MaPlayer(
                     }
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "Ripresa non riuscita: ${e.message}")
+                Log.w(TAG, "Ripresa non riuscita: ${Logged.error(e)}")
             }
         }
     }
@@ -457,9 +465,10 @@ class MaPlayer(
             return Futures.immediateVoidFuture()
         }
         if (!playWhenReady) {
-            // Una pausa voluta: dopo un calo di rete non si riprende da soli.
+            // Una pausa voluta: dopo un calo di rete non si riprende da soli, e un play che aspetta il server non parte.
             drop = null
             lastPlayingAt = 0L
+            pauses++
         }
         if (!playWhenReady && pendingSkip?.isDone == false) {
             // Pausa durante un salto: "pause" arriverebbe prima del brano nuovo, che poi partirebbe lo stesso. Si
@@ -472,6 +481,12 @@ class MaPlayer(
             // Un secondo play (cuffie, auto) mentre la musica parte: per Music Assistant sarebbe un resume, che con la
             // coda già in partenza fa ripartire il brano da capo. Niente di nuovo.
             if (playWhenReady) return pending
+            // Il play aspetta ancora che il server sul telefono riparta: non è arrivato a Music Assistant, e non partirà
+            // (vedi pauses). Niente da fermare.
+            if (waking > 0) {
+                pendingPlay = null
+                return Futures.immediateVoidFuture()
+            }
             // Una pausa adesso: "pause" arriverebbe prima dell'avvio e Music Assistant lo ignorerebbe (la musica
             // partirebbe lo stesso); "stop" aspetta che l'avvio finisca e poi ferma.
             pendingPlay = null
@@ -506,9 +521,10 @@ class MaPlayer(
     }
 
     override fun handleStop(): ListenableFuture<*> {
-        // Uno stop voluto: dopo un calo di rete non si riprende da soli.
+        // Uno stop voluto: dopo un calo di rete non si riprende da soli, e un play che aspetta il server non parte.
         drop = null
         lastPlayingAt = 0L
+        pauses++
         // e la stessa voce toccata dopo deve ripartire, non aspettare la scelta di prima (che poi si ferma)
         lastChoice = null
         return command("player_queues/stop") { it?.playing != true }
@@ -668,7 +684,7 @@ class MaPlayer(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                Log.w(TAG, "Non riesco a suonare ${item.mediaId}: ${e.message}")
+                Log.w(TAG, "Non riesco a suonare ${Logged.id(item.mediaId)}: ${Logged.error(e)}")
                 onFailure?.invoke(e)
             } finally {
                 choosing--
@@ -730,7 +746,7 @@ class MaPlayer(
             try {
                 send()
             } catch (e: Exception) {
-                Log.w(TAG, "Coda non cambiata: ${e.message}")
+                Log.w(TAG, "Coda non cambiata: ${Logged.error(e)}")
                 if (windowExpectations.remove(expectation)) future.set(null)
             }
         }
@@ -780,7 +796,6 @@ class MaPlayer(
         invalidateState()
     }
 
-    /** Aspetta che il telefono sia un lettore di Music Assistant: al primo avvio ci vuole un attimo. */
     /**
      * Un comando chiesto da chi comanda il lettore (l'auto, la notifica, il telefono) non è riuscito: il perché, da
      * mostrare. Prima restava nel logcat, e in auto la scelta compariva un attimo e poi niente (per esempio "Qui non
@@ -791,9 +806,36 @@ class MaPlayer(
     /** Una pausa (o uno stop) chiesta ma non arrivata a Music Assistant per la connessione. Sul thread principale. */
     var onPauseLost: (() -> Unit)? = null
 
-    private suspend fun awaitReady() {
-        withTimeoutOrNull(READY_TIMEOUT_MS) { ready.first { it } }
+    /**
+     * Aspetta che il telefono sia un lettore di Music Assistant: al primo avvio ci vuole un attimo. Col Music Assistant
+     * sul telefono, fermo perché nessuno lo usava, prima lo risveglia, e aspetta di più: ripartire ci mette un po'
+     * (sull'emulatore circa 10 s, poi l'accesso a Spotify). Vero se ha dovuto aspettare.
+     */
+    private suspend fun awaitReady(): Boolean {
+        if (ready.value) return false
+        val phone = phoneServer()
+        if (phone && repo.connection.value !is Connection.Connected) {
+            Log.i(TAG, "Music Assistant sul telefono non è collegato: lo sveglio")
+            wake()
+        }
+        withTimeoutOrNull(if (phone) PHONE_READY_TIMEOUT_MS else READY_TIMEOUT_MS) { ready.first { it } }
             ?: throw MaException("Music Assistant non è pronto", problem = Problem.NOT_CONNECTED)
+        return true
+    }
+
+    /** Pause e stop chiesti (vedi [handleSetPlayWhenReady], [handleStop]): un play che aspettava il server non parte più. */
+    private var pauses = 0
+
+    /** I comandi che aspettano che il server sul telefono riparta. */
+    private var waking = 0
+
+    private suspend fun <T> wakingFor(block: suspend () -> T): T {
+        waking++
+        try {
+            return block()
+        } finally {
+            waking--
+        }
     }
 
     /**
@@ -809,9 +851,26 @@ class MaPlayer(
         val expectation = Expectation(until, future)
         expectations += expectation
         // Un limite in ogni caso, se la risposta non arriva mai.
-        handler.postDelayed({ if (expectations.remove(expectation)) future.set(null) }, COMMAND_CAP_MS)
+        val cap = Runnable { if (expectations.remove(expectation)) future.set(null) }
+        handler.postDelayed(cap, COMMAND_CAP_MS)
         scope.launch {
             try {
+                // Un play o un salto col server sul telefono fermo (nessuno lo usava): lo si risveglia e si aspetta, invece
+                // di "Music Assistant non è collegato". Non pausa e stop: non c'è niente da fermare, e l'audio già
+                // ricevuto deve zittirsi subito (onPauseLost).
+                if (name in WAKING && phoneServer() && !ready.value) {
+                    val asked = pauses
+                    wakingFor { awaitReady() }
+                    if (pauses != asked) {
+                        // Nel frattempo una pausa o uno stop: il play non parte più.
+                        Log.i(TAG, "$name non mandato: nel frattempo una pausa")
+                        if (expectations.remove(expectation)) future.set(null)
+                        return@launch
+                    }
+                    // Il limite conta da quando il server risponde: la sua partenza non ci rientra.
+                    handler.removeCallbacks(cap)
+                    handler.postDelayed(cap, COMMAND_CAP_MS)
+                }
                 unlock.retrying(queueId) {
                     repo.command(name) {
                         put("queue_id", queueId)
@@ -826,7 +885,7 @@ class MaPlayer(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                Log.w(TAG, "$name non riuscito: ${e.message}")
+                Log.w(TAG, "$name non riuscito: ${Logged.error(e)}")
                 // Una pausa che non arriva perché manca la rete: l'audio già ricevuto (fino a 30 s) non deve
                 // continuare a suonare come se niente fosse.
                 if ((name == "player_queues/pause" || name == "player_queues/stop") && (e as? MaException)?.problem in UNREACHABLE) {
@@ -871,12 +930,25 @@ class MaPlayer(
         private const val WINDOW_DEBOUNCE_MS = 150L
         private const val EXPECT_TIMEOUT_MS = 3_000L
 
+        /** I comandi che fanno suonare: col server sul telefono fermo lo risvegliano (vedi [command]). */
+        private val WAKING = setOf(
+            "player_queues/play",
+            "player_queues/resume",
+            "player_queues/play_index",
+            "player_queues/next",
+            "player_queues/previous",
+        )
+
         /** I problemi per cui un comando non arriva a Music Assistant. */
         private val UNREACHABLE = setOf(Problem.NOT_CONNECTED, Problem.LOST, Problem.NO_ANSWER, Problem.NETWORK)
         private const val COMMAND_CAP_MS = 60_000L
 
         private const val PLAY_SETTLE_MS = 4_000L
         private const val READY_TIMEOUT_MS = 20_000L
+
+        /** Lo stesso col Music Assistant sul telefono, che può dover ripartire (vedi [awaitReady]). */
+        private const val PHONE_READY_TIMEOUT_MS = 60_000L
+
         private const val RECENT_PLAY_MS = 30_000L
         private const val RESUME_WINDOW_MS = 10 * 60_000L
 

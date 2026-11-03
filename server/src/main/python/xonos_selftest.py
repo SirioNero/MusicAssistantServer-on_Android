@@ -368,6 +368,8 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
     backend = solo.SoloistBackend(provider)
     backend._server = server
     backend._binary = Path(python)
+    # come sul telefono: l'abbinamento a Spotify c'è (senza, un Soloist che non entra sarebbe "abbinamento perso")
+    backend._has_stored_session = lambda: True
 
     class FakeManager:
         """Il programma di Soloist c'è già: è il finto."""

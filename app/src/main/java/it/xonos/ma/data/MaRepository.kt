@@ -164,7 +164,13 @@ class MaRepository(private val settings: Settings) {
             active.onEvent = { event, objectId, data -> listeners.forEach { it(event, objectId, data) } }
             client = active
             try {
-                Log.i(TAG, "Collegato a ${server.name} (${server.version}) su $usedUrl")
+                // Nelle build vere senza nome e indirizzo del server: solo da dove (casa, fuori, il telefono stesso).
+                val where = when {
+                    usedUrl != config.homeUrl -> "da fuori casa"
+                    usedUrl.startsWith(LOCAL_PREFIX) -> "sul telefono"
+                    else -> "di casa"
+                }
+                Log.i(TAG, "Collegato a Music Assistant ${server.version} ($where)" + Logged.text(" ${server.name} su $usedUrl", ""))
                 _connection.value = Connection.Connected(usedUrl, server)
                 scope.launch { renewToken(active, config.token) }
                 val reason = active.closed.await()
@@ -209,12 +215,15 @@ class MaRepository(private val settings: Settings) {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Log.w(TAG, "Token non rinnovato: ${e.message}")
+            Log.w(TAG, "Token non rinnovato: ${Logged.error(e)}")
         }
     }
 
     companion object {
         private const val TAG = "Xonos"
+
+        /** L'indirizzo di un Music Assistant sul telefono stesso (quello scaricato da Xonos). */
+        private const val LOCAL_PREFIX = "http://127.0.0.1"
 
         /** Il tempo per aprire la connessione all'indirizzo di casa, quando dopo c'è quello remoto. */
         const val HOME_CONNECT_S = 3L

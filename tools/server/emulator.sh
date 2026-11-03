@@ -46,6 +46,29 @@ copy_music() {
     [ "$expected" = "$copied" ]
 }
 
+# Nel logcat niente dati personali: le righe dei tag $2 (per esempio "Xonos|XonosServer") del file $1 non devono avere
+# le parole $3, i nomi della musica di prova (tones.py: le cartelle "Check Artist/Check Album", che per Music Assistant
+# sono artista e album, e i brani "Tone 1" e "Tone 2"). Il formato è quello di "adb logcat -v time":
+# "11-03 08:00:00.123 I/Xonos   ( 1234): testo". Se nessuna riga è di quei tag, la prova non vede niente: errore.
+PRIVACY_NAMES='Check Artist|Check Album'
+privacy() {
+    local lines leaks
+    lines=$(grep -E " [VDIWEF]/($2) *\(" "$1")
+    if [ -z "$lines" ]; then
+        echo "::error title=Privacy::Nessuna riga di $2 in $(basename "$1"): la prova dei dati personali non vede il logcat"
+        status=1
+        return
+    fi
+    leaks=$(echo "$lines" | grep -E "$3")
+    if [ -n "$leaks" ]; then
+        echo "::error title=Privacy::Nel logcat ($(basename "$1"), $2) ci sono i nomi della musica di prova"
+        echo "$leaks" | head -n 20
+        status=1
+    else
+        echo "== Privacy: nessun nome della musica di prova nelle righe di $2 ($(basename "$1"))"
+    fi
+}
+
 # Aspetta nel logcat $1 una riga che corrisponde a $2 (al massimo $3 secondi) e la scrive.
 wait_for() {
     local line=""
@@ -167,6 +190,8 @@ adb shell run-as "$PACKAGE" env LD_LIBRARY_PATH="$server_dir/lib" /system/bin/li
     | tee "$OUT/librespot.txt"
 kill "$LOGCAT" 2>/dev/null
 grep -E "XonosServer|AndroidRuntime" "$OUT/logcat.txt" | tail -n 60
+# XonosServer è filtrato allo stesso modo in ogni build (ServerLines), anche in quella di prova.
+privacy "$OUT/logcat.txt" XonosServer "$PRIVACY_NAMES"
 
 # 2. Xonos stesso, da capo.
 echo "== Xonos con Music Assistant sul telefono"
@@ -182,6 +207,9 @@ result=$(wait_for "$OUT/logcat-xonos.txt" "Xonos: \(suona=.*\|prova interrotta.*
 kill "$LOGCAT" 2>/dev/null
 grep -E "XonosServer|I/Xonos|W/Xonos|AndroidRuntime" "$OUT/logcat-xonos.txt" | tail -n 80
 echo "== Xonos: ${result:-nessun risultato dopo 10 minuti}"
+# Solo XonosServer: la build di prova scrive i dettagli col tag Xonos (Logged.details), e la sua prova scrive il titolo
+# del brano suonato ("Xonos: suona=... brano=Tone 1", ServerCheckActivity): qui solo le cartelle.
+privacy "$OUT/logcat-xonos.txt" XonosServer "$PRIVACY_NAMES"
 adb exec-out run-as "$PACKAGE" cat files/music-assistant/musicassistant.log > "$OUT/musicassistant-xonos.log" 2>/dev/null
 position=$(echo "$result" | sed -n 's/.*posizione=\([0-9]*\).*/\1/p')
 if ! echo "$result" | grep -q "suona=true" || [ "${position:-0}" -lt 5 ]; then
@@ -260,5 +288,7 @@ adb exec-out screencap -p > "$OUT/release.png"
 adb exec-out cat "$DATA/files/music-assistant/musicassistant.log" > "$OUT/musicassistant-release.log" 2>/dev/null
 kill "$LOGCAT" 2>/dev/null
 grep -E "Xonos|AndroidRuntime" "$OUT/logcat-release.txt" | tail -n 80
+# La release ha suonato la musica di prova: nelle righe di Xonos e del server niente titoli, artisti, album.
+privacy "$OUT/logcat-release.txt" "Xonos|XonosServer" "$PRIVACY_NAMES|Tone [12]"
 [ "$release" = 0 ] || status=1
 exit "$status"

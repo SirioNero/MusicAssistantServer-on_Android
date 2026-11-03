@@ -353,6 +353,14 @@ def _patch(root: Path) -> None:
             f"{indent}    sample_rate={rate},\n{indent}    bit_depth=16,\n{indent}    channels=2,\n"
             f'{indent}    sample_type="int",  # Xonos: PCM a 16 bit\n',
         )
+    # Il proxy /sendspin (da cui passano Xonos e myCar) comprimeva ogni pacchetto: OkHttp offre sempre permessage-deflate
+    # e aiohttp dal lato server lo accetta di suo. Così ogni pezzo di PCM da 25 ms passava da zlib sul ciclo di Music
+    # Assistant (e l'app lo decomprimeva): PCM non si comprime quasi, e aiosendspin stesso la compressione la spegne.
+    _replace(
+        root / "controllers" / "webserver" / "sendspin_proxy.py",
+        "        wsock = web.WebSocketResponse(heartbeat=25)\n",
+        "        wsock = web.WebSocketResponse(heartbeat=25, compress=False)  # Xonos: niente zlib sull'audio\n",
+    )
     # Spotify: librespot per Android non sta nella cartella bin del servizio ma tra i programmi
     # del pacchetto, che Xonos mette nel PATH (vedi server/librespot e PhoneServer).
     spotify = root / "providers" / "spotify" / "helpers.py"
@@ -390,8 +398,10 @@ def _patch(root: Path) -> None:
     _reasons(root)
     _flows(root)
     _spotify(root)
+    _spotify_limits(root)
     _soloist(root)
     _soloist_live(root)
+    _soloist_connect(root)
     _phone_chain(root)
     _texts(root)
 
@@ -778,6 +788,498 @@ def _spotify(root: Path) -> None:
     )
 
 
+def _spotify_limits(root: Path) -> None:
+    """
+    I limiti di Spotify sul telefono (registro dell'utente con la 0.1.53: Spotify ha bloccato le richieste per un'ora).
+
+    Il server sul telefono entra in Spotify con l'app della persona, che ha limiti suoi (Development Mode). Music
+    Assistant già ferma le richieste quando Spotify chiede di aspettare più di un minuto (Retry-After), ma:
+    - la riproduzione (BYPASS_THROTTLER) passava senza limiti e anche durante il blocco: suonare un artista o una
+      playlist grande mandava centinaia di richieste di fila, e ogni play durante il blocco ne mandava altre;
+    - un rinnovo del token rifiutato (troppe richieste, o un guasto di Spotify) diventava LoginFailed, e il servizio si
+      toglieva finché la persona non lo rifaceva; il blocco stava solo in memoria, e dopo un riavvio (Android chiude
+      l'app) il servizio chiedeva di nuovo /me, non partiva e Music Assistant lo riprovava ogni 2 minuti;
+    - la persona leggeva solo "Rate limit reached. Please try again later.", e nel registro non c'era chi aveva fatto
+      le richieste.
+    Qui, come in parte fa già Music Assistant 2.11: la riproduzione prende un posto nel limite e si ferma subito durante
+    un blocco lungo; i rinnovi rifiutati passano da soli; il blocco va nel registro (con le richieste degli ultimi 5
+    minuti) e in un file che vale anche dopo un riavvio; durante il blocco il servizio parte con l'account dell'ultimo
+    accesso; l'errore dice quanti minuti mancano. E una ricerca su Spotify è una richiesta sola.
+    """
+    throttle = root / "helpers" / "throttle_retry.py"
+    # La riproduzione: un posto nel limite come le altre richieste e, durante un blocco lungo, l'errore subito.
+    _replace(
+        throttle,
+        "        if BYPASS_THROTTLER.get():\n            yield 0\n            return\n",
+        "        if BYPASS_THROTTLER.get():\n"
+        "            # Xonos: la riproduzione non aspetta i blocchi brevi, ma prende un posto nel limite come le altre\n"
+        "            # richieste (come in Music Assistant 2.11, senza posti in più): prima passava senza limiti, e suonare un\n"
+        "            # artista o una playlist grande mandava centinaia di richieste di fila. Durante un blocco lungo si ferma\n"
+        "            # subito come le altre: qui Xonos fa diversamente da Music Assistant (anche 2.11 la fa passare), perché\n"
+        "            # ogni richiesta durante il blocco è comunque rifiutata, e Spotify non dice se così il blocco si allunga.\n"
+        "            # Il blocco si guarda anche dopo l'attesa del posto: può essere arrivato intanto.\n"
+        "            delay = 0.0 if self.cooldown_remaining > MAX_WAIT_TIME else await self.throttler.acquire()\n"
+        "            if (remaining := self.cooldown_remaining) > MAX_WAIT_TIME:\n"
+        '                msg = f"Rate limited for another {remaining:.0f} seconds"\n'
+        "                raise RateLimited(msg, backoff_time=round(remaining))\n"
+        "            yield delay\n"
+        "            return\n",
+    )
+    # I blocchi chiesti dal server su un orologio che conta anche il tempo in cui il telefono dorme: su Android
+    # time.monotonic() lì si ferma, e un blocco di un'ora con il telefono addormentato durava di più (e ora ferma anche
+    # la riproduzione). Il conto dei posti nel limite (Throttler) resta su time.monotonic().
+    _replace(
+        throttle,
+        "MAX_WAIT_TIME = 60\n",
+        "MAX_WAIT_TIME = 60\n"
+        "\n"
+        "\n"
+        "def _xonos_clock() -> float:\n"
+        '    """Xonos: i secondi dei blocchi chiesti dal server, compreso il tempo in cui il telefono dorme."""\n'
+        "    try:\n"
+        "        return time.clock_gettime(time.CLOCK_BOOTTIME)\n"
+        "    except AttributeError:  # dove CLOCK_BOOTTIME non c'è (non Linux)\n"
+        "        return time.monotonic()\n",
+    )
+    for clock_line in (
+        "        return max(0.0, self._cooldown_until - time.monotonic())\n",
+        "        self._cooldown_until = max(self._cooldown_until, time.monotonic() + seconds)\n",
+        '        """Sleep until the given monotonic deadline, return the time waited."""\n'
+        "        remaining = deadline - time.monotonic()\n",
+        "                            honored_until = time.monotonic() + sleep_time\n",
+        "        :param honored_until: Monotonic deadline the caller already waited out, so a\n",
+    ):
+        _replace(
+            throttle,
+            clock_line,
+            clock_line.replace("time.monotonic()", "_xonos_clock()")
+            .replace("given monotonic deadline", "given deadline (Xonos: su _xonos_clock)")
+            .replace("Monotonic deadline", "Deadline (Xonos: su _xonos_clock)"),
+        )
+    # Chi usa il throttler può sapere di un blocco lungo chiesto dal server (solo quello: non le attese che Music
+    # Assistant allunga da sé dopo più rifiuti brevi) e dare i testi dell'errore che lo dice.
+    _replace(
+        throttle,
+        "        self._cooldown_until: float = 0.0\n",
+        "        self._cooldown_until: float = 0.0\n"
+        "        # Xonos: chi avvisare di un blocco lungo chiesto dal server (con i secondi), e di chi sono i testi\n"
+        '        # dell\'errore che lo dice (per esempio "provider.spotify"; None: quelli comuni)\n'
+        "        self.xonos_on_block: Callable[[float], None] | None = None\n"
+        "        self.xonos_owner: str | None = None\n"
+        "        # Xonos: di chi è il blocco lungo (per Spotify il segno del Client ID; None: di nessuno in particolare)\n"
+        "        self.xonos_mark: str | None = None\n",
+    )
+    _replace(
+        throttle,
+        "                            if isinstance(e, RateLimited):\n"
+        "                                throttler.set_cooldown(server_wait)\n",
+        "                            if isinstance(e, RateLimited):\n"
+        "                                throttler.set_cooldown(server_wait)\n"
+        "                                if throttler.xonos_on_block is not None:\n"
+        "                                    throttler.xonos_on_block(server_wait)  # Xonos\n",
+    )
+    _replace(
+        throttle,
+        "                            raise _give_up(e, server_wait) from e\n",
+        "                            raise _give_up(e, server_wait, throttler.xonos_owner) from e\n",
+    )
+    _replace(
+        throttle,
+        "                raise _give_up(e, e.backoff_time) from e\n",
+        "                raise _give_up(e, e.backoff_time, throttler.xonos_owner) from e\n",
+    )
+    _replace(
+        throttle,
+        "def _give_up(err: ResourceTemporarilyUnavailable, wait: float) -> RetriesExhausted:\n"
+        '    """\n'
+        "    Return the error of a call that does not sit out the wait asked of it.\n"
+        "\n"
+        "    :param err: The error that asked for the wait, its localization is carried over.\n"
+        "    :param wait: The wait that was asked for, in seconds.\n"
+        '    """\n',
+        "def _give_up(\n"
+        "    err: ResourceTemporarilyUnavailable, wait: float, owner: str | None = None\n"
+        ") -> RetriesExhausted:\n"
+        '    """\n'
+        "    Return the error of a call that does not sit out the wait asked of it.\n"
+        "\n"
+        "    :param err: The error that asked for the wait, its localization is carried over.\n"
+        "    :param wait: The wait that was asked for, in seconds.\n"
+        "    :param owner: Xonos: di chi sono i testi dell'errore di un blocco lungo (None: quelli comuni).\n"
+        '    """\n'
+        "    if isinstance(err, RateLimited) and wait > MAX_WAIT_TIME:\n"
+        '        # Xonos: quanti minuti mancano, nella lingua della persona, invece di "Rate limit reached. Please try\n'
+        '        # again later."\n'
+        "        return RetriesExhausted(\n"
+        '            f"Not retrying, asked to wait {wait:.0f} seconds",\n'
+        '            translation_key="xonos_rate_limited",\n'
+        "            translation_args=[max(1, round(wait / 60))],\n"
+        "            translation_owner=owner,\n"
+        "        )\n",
+    )
+
+    folder = root / "providers" / "spotify"
+    # Un rinnovo del token rifiutato per troppe richieste o per un guasto di Spotify passa da solo (come in Music
+    # Assistant 2.11): prima diventava LoginFailed, che toglie il servizio finché la persona non lo rifà.
+    helpers = folder / "helpers.py"
+    _replace(
+        helpers,
+        "from music_assistant_models.errors import LoginFailed\n",
+        "from music_assistant_models.errors import LoginFailed, RateLimited, ResourceTemporarilyUnavailable\n",
+    )
+    _replace(
+        helpers,
+        "from music_assistant.helpers.process import AsyncProcess, check_output\n",
+        "from music_assistant.helpers.process import AsyncProcess, check_output\n"
+        "from music_assistant.helpers.throttle_retry import parse_retry_after\n",
+    )
+    _replace(
+        helpers,
+        "    for _ in range(2):\n"
+        "        async with http_session.post(\n"
+        '            "https://accounts.spotify.com/api/token", data=params\n'
+        "        ) as response:\n"
+        "            if response.status != 200:\n",
+        "    for attempt in range(2):\n"
+        "        async with http_session.post(\n"
+        '            "https://accounts.spotify.com/api/token", data=params\n'
+        "        ) as response:\n"
+        "            # Xonos (come Music Assistant 2.11): troppe richieste non sono un accesso sbagliato\n"
+        "            if response.status == 429:\n"
+        "                raise RateLimited(\n"
+        '                    f"Spotify rate limits the {session_name} token refresh",\n'
+        '                    backoff_time=parse_retry_after(response.headers.get("Retry-After")),\n'
+        "                )\n"
+        "            if response.status != 200:\n",
+    )
+    _replace(
+        helpers,
+        "                # the token failed to refresh, we allow one retry\n"
+        "                await asyncio.sleep(2)\n"
+        "                continue\n",
+        "                # the token failed to refresh, we allow one retry\n"
+        "                if response.status >= 500 and attempt:\n"
+        "                    # Xonos (come Music Assistant 2.11): un guasto di Spotify passa da solo\n"
+        "                    raise ResourceTemporarilyUnavailable(\n"
+        '                        f"Spotify failed to refresh the {session_name} access token: HTTP {response.status}",\n'
+        "                        backoff_time=30,\n"
+        "                    )\n"
+        "                await asyncio.sleep(2)\n"
+        "                continue\n",
+    )
+
+    provider = folder / "provider.py"
+    _replace(
+        provider,
+        "import asyncio\nimport os\nimport shutil\nimport time\nfrom collections import OrderedDict\n",
+        "import asyncio\nimport hashlib\nimport os\nimport re\nimport shutil\nimport time\n"
+        "from collections import Counter, OrderedDict, deque\n",
+    )
+    _replace(
+        provider,
+        "    RateLimited,\n    ResourceTemporarilyUnavailable,\n    UnsupportedFeaturedException,\n)\n",
+        "    RateLimited,\n    ResourceTemporarilyUnavailable,\n    RetriesExhausted,\n    UnsupportedFeaturedException,\n)\n",
+    )
+    _replace(
+        provider,
+        "from music_assistant.controllers.cache import use_cache\n",
+        "from music_assistant.controllers.cache import use_cache\n"
+        "from music_assistant.controllers.tasks.constants import ACTIVE_TASK_ID\n",
+    )
+    _replace(
+        provider,
+        "from music_assistant.helpers.throttle_retry import (\n    ThrottlerManager,\n",
+        "from music_assistant.helpers.throttle_retry import (\n"
+        "    BYPASS_THROTTLER,\n    MAX_RETRY_AFTER,\n    MAX_WAIT_TIME,\n    ThrottlerManager,\n",
+    )
+    _replace(
+        provider,
+        "_THROTTLERS: dict[str, ThrottlerManager] = {}\n",
+        "_THROTTLERS: dict[str, ThrottlerManager] = {}\n" + SPOTIFY_LIMITS_STATE,
+    )
+    # Il blocco: nel registro, nel file per il riavvio, e quello di prima di un riavvio rimesso al suo posto.
+    _replace(
+        provider,
+        "            # Xonos: con la chiave della persona, i limiti di una chiave propria\n"
+        "            self.throttler.set_rate_limit(rate_limit=30, period=30)\n",
+        "            # Xonos: con la chiave della persona, i limiti di una chiave propria\n"
+        "            self.throttler.set_rate_limit(rate_limit=30, period=30)\n"
+        "            # Xonos: un blocco lungo di Spotify nel registro e in un file, che vale anche dopo un riavvio\n"
+        "            self.throttler.xonos_on_block = self._xonos_blocked\n"
+        '            self.throttler.xonos_owner = "provider.spotify"\n'
+        "            self._xonos_restore_block()\n",
+    )
+    # Durante un blocco (o se Spotify non risponde) il servizio parte con l'account dell'ultimo accesso riuscito.
+    _replace(
+        provider,
+        "            # try login which will raise if it fails (logs in global session)\n"
+        "            await self.login()\n"
+        '            if not app_var("spotify_client_id"):\n',
+        "            # try login which will raise if it fails (logs in global session)\n"
+        "            await self._xonos_login()\n"
+        '            if not app_var("spotify_client_id"):\n',
+    )
+    # L'account dell'ultimo accesso vale solo finché /me non risponde: la persona può aver rifatto Spotify con un altro
+    # account durante il blocco (allora /me non ha risposto e l'account salvato è quello di prima).
+    _replace(
+        provider,
+        "    _sp_user: dict[str, Any] | None = None\n",
+        "    _sp_user: dict[str, Any] | None = None\n"
+        "    # Xonos: _sp_user è l'account dell'ultimo accesso, non confermato da Spotify: /me si richiede al prossimo accesso\n"
+        "    _xonos_user_unconfirmed: bool = False\n",
+    )
+    _replace(
+        provider,
+        "        if not self._sp_user:\n"
+        "            self._sp_user = userinfo = await self._get_data(\n"
+        '                "me", auth_info=auth_info, use_global_session=True\n'
+        "            )\n",
+        "        if not self._sp_user or self._xonos_user_unconfirmed:\n"
+        "            try:\n"
+        '                userinfo = await self._get_data("me", auth_info=auth_info, use_global_session=True)\n'
+        "            except (RetriesExhausted, ResourceTemporarilyUnavailable):\n"
+        "                # Xonos (come Music Assistant 2.11): Spotify non risponde, o ha bloccato le richieste: l'account\n"
+        "                # dell'ultimo accesso riuscito\n"
+        "                if (stored := self._xonos_stored_account()) is None:\n"
+        "                    raise\n"
+        "                self._sp_user = stored\n"
+        "                self._xonos_user_unconfirmed = True\n"
+        '                self.logger.info("Spotify non risponde: il servizio usa l\'account dell\'ultimo accesso")\n'
+        "                return auth_info\n"
+        "            self._sp_user = userinfo\n"
+        '            if self.get_setup_value(_XONOS_ACCOUNT_NAME) != userinfo.get("display_name"):\n'
+        '                self._update_setup_data(_XONOS_ACCOUNT_NAME, userinfo.get("display_name"), immediate=False)\n',
+    )
+    _replace(
+        provider,
+        '                self._update_setup_data(CONF_ACCOUNT_ID, userinfo["id"])\n'
+        '            self.logger.info("Successfully logged in to Spotify as %s", userinfo["display_name"])\n',
+        '                self._update_setup_data(CONF_ACCOUNT_ID, userinfo["id"])\n'
+        "            self._xonos_user_unconfirmed = False  # Xonos: l'account è quello che dice Spotify\n"
+        '            self.logger.info("Successfully logged in to Spotify as %s", userinfo["display_name"])\n',
+    )
+    _replace(
+        provider,
+        "        except MediaNotFoundError, ProviderUnavailableError:\n            return False\n",
+        "        except MediaNotFoundError, ProviderUnavailableError:\n            return False\n"
+        "        except (RetriesExhausted, ResourceTemporarilyUnavailable):\n"
+        "            # Xonos (come Music Assistant 2.11): Spotify non risponde, vale la risposta dell'ultima volta\n"
+        "            return bool(self.get_setup_value(_XONOS_AUDIOBOOKS, False))\n",
+    )
+    _replace(
+        provider,
+        "            self._audiobooks_supported = await self._test_audiobook_support()\n",
+        "            self._audiobooks_supported = await self._test_audiobook_support()\n"
+        "            if self.get_setup_value(_XONOS_AUDIOBOOKS) != self._audiobooks_supported:\n"
+        "                self._update_setup_data(_XONOS_AUDIOBOOKS, self._audiobooks_supported, immediate=False)\n",
+    )
+    # Il conto delle richieste (Web API e rinnovi del token), per il registro.
+    market = '        kwargs["market"] = "from_token"\n'
+    _replace(provider, market, "        self._xonos_count(endpoint)\n" + market)
+    for docstring, method in (
+        ('        """Delete data from api."""\n', "DELETE"),
+        ('        """Put data on api."""\n', "PUT"),
+        ('        """Post data on api."""\n', "POST"),
+    ):
+        _replace(provider, docstring, f'{docstring}        self._xonos_count(endpoint, "{method}")\n')
+    _replace(
+        provider,
+        "        try:\n"
+        "            auth_info = await get_spotify_token(\n"
+        "                self.mass.http_session,\n"
+        "                # Xonos: senza la chiave di Music Assistant",
+        '        self._xonos_count("token")  # Xonos\n'
+        "        try:\n"
+        "            auth_info = await get_spotify_token(\n"
+        "                self.mass.http_session,\n"
+        "                # Xonos: senza la chiave di Music Assistant",
+    )
+    # Il blocco salvato e il conto se ne vanno con il servizio.
+    _replace(
+        provider,
+        "                _THROTTLERS.pop(self.instance_id, None)\n",
+        "                _THROTTLERS.pop(self.instance_id, None)\n"
+        "                # Xonos: anche il blocco salvato per il riavvio e il conto delle richieste\n"
+        "                self._xonos_block_file.unlink(missing_ok=True)\n"
+        "                for xonos_state in (_XONOS_REQUESTS, _XONOS_REPORTED, _XONOS_BLOCKED_UNTIL):\n"
+        "                    xonos_state.pop(self.instance_id, None)\n",
+    )
+    playable = "    async def _xonos_playable_again(self) -> None:\n"
+    _replace(provider, playable, SPOTIFY_LIMITS_METHODS + playable)
+    # Una ricerca su Spotify sul telefono è una richiesta sola: al massimo 10 per tipo. Xonos ne chiede 25, cioè tre
+    # richieste a ogni ricerca (Spotify ne dà 10 per volta), e la ricerca riparte a ogni pausa mentre si scrive.
+    _replace(
+        provider,
+        "        page_limit = min(limit, 10)\n",
+        '        if not app_var("spotify_client_id"):\n'
+        "            limit = min(limit, 10)  # Xonos: una richiesta sola per ricerca\n"
+        "        page_limit = min(limit, 10)\n",
+    )
+
+
+# Xonos: lo stato dei limiti di Spotify (_spotify_limits), accanto a _THROTTLERS.
+SPOTIFY_LIMITS_STATE = '''
+# Xonos: le richieste a Spotify degli ultimi 5 minuti per istanza (quando, tipo, per chi), quando il loro conto è
+# andato nel registro l'ultima volta e fin quando (ora del telefono) vale l'ultimo blocco scritto nel registro. Come
+# il throttler, sopravvivono a un nuovo caricamento del servizio.
+_XONOS_REQUESTS: dict[str, deque[tuple[float, str, str]]] = {}
+_XONOS_REPORTED: dict[str, float] = {}
+_XONOS_BLOCKED_UNTIL: dict[str, float] = {}
+_XONOS_WINDOW_S = 300
+# Xonos: oltre tante richieste in 5 minuti il loro conto va nel registro, al massimo ogni _XONOS_REPORT_S
+_XONOS_BUSY = 100
+_XONOS_REPORT_S = 600
+# Xonos: un blocco salvato per il riavvio vale al massimo 3 ore; se Spotify blocca ancora, la prima richiesta dopo
+# lo dice di nuovo
+_XONOS_BLOCK_FILE_S = 3 * 60 * 60
+# Xonos: nei dati dell'account, il nome e la risposta sugli audiolibri dell'ultimo accesso riuscito
+_XONOS_ACCOUNT_NAME = "xonos_account_name"
+_XONOS_AUDIOBOOKS = "xonos_audiobooks"
+'''
+
+# Xonos: i metodi di SpotifyProvider per i limiti di Spotify (_spotify_limits).
+SPOTIFY_LIMITS_METHODS = '''    def _xonos_stored_account(self) -> dict[str, Any] | None:
+        """Xonos: l'account dell'ultimo accesso riuscito (come Music Assistant 2.11), None se non ce n'è stato uno."""
+        if not (account_id := self.get_setup_value(CONF_ACCOUNT_ID)):
+            return None
+        return {"id": account_id, "display_name": self.get_setup_value(_XONOS_ACCOUNT_NAME) or account_id}
+
+    async def _xonos_login(self) -> None:
+        """
+        Xonos: l'accesso all'avvio del servizio.
+
+        Se Spotify ha bloccato le richieste (anche prima di un riavvio) o non risponde, il servizio parte lo stesso con
+        l'account dell'ultimo accesso riuscito, come in Music Assistant 2.11: Soloist e librespot suonano senza la Web
+        API, e la prima richiesta dopo il blocco rifà l'accesso. Prima il servizio non partiva e Music Assistant lo
+        riprovava ogni 2 minuti: a ogni tentativo un rinnovo del token, e PulseAudio acceso e spento in proot.
+        """
+        stored = self._xonos_stored_account()
+        if stored is not None and (remaining := self.throttler.cooldown_remaining) > MAX_WAIT_TIME:
+            self._sp_user = stored
+            self._xonos_user_unconfirmed = True
+            self.logger.info(
+                "Spotify: richieste bloccate ancora per %d minuti, il servizio usa l'account dell'ultimo accesso",
+                max(1, round(remaining / 60)),
+            )
+            return
+        try:
+            await self.login()
+        except ResourceTemporarilyUnavailable as err:
+            wait = min(float(err.backoff_time or 0), MAX_RETRY_AFTER)
+            if isinstance(err, RateLimited) and wait > MAX_WAIT_TIME:
+                self.throttler.set_cooldown(wait)
+                self._xonos_blocked(wait)
+            if stored is None:
+                raise
+            self._sp_user = stored
+            self._xonos_user_unconfirmed = True
+            self.logger.info("Spotify non risponde all'accesso (%s): il servizio usa l'account dell'ultimo accesso", err)
+
+    @property
+    def _xonos_block_file(self) -> Path:
+        """Xonos: il file del blocco di Spotify, per il riavvio."""
+        return Path(self.mass.storage_path) / f".xonos-spotify-block-{self.instance_id}"
+
+    def _xonos_key_mark(self) -> str:
+        """Xonos: un segno del Client ID in uso (non il Client ID): un blocco vale solo per l'app Spotify che l'ha preso."""
+        client_id = app_var("spotify_client_id") or str(self.get_setup_value(CONF_XONOS_CLIENT_ID) or "")
+        return hashlib.sha256(client_id.encode()).hexdigest()[:12]
+
+    def _xonos_blocked(self, seconds: float) -> None:
+        """
+        Xonos: Spotify ha chiesto di aspettare più di un minuto (Retry-After) e il throttler ha fermato le richieste.
+
+        Una riga nel registro, con le richieste degli ultimi 5 minuti (per capire chi le ha fatte), e il blocco in un
+        file: dopo un riavvio (Android chiude l'app) il servizio non chiede di nuovo a Spotify prima della fine.
+        Più richieste rifiutate insieme sono lo stesso blocco: una riga sola.
+        """
+        self.throttler.xonos_mark = self._xonos_key_mark()  # il blocco è dell'app Spotify di questo Client ID
+        until = time.time() + seconds
+        if until <= _XONOS_BLOCKED_UNTIL.get(self.instance_id, 0.0) + 60:
+            return
+        _XONOS_BLOCKED_UNTIL[self.instance_id] = until
+        self.logger.warning(
+            "Spotify ha bloccato le richieste per %d minuti (Retry-After %d s); richieste negli ultimi 5 min: %s",
+            max(1, round(seconds / 60)),
+            round(seconds),
+            self._xonos_requests(),
+        )
+        try:
+            self._xonos_block_file.write_text(
+                f"{time.time() + min(seconds, _XONOS_BLOCK_FILE_S):.0f} {self._xonos_key_mark()}"
+            )
+        except OSError as err:
+            self.logger.warning("Blocco di Spotify non salvato: %s", err)
+
+    def _xonos_restore_block(self) -> None:
+        """
+        Xonos: il blocco di Spotify salvato prima di un riavvio, se vale ancora e per questa app Spotify.
+
+        Il throttler resta lo stesso quando il servizio si ricarica: se la persona l'ha rifatto con un altro Client ID,
+        il blocco dell'app di prima si toglie anche dalla memoria.
+        """
+        if self.throttler.xonos_mark not in (None, self._xonos_key_mark()):
+            self.throttler._cooldown_until = 0.0
+            self.throttler.xonos_mark = None
+            _XONOS_BLOCKED_UNTIL.pop(self.instance_id, None)
+            self.logger.info("Spotify: un altro Client ID, il blocco dell'app di prima non vale più")
+        path = self._xonos_block_file
+        try:
+            until_text, mark = path.read_text().split()
+            remaining = min(float(until_text) - time.time(), _XONOS_BLOCK_FILE_S)
+        except FileNotFoundError:
+            return
+        except (OSError, ValueError):
+            remaining, mark = 0.0, ""
+        if remaining <= 0 or mark != self._xonos_key_mark():
+            path.unlink(missing_ok=True)
+            return
+        self.throttler.xonos_mark = mark
+        until = time.time() + remaining
+        _XONOS_BLOCKED_UNTIL[self.instance_id] = max(_XONOS_BLOCKED_UNTIL.get(self.instance_id, 0.0), until)
+        if remaining > self.throttler.cooldown_remaining + 60:
+            self.throttler.set_cooldown(remaining)
+            self.logger.info(
+                "Spotify: richieste ancora bloccate per %d minuti (blocco salvato prima del riavvio)",
+                max(1, round(remaining / 60)),
+            )
+
+    def _xonos_count(self, endpoint: str, method: str = "") -> None:
+        """
+        Xonos: una richiesta a Spotify, per il registro.
+
+        Di che tipo (l'indirizzo senza id né nomi) e per chi: bg un lavoro in disparte (sincronizzazione, metadati), play
+        la riproduzione, user una richiesta della persona. Si tengono gli ultimi 5 minuti; se sono più di _XONOS_BUSY,
+        il loro conto va nel registro, al massimo ogni _XONOS_REPORT_S.
+        """
+        family = re.sub(r"[0-9A-Za-z]{16,}", "{id}", endpoint.split("?")[0])
+        who = "bg" if ACTIVE_TASK_ID.get() else "play" if BYPASS_THROTTLER.get() else "user"
+        now = time.monotonic()
+        requests = _XONOS_REQUESTS.setdefault(self.instance_id, deque())
+        requests.append((now, f"{method} {family}" if method else family, who))
+        while now - requests[0][0] > _XONOS_WINDOW_S:
+            requests.popleft()
+        reported = _XONOS_REPORTED.get(self.instance_id)
+        if len(requests) > _XONOS_BUSY and (reported is None or now - reported > _XONOS_REPORT_S):
+            _XONOS_REPORTED[self.instance_id] = now
+            self.logger.info("Spotify Web API, richieste negli ultimi 5 min: %s", self._xonos_requests())
+
+    def _xonos_requests(self) -> str:
+        """Xonos: le richieste a Spotify degli ultimi 5 minuti, in tutto e per tipo e per chi (le più numerose prima)."""
+        now = time.monotonic()
+        counts = Counter(
+            (family, who)
+            for when, family, who in _XONOS_REQUESTS.get(self.instance_id, ())
+            if now - when <= _XONOS_WINDOW_S
+        )
+        if not counts:
+            return "nessuna"
+        parts = ", ".join(f"{family} {who} {count}" for (family, who), count in counts.most_common(12))
+        return f"{counts.total()} ({parts})"
+
+'''
+
+
 def _soloist(root: Path) -> None:
     """
     Soloist, il motore ufficiale di Spotify (tutti gli account Premium, anche quelli nuovi), sul telefono.
@@ -831,6 +1333,109 @@ def _soloist(root: Path) -> None:
         '                LOGGER.warning("suspend-sink %s %d failed", self._sink_name, int(suspended))\n'
         "            return\n"
         "        returncode, output = await check_output(\n",
+    )
+    # Come PulseAudio si accorda con chi suona (Soloist, pacat): il buffer e i pacchetti chiesti (tlength, minreq), la
+    # latenza, la memoria condivisa (SHM, memfd) e lo srbchannel, che decidono quante volte ogni secondo l'audio passa
+    # dal socket (e quindi da proot). PulseAudio lo dice solo a livello debug, e Music Assistant non gli dava né il
+    # livello né dove scrivere (senza un terminale può scegliere il journal, che sul telefono non c'è). Le righe
+    # dell'accordo vanno nel registro (ognuna al massimo una volta ogni 10 minuti), le altre restano in debug.
+    _replace(
+        capture,
+        '                f"--file={self._config_path}",\n',
+        '                f"--file={self._config_path}",\n'
+        "                # Xonos: i messaggi dell'accordo con chi suona, sullo stderr che legge _supervise\n"
+        '                "--log-target=stderr",\n'
+        '                "--log-level=debug",\n',
+    )
+    # Se PulseAudio scrive troppo (una riga a ogni pacchetto, per esempio a ogni fine di un "underrun"), passa a info
+    # col socket dei comandi: le righe vanno lette tutte, anche quelle che restano in debug.
+    _replace(
+        capture,
+        "                try:\n"
+        "                    async for line in proc.iter_stderr():\n"
+        '                        LOGGER.debug("pulseaudio: %s", line)\n',
+        "                try:\n"
+        "                    xonos_lines: deque[float] | None = deque()  # Xonos: le righe dell'ultimo minuto\n"
+        "                    xonos_failed = False  # Xonos: un passaggio a info già fallito (nel registro una volta sola)\n"
+        "                    async for line in proc.iter_stderr():\n"
+        '                        LOGGER.log(_xonos_pulse_level(line), "pulseaudio: %s", line)  # Xonos\n'
+        "                        if xonos_lines is not None and _xonos_pulse_chatty(xonos_lines):\n"
+        "                            xonos_lines = None\n"
+        "                            xonos_reply: str | None = None\n"
+        "                            if (controller := self._controller) is not None:\n"
+        "                                with suppress(Exception):  # un errore qui fermerebbe la lettura e PulseAudio\n"
+        "                                    xonos_reply = await asyncio.to_thread(\n"
+        '                                        controller._cli_send, "set-log-level 3"\n'
+        "                                    )\n"
+        "                            if xonos_reply is not None and not xonos_reply.strip():\n"
+        "                                LOGGER.info(\n"
+        '                                    "PulseAudio: più di %d righe in un minuto, da qui solo quelle di livello info",\n'
+        "                                    _XONOS_PULSE_MAX_LINES,\n"
+        "                                )\n"
+        "                            else:\n"
+        "                                # il socket dei comandi non c'è, non ha risposto o ha detto un errore: si riprova\n"
+        "                                # dopo altre _XONOS_PULSE_MAX_LINES righe (nel registro la prima volta)\n"
+        "                                LOGGER.log(\n"
+        "                                    logging.DEBUG if xonos_failed else logging.INFO,\n"
+        '                                    "PulseAudio: più di %d righe in un minuto, livello info non messo (%s): "\n'
+        '                                    "si riprova",\n'
+        "                                    _XONOS_PULSE_MAX_LINES,\n"
+        '                                    (xonos_reply or "").strip() or "socket dei comandi senza risposta",\n'
+        "                                )\n"
+        "                                xonos_failed = True\n"
+        "                                xonos_lines = deque()\n",
+    )
+    _replace(capture, "import threading\nimport uuid\n", "import threading\nimport time\nimport uuid\n")
+    _replace(capture, "from contextlib import suppress\n", "from collections import deque\nfrom contextlib import suppress\n")
+    _replace(
+        capture,
+        'LOGGER = logging.getLogger(f"{MASS_LOGGER_NAME}.helpers.pulse_capture")\n',
+        'LOGGER = logging.getLogger(f"{MASS_LOGGER_NAME}.helpers.pulse_capture")\n' + PULSE_LOG,
+    )
+    # Il ciclo che tiene collegata la WebSocket di Soloist si ricollegava subito quando la connessione si chiudeva senza
+    # errori: un Soloist che accetta e chiude lo faceva girare senza sosta (Python e, attraverso proot, connect e close).
+    # Ora, se Soloist è uscito, si smette; se è acceso, al massimo due collegamenti al secondo.
+    backend_file = root / "providers" / "spotify" / "backends" / "soloist.py"
+    _replace(
+        backend_file,
+        "_CONNECT_POLL_S: Final[float] = 0.05\n",
+        "_CONNECT_POLL_S: Final[float] = 0.05\n"
+        "# Xonos: il tempo minimo fra due collegamenti alla WebSocket di Soloist, quando si chiude senza errori\n"
+        "_XONOS_EVENTS_RETRY_S: Final[float] = 0.5\n",
+    )
+    _replace(
+        backend_file,
+        "        while not self._stopped:\n"
+        "            try:\n"
+        "                await client.listen_events(self._handle_event)\n"
+        "            except asyncio.CancelledError:\n"
+        "                raise\n"
+        "            except Exception as err:\n"
+        "                if self._engine_exited or proc.returncode is not None:\n"
+        "                    # the daemon exited (the item finished); the socket dying with\n"
+        "                    # it is not an error\n"
+        "                    return\n"
+        '                self.logger.debug("Soloist event connection lost, reconnecting: %s", err)\n'
+        "                await asyncio.sleep(_CONNECT_POLL_S)\n",
+        "        while not self._stopped:\n"
+        "            xonos_since = time.monotonic()\n"
+        "            try:\n"
+        "                await client.listen_events(self._handle_event)\n"
+        "            except asyncio.CancelledError:\n"
+        "                raise\n"
+        "            except Exception as err:\n"
+        "                if self._engine_exited or proc.returncode is not None:\n"
+        "                    # the daemon exited (the item finished); the socket dying with\n"
+        "                    # it is not an error\n"
+        "                    return\n"
+        '                self.logger.debug("Soloist event connection lost, reconnecting: %s", err)\n'
+        "                await asyncio.sleep(_CONNECT_POLL_S)\n"
+        "                continue\n"
+        "            # Xonos: chiusa senza errori. Soloist uscito: niente da riprendere; acceso: non più di due volte al secondo\n"
+        "            if self._engine_exited or proc.returncode is not None:\n"
+        "                return\n"
+        "            if (xonos_rest := _XONOS_EVENTS_RETRY_S - (time.monotonic() - xonos_since)) > 0:\n"
+        "                await asyncio.sleep(xonos_rest)\n",
     )
     # Dove va il tempo quando un brano di Soloist parte o si ferma: sul telefono ogni passo passa da proot. Tre
     # righe nel registro per brano, per capire dal registro di una persona cosa rende lenti play e salti.
@@ -886,6 +1491,47 @@ def _soloist(root: Path) -> None:
         "        self._teardown_done = True\n",
     )
 
+
+# Xonos: le righe di PulseAudio sull'accordo con chi suona, nel registro (vedi _soloist).
+PULSE_LOG = '''
+# Xonos: le righe di PulseAudio su come si accorda con chi suona: buffer e pacchetti (tlength, minreq), latenza, memoria
+# condivisa (SHM, memfd, il ripiego sulla memoria normale) e srbchannel. Nel registro a livello INFO, ognuna al massimo
+# una volta ogni _XONOS_PULSE_EVERY_S (a ogni brano si ripetono uguali); le altre righe di PulseAudio restano in debug.
+_XONOS_PULSE_WORDS: Final = ("Requested tlength", "Final latency", "srbchannel", "Negotiated SHM", "memory pool")
+_XONOS_PULSE_EVERY_S: Final = 600.0
+_xonos_pulse_said: dict[str, float] = {}
+# Xonos: le ultime righe sull'accordo, anche quelle non scritte nel registro (le legge l'autotest)
+_xonos_pulse_seen: deque[tuple[float, str]] = deque(maxlen=64)
+
+
+def _xonos_pulse_level(line: str) -> int:
+    """Xonos: il livello nel registro di una riga di PulseAudio."""
+    if not any(word in line for word in _XONOS_PULSE_WORDS):
+        return logging.DEBUG
+    now = time.monotonic()
+    _xonos_pulse_seen.append((now, line))
+    said = _xonos_pulse_said.get(line)
+    if said is not None and now - said < _XONOS_PULSE_EVERY_S:
+        return logging.DEBUG
+    if len(_xonos_pulse_said) > 200:
+        _xonos_pulse_said.clear()
+    _xonos_pulse_said[line] = now
+    return logging.INFO
+
+
+# Xonos: oltre tante righe di PulseAudio in un minuto (per esempio una a ogni pacchetto) il demone passa al livello info
+_XONOS_PULSE_MAX_LINES: Final = 1200
+
+
+def _xonos_pulse_chatty(times: deque[float]) -> bool:
+    """Xonos: una riga in più di PulseAudio; vero se nell'ultimo minuto sono almeno _XONOS_PULSE_MAX_LINES."""
+    now = time.monotonic()
+    times.append(now)
+    while now - times[0] > 60:
+        times.popleft()
+    return len(times) >= _XONOS_PULSE_MAX_LINES
+
+'''
 
 # Xonos: al posto della classe di Music Assistant, che usa libpulse con ctypes.
 PULSE_CONTROLLER = '''class PAVolumeController:
@@ -1133,7 +1779,9 @@ def _soloist_live(root: Path) -> None:
         "        self._xonos_park_task: asyncio.Task[None] | None = None\n"
         "        self._xonos_failures = {\"salto\": 0, \"ripresa\": 0}\n"
         "        self._xonos_failed_at = {\"salto\": 0.0, \"ripresa\": 0.0}\n"
-        "        self._xonos_retries = {\"salto\": 0, \"ripresa\": 0}\n",
+        "        self._xonos_retries = {\"salto\": 0, \"ripresa\": 0}\n"
+        "        # un salto o una ripresa non riusciti contano solo se poi il brano parte da capo (_xonos_fresh_run)\n"
+        "        self._xonos_unconfirmed: str | None = None\n",
     )
     _replace(
         backend,
@@ -1347,6 +1995,179 @@ def _soloist_live(root: Path) -> None:
     _replace(backend, "    # ---- internals ----\n", LIVE_RUN_METHODS + "    # ---- internals ----\n")
 
 
+def _soloist_connect(root: Path) -> None:
+    """
+    Soloist in modalità Spotify Connect: una sessione sola che cambia brano su comando.
+
+    Con --single-track (come in Music Assistant) Soloist suona un brano e si chiude, e si chiude anche appena gli si
+    chiede un altro brano: sul telefono dell'utente (0.1.52 e 0.1.53) ogni salto sulla sessione accesa finiva in
+    "websocket connection closed", e ogni avanti rifaceva processo e accesso a Spotify (circa 3,5 s in tutto). Senza
+    --single-track Soloist è un dispositivo Spotify Connect (il plugin Spotify Connect di Music Assistant lo usa così):
+    resta acceso, e play(uri) cambia brano. Qui: si avvia senza brano (_xonos_connect_args), casuale e ripeti spenti, poi
+    play del brano (un play senza activate, che suona sul posto senza passare la riproduzione alle app di Spotify); i
+    salti sono play(uri) sulla sessione accesa (_xonos_reuse, xonos_switch); a fine brano Soloist non esce: quando passa a
+    un altro brano (autoplay), o si ferma alla fine, il brano è finito e Soloist va in pausa, pronto per il prossimo
+    (_xonos_item_ended). Se in modalità Spotify Connect non parte, si torna a un processo per brano
+    (_xonos_fresh_run). Il telefono compare come dispositivo "Xonos" tra quelli dell'account (scelta dell'utente).
+    Provato in CI col finto Soloist (xonos_fake_soloist.py senza --single-track); con Spotify vero va provato sul telefono.
+    """
+    backend = root / "providers" / "spotify" / "backends" / "soloist.py"
+    _replace(
+        backend,
+        '        self._xonos_retries = {"salto": 0, "ripresa": 0}\n',
+        '        self._xonos_retries = {"salto": 0, "ripresa": 0}\n'
+        "        # Xonos: la modalità Spotify Connect (_xonos_fresh_run): quando la si riprova dopo un avvio non riuscito\n"
+        "        self._xonos_connect_blocked_until = 0.0\n"
+        "        self._xonos_connect_fails = 0\n"
+        "        # Xonos: gli account Spotify nella cartella dei dati di Soloist al primo avvio (_xonos_foreign_account)\n"
+        "        self._xonos_accounts: frozenset[str] | None = None\n",
+    )
+    _replace(
+        backend,
+        "from music_assistant.providers.spotify.helpers import soloist_session_present\n",
+        "from music_assistant.providers.spotify.helpers import (  # Xonos: anche gli account (_xonos_foreign_account)\n"
+        "    _soloist_session_accounts,\n"
+        "    soloist_session_present,\n"
+        ")\n",
+    )
+    _replace(
+        backend,
+        "        self._xonos_sink_at = self._xonos_started_at\n",
+        "        self._xonos_sink_at = self._xonos_started_at\n"
+        "        # Xonos: Soloist in modalità Spotify Connect (_soloist_connect), e la sua pausa dopo la fine di un brano\n"
+        "        self._xonos_connect = False\n"
+        "        self._xonos_holding = False\n",
+    )
+    # l'avvio: senza --single-track, attesa dell'accesso più corta (poi un processo per brano), e il brano chiesto con play
+    _replace(
+        backend,
+        "            backend._session_args(self.spotify_uri),\n",
+        "            # Xonos: in modalità Spotify Connect senza --single-track (_soloist_connect in prepare.py)\n"
+        "            backend._xonos_connect_args(self.spotify_uri)\n"
+        "            if self._xonos_connect\n"
+        "            else backend._session_args(self.spotify_uri),\n",
+    )
+    _replace(
+        backend,
+        "            async with asyncio.timeout(_STARTUP_TIMEOUT_S):\n                while not self._error and not (\n",
+        "            # Xonos: in modalità Spotify Connect l'attesa è più corta: se non entra, un processo per brano\n"
+        "            async with asyncio.timeout(_XONOS_CONNECT_LOGIN_S if self._xonos_connect else _STARTUP_TIMEOUT_S):\n"
+        "                while not self._error and not (\n",
+    )
+    _replace(
+        backend,
+        "                    client_ready.is_set() and client.connected and self._logged_in\n"
+        "                ):\n"
+        "                    await asyncio.sleep(_CONNECT_POLL_S)\n",
+        "                    client_ready.is_set() and client.connected and self._logged_in\n"
+        "                ):\n"
+        "                    if self._xonos_connect and not proc_running(proc):\n"
+        "                        # Xonos: un Soloist già uscito non entrerà più: subito un processo per brano\n"
+        '                        self._raise_startup_error("stopped before signing in")\n'
+        "                    await asyncio.sleep(_CONNECT_POLL_S)\n",
+    )
+    # In modalità Spotify Connect Soloist non esce da solo a fine brano: stop() non aspetta la sua uscita (5 s), lo chiude.
+    _replace(
+        backend,
+        "        if (self._engine_exited or self._item_over) and (proc := self._proc) is not None:\n",
+        "        # Xonos: in modalità Spotify Connect Soloist non esce a fine brano: la sua uscita non si aspetta\n"
+        "        if (self._engine_exited or (self._item_over and not self._xonos_connect)) and (\n"
+        "            proc := self._proc\n"
+        "        ) is not None:\n",
+    )
+    # Audio letto oltre la durata: con ripeti acceso da fuori Soloist ricomincia lo stesso brano, senza cambi né pause.
+    _replace(
+        backend,
+        "                self._read_bytes += len(chunk)\n",
+        "                self._read_bytes += len(chunk)\n"
+        "                if self._xonos_connect and self._xonos_overrun():\n"
+        "                    # Xonos: il brano è ricominciato (ripeti acceso da fuori): è finito\n"
+        "                    self._xonos_item_ended()\n"
+        "                    return\n",
+    )
+    _replace(
+        backend,
+        "        await self._await_playback_started(proc)\n",
+        "        if self._xonos_connect:\n"
+        "            # Xonos: in modalità Spotify Connect Soloist parte senza brano: il brano lo chiede play\n"
+        "            await self._xonos_connect_play(client)\n"
+        "        else:\n"
+        "            await self._await_playback_started(proc)\n",
+    )
+    _replace(
+        backend,
+        "                    fresh = _SingleTrackRun(self, spotify_uri, seek_position * 1000, streamdetails)\n"
+        "                    try:\n"
+        "                        await fresh.start()\n"
+        "                    except BaseException:\n"
+        "                        await fresh.stop()\n"
+        "                        raise\n"
+        "                    self._run = fresh\n",
+        "                    # Xonos: in modalità Spotify Connect se si può, sennò un processo per brano\n"
+        "                    fresh = await self._xonos_fresh_run(spotify_uri, seek_position, streamdetails)\n"
+        "                    self._run = fresh\n",
+    )
+    # Dopo la fine del brano gli stati di Soloist (che suona l'autoplay finché non va in pausa) non riaprono il sink; e il
+    # dispositivo "non attivo" non ferma niente: un play senza activate suona sul posto, e se un'altra app prende
+    # l'account Soloist va in pausa (allora si ferma la coda, come prima).
+    _replace(
+        backend,
+        "                self._xonos_parked or self._xonos_switching\n            ):\n",
+        "                self._xonos_parked or self._xonos_switching or self._item_over\n            ):\n",
+    )
+    _replace(
+        backend,
+        "        if self._xonos_parked or self._xonos_switching:\n"
+        "            # Xonos: in pausa tra due brani Soloist può smettere",
+        "        if self._xonos_parked or self._xonos_switching or self._xonos_connect:\n"
+        "            # Xonos: in pausa tra due brani Soloist può smettere",
+    )
+    # A fine brano Soloist in modalità Spotify Connect non esce: il brano è finito e Soloist va in pausa, pronto per il
+    # prossimo. Due modi: passa a un altro brano (l'autoplay di Spotify), o si ferma alla fine.
+    _replace(
+        backend,
+        "            self._item_over = True\n"
+        '            self.logger.debug("Engine wandered to %s; %s has ended", uri, self.spotify_uri)\n',
+        "            if self._xonos_connect:\n"
+        "                # Xonos: in modalità Spotify Connect Soloist non esce a fine brano: va in pausa, per il prossimo\n"
+        '                self.logger.debug("Engine wandered to %s; %s has ended", uri, self.spotify_uri)\n'
+        "                self._xonos_item_ended()\n"
+        "                return\n"
+        "            self._item_over = True\n"
+        '            self.logger.debug("Engine wandered to %s; %s has ended", uri, self.spotify_uri)\n',
+    )
+    _replace(
+        backend,
+        '            if was_playing and data.status == "paused":\n',
+        "            if was_playing and (\n"
+        '                data.status == "paused"\n'
+        "                # Xonos: in modalità Spotify Connect, senza autoplay, Soloist può fermarsi alla fine del brano\n"
+        '                or (self._xonos_connect and data.status in ("stopped", "idle"))\n'
+        "            ):\n",
+    )
+    _replace(
+        backend,
+        "        # only the Spotify app or Web API pauses the engine, and a paused engine stalls\n",
+        "        if self._xonos_connect and self._xonos_near_end():\n"
+        "            # Xonos: in modalità Spotify Connect, senza autoplay, Soloist si ferma alla fine del brano: è la fine\n"
+        "            # del brano, non una pausa chiesta dall'app di Spotify\n"
+        "            self._xonos_item_ended()\n"
+        "            return\n"
+        "        # only the Spotify app or Web API pauses the engine, and a paused engine stalls\n",
+    )
+    # Subito dopo un avvio o un cambio di brano, le righe di Soloist nel registro: dal registro di una persona si vede
+    # cosa fa Soloist mentre carica il brano (e perché, se non va).
+    _replace(
+        backend,
+        '            self.logger.debug("[soloist] %s", text)\n',
+        "            # Xonos: subito dopo un avvio o un cambio di brano le righe di Soloist vanno nel registro\n"
+        "            if time.monotonic() - self._xonos_started_at < _XONOS_ENGINE_LOG_S:\n"
+        '                self.logger.info("[soloist] %s", text[:300])\n'
+        "            else:\n"
+        '                self.logger.debug("[soloist] %s", text)\n',
+    )
+
+
 def _phone_chain(root: Path) -> None:
     """
     Il percorso dell'audio dal servizio al lettore del telefono: un passo in meno e i tempi nel registro.
@@ -1499,6 +2320,28 @@ _XONOS_POLL_S: Final[float] = 0.01
 _XONOS_SEEK_PAUSED_S: Final[float] = 0.3
 # Xonos: mentre cambia brano, quanto oltre il punto chiesto può stare la posizione che conferma il seek
 _XONOS_SEEK_AHEAD_MS: Final[int] = 1000
+# Xonos: Soloist in modalità Spotify Connect (_soloist_connect in prepare.py): una sessione sola che cambia brano su
+# comando. Se non parte si torna a un processo per brano, e la si riprova dopo _XONOS_CONNECT_RETRY_S (raddoppiato a ogni
+# nuovo fallimento, fino a 16 ore)
+_XONOS_CONNECT: Final[bool] = True
+_XONOS_CONNECT_LOGIN_S: Final[float] = 8.0
+_XONOS_CONNECT_RETRY_S: Final[float] = 1800.0
+# Xonos: il nome del telefono nei dispositivi Spotify Connect dell'account
+_XONOS_DEVICE_NAME: Final[str] = "Xonos"
+# Xonos: in modalità Spotify Connect, una pausa a meno di tanto dalla fine (posizione di Soloist, o audio letto) è la
+# fine del brano, non una pausa chiesta dall'app di Spotify
+_XONOS_END_MS: Final[int] = 3000
+_XONOS_END_READ_S: Final[float] = 5.0
+# Xonos: per quanto, dopo un avvio o un cambio di brano, le righe di Soloist vanno nel registro (sennò solo in debug)
+_XONOS_ENGINE_LOG_S: Final[float] = 15.0
+# Xonos: in modalità Spotify Connect, audio letto oltre la durata del brano di tanto: il brano ricomincia (ripeti acceso da
+# fuori), ed è finito
+_XONOS_OVERRUN_S: Final[float] = 5.0
+
+
+def _xonos_now() -> float:
+    """Xonos: i secondi da quando il telefono è acceso, sospensione compresa (time.monotonic() su Android si ferma)."""
+    return time.clock_gettime(time.CLOCK_BOOTTIME)
 '''
 
 # Xonos: i metodi di SoloistBackend per la sessione che resta accesa (_soloist_live).
@@ -1512,14 +2355,6 @@ LIVE_BACKEND_METHODS = '''    async def _xonos_release(self, run: _SingleTrackRu
         si spegne.
         """
         async with self._run_lock:
-            if self._run is run and run.xonos_can_park():
-                try:
-                    await run.xonos_park()
-                except Exception as err:  # noqa: BLE001 - se non va in pausa bene si spegne, come prima
-                    self.logger.info("Soloist: non resta in pausa (%s), lo spengo", err)
-                else:
-                    self._xonos_arm_park(run)
-                    return
             if run._item_over and run._delivered:
                 # per il registro: a fine brano, quanto audio in quanto tempo dal sink ripartito (l'avvio ha la sua
                 # riga). Il tubo si legge a 1,1x dopo un primo secondo senza freno: se Soloist tiene il passo il
@@ -1531,6 +2366,14 @@ LIVE_BACKEND_METHODS = '''    async def _xonos_release(self, run: _SingleTrackRu
                     spent,
                     run._delivered / _BYTES_PER_SECOND / max(spent, 0.001),
                 )
+            if self._run is run and run.xonos_can_park():
+                try:
+                    await run.xonos_park()
+                except Exception as err:  # noqa: BLE001 - se non va in pausa bene si spegne, come prima
+                    self.logger.info("Soloist: non resta in pausa (%s), lo spengo", err)
+                else:
+                    self._xonos_arm_park(run)
+                    return
             await run.stop()
             if self._run is run:
                 self._run = None
@@ -1547,12 +2390,18 @@ LIVE_BACKEND_METHODS = '''    async def _xonos_release(self, run: _SingleTrackRu
 
         Lo stesso brano è una ripresa (alla posizione chiesta), un altro è un salto. Falso se non si può o non va:
         allora si riparte da capo, come prima. Dopo _XONOS_TRIES salti (o riprese) falliti di fila non si provano più
-        per _XONOS_RETRY_S.
+        per _XONOS_RETRY_S. Il salto solo in modalità Spotify Connect: con un processo per brano (--single-track)
+        Soloist si chiude appena gli si chiede un altro brano (visto sul telefono, "websocket connection closed").
         """
-        same = spotify_uri == run.spotify_uri
+        same = spotify_uri == run.spotify_uri and not run._item_over
         what = "ripresa" if same else "salto"
+        if not same and not run._xonos_connect:
+            return False
+        if run._xonos_connect and await asyncio.to_thread(self._xonos_foreign_account):
+            self.logger.info("Soloist: la sessione accesa non si riusa (c'è un altro account Spotify)")
+            return False
         if self._xonos_failures[what] >= _XONOS_TRIES:
-            if time.monotonic() - self._xonos_failed_at[what] < self._xonos_retry_after(what):
+            if _xonos_now() - self._xonos_failed_at[what] < self._xonos_retry_after(what):
                 return False
             # passato un po' di tempo (la galleria è finita): un altro tentativo
             self._xonos_failures[what] = _XONOS_TRIES - 1
@@ -1570,15 +2419,12 @@ LIVE_BACKEND_METHODS = '''    async def _xonos_release(self, run: _SingleTrackRu
             await asyncio.shield(self._xonos_drop(run))
             raise
         except Exception as err:  # noqa: BLE001 - si riparte da capo, come prima
-            self._xonos_failures[what] += 1
-            self._xonos_failed_at[what] = time.monotonic()
-            if self._xonos_failures[what] >= _XONOS_TRIES:
-                self.logger.warning(
-                    "Soloist: %s sulla sessione accesa non riesce, per %.0f minuti si riparte da capo",
-                    what,
-                    self._xonos_retry_after(what) / 60,
-                )
-            self.logger.info("Soloist: %s sulla sessione accesa non riuscito (%s), riparte da capo", what, err)
+            # conta solo se poi il brano parte da capo (_xonos_fresh_run): un brano che Spotify non dà, o la rete che
+            # manca, non dicono niente della sessione accesa
+            self._xonos_unconfirmed = what
+            self.logger.info(
+                "Soloist: %s sulla sessione accesa non riuscito (%s), riparte da capo", what, err or type(err).__name__
+            )
             return False
         self._xonos_failures[what] = 0
         self._xonos_retries[what] = 0
@@ -1599,6 +2445,123 @@ LIVE_BACKEND_METHODS = '''    async def _xonos_release(self, run: _SingleTrackRu
         await run.stop()
         if self._run is run:
             self._run = None
+
+    async def _xonos_fresh_run(
+        self, spotify_uri: str, seek_position: int, streamdetails: StreamDetails | None
+    ) -> _SingleTrackRun:
+        """
+        Xonos: avvia Soloist per questo brano, se si può in modalità Spotify Connect.
+
+        In modalità Spotify Connect (senza --single-track) Soloist resta acceso e cambia brano su comando: i salti e la
+        fine di un brano non rifanno né il processo né l'accesso a Spotify. Se in quella modalità non parte, questo brano
+        e i prossimi (per _XONOS_CONNECT_RETRY_S, raddoppiato a ogni nuovo fallimento) vanno con un processo per brano,
+        come in Music Assistant.
+        """
+        if await asyncio.to_thread(self._xonos_foreign_account):
+            # Soloist ha dentro l'accesso di un altro account: non si suona finché non si rifà l'abbinamento
+            self._xonos_unconfirmed = None
+            self.logger.warning(
+                "Soloist: un altro account Spotify è entrato in Soloist dalla rete locale; va rifatto l'abbinamento"
+            )
+            error = LoginFailed(
+                "Another Spotify account signed in to Spotify Soloist from the local network",
+                translation_key="soloist_pairing_required",
+                translation_owner="provider.spotify",
+            )
+            if self.provider.available:
+                self.provider.unload_with_error(error)
+            raise error
+        connect_error: Exception | None = None
+        if _XONOS_CONNECT and _xonos_now() >= self._xonos_connect_blocked_until:
+            run = _SingleTrackRun(self, spotify_uri, seek_position * 1000, streamdetails)
+            run._xonos_connect = True
+            # finché suona il brano chiesto, le notizie di Soloist (un brano di prima, il dispositivo) non contano
+            run._xonos_switching = True
+            try:
+                await run.start()
+            except Exception as err:  # noqa: BLE001 - si prova con un processo per brano, come prima
+                await run.stop()
+                if run._unpaired:
+                    # l'abbinamento non c'è più: con un processo per brano sarebbe lo stesso
+                    self._xonos_unconfirmed = None
+                    raise
+                connect_error = err
+                self.logger.info(
+                    "Soloist: in modalità Spotify Connect non parte (%s), provo un processo per brano",
+                    err or type(err).__name__,
+                )
+            except BaseException:
+                self._xonos_unconfirmed = None
+                await run.stop()
+                raise
+            else:
+                self._xonos_connect_fails = 0
+                self._xonos_count_failure()
+                return run
+        run = _SingleTrackRun(self, spotify_uri, seek_position * 1000, streamdetails)
+        try:
+            await run.start()
+        except BaseException:
+            # non parte nemmeno così (brano non disponibile, niente rete...): non è colpa della modalità Spotify Connect
+            # né della sessione accesa, e non si conta
+            self._xonos_unconfirmed = None
+            await run.stop()
+            raise
+        self._xonos_count_failure()
+        if connect_error is not None:
+            # un processo per brano parte e la modalità Spotify Connect no: per un po' un processo per brano
+            wait = _XONOS_CONNECT_RETRY_S * 2 ** min(self._xonos_connect_fails, 5)
+            self._xonos_connect_fails += 1
+            self._xonos_connect_blocked_until = _xonos_now() + wait
+            self.logger.warning(
+                "Soloist: in modalità Spotify Connect non parte (%s); per %.0f minuti un processo per brano",
+                connect_error or type(connect_error).__name__,
+                wait / 60,
+            )
+        return run
+
+    def _xonos_count_failure(self) -> None:
+        """Xonos: il salto (o la ripresa) di prima non riuscito conta: dopo è partito da capo, quindi era la sessione."""
+        what = self._xonos_unconfirmed
+        self._xonos_unconfirmed = None
+        if what is None:
+            return
+        self._xonos_failures[what] += 1
+        self._xonos_failed_at[what] = _xonos_now()
+        if self._xonos_failures[what] >= _XONOS_TRIES:
+            self.logger.warning(
+                "Soloist: %s sulla sessione accesa non riesce, per %.0f minuti si riparte da capo",
+                what,
+                self._xonos_retry_after(what) / 60,
+            )
+
+    def _xonos_foreign_account(self) -> bool:
+        """
+        Xonos: se nella cartella dei dati di Soloist è entrato un altro account Spotify (bloccante).
+
+        In modalità Spotify Connect Soloist si annuncia nella rete locale, e un altro account può prenderlo dalla sua app
+        ("any Spotify account may claim it", README del plugin Spotify Connect di Music Assistant). Soloist tiene ogni
+        account in settings/Users/<nome>-user: quelli del primo controllo sono l'abbinamento della persona, e uno nuovo
+        (o più di uno) vuol dire l'accesso di un altro.
+        """
+        accounts = frozenset(_soloist_session_accounts(self._data_dir))
+        if self._xonos_accounts is None:
+            self._xonos_accounts = accounts
+        return len(accounts) > 1 or not accounts <= self._xonos_accounts
+
+    def _xonos_connect_args(self, spotify_uri: str) -> list[str]:
+        """
+        Xonos: gli argomenti di Soloist in modalità Spotify Connect.
+
+        Quelli di un processo per brano (_session_args) senza --single-track: Soloist parte senza brano, col nome
+        _XONOS_DEVICE_NAME nei dispositivi dell'account, e il brano lo chiede _SingleTrackRun._xonos_connect_play.
+        """
+        args = self._session_args(spotify_uri)
+        index = args.index("--single-track")
+        del args[index : index + 2]
+        if "--device-name" in args:
+            args[args.index("--device-name") + 1] = _XONOS_DEVICE_NAME
+        return args
 
     def _xonos_arm_park(self, run: _SingleTrackRun) -> None:
         """Xonos: dopo _XONOS_PARK_S senza brani il Soloist in pausa si spegne."""
@@ -1631,11 +2594,15 @@ LIVE_RUN_METHODS = '''    # ---- Xonos: la sessione che resta accesa tra un bran
         return self._xonos_parked
 
     def xonos_can_park(self) -> bool:
-        """Whether the run can stay on, paused, for the next item: alive, signed in, mid-item."""
+        """
+        Whether the run can stay on, paused, for the next item: alive, signed in, mid-item.
+
+        In Spotify Connect mode also after the item ended: the engine does not exit, it moved on and was paused.
+        """
         return (
             not self._stopped
             and self._error is None
-            and not self._item_over
+            and (self._xonos_connect or not self._item_over)
             and not self._engine_exited
             and proc_running(self._proc)
             and self._client is not None
@@ -1655,12 +2622,7 @@ LIVE_RUN_METHODS = '''    # ---- Xonos: la sessione che resta accesa tra un bran
         # si aspetta qui, dove ferma il salto, ma al cambio di brano dopo (xonos_switch), che di solito la trova già
         # arrivata. Se non arriva, la sessione non si riusa.
         await self._set_sink(running=False)
-        pause = asyncio.ensure_future(asyncio.wait_for(client.pause(await_result=True), _XONOS_COMMAND_S))
-        # un errore lo guarda xonos_unusable o xonos_switch; qui solo perché asyncio non lo segnali come perso
-        pause.add_done_callback(lambda task: task.cancelled() or task.exception())
-        self._xonos_pause = pause
-        # stop() la annulla, se Soloist si spegne prima
-        self._tasks.append(pause)
+        self._xonos_send_pause()
         if (task := self._xonos_reader_task) is not None:
             self._xonos_reader_task = None
             await _cancel_and_join([task])
@@ -1685,8 +2647,13 @@ LIVE_RUN_METHODS = '''    # ---- Xonos: la sessione che resta accesa tra un bran
         if self._logged_in is False:
             return "accesso a Spotify perso"
         pause = self._xonos_pause
-        if pause is not None and pause.done() and (pause.cancelled() or pause.exception() is not None):
-            return "pausa non confermata"
+        if (
+            pause is not None
+            and pause.done()
+            and (pause.cancelled() or pause.exception() is not None)
+            and self._engine_playing
+        ):
+            return "pausa non riuscita"
         # the engine reads its loudness setting only when it starts
         saved = self.queue_id
         self.queue_id = streamdetails.queue_id if streamdetails is not None else None
@@ -1714,7 +2681,8 @@ LIVE_RUN_METHODS = '''    # ---- Xonos: la sessione che resta accesa tra un bran
         """
         client = self._client
         assert client is not None
-        same = spotify_uri == self.spotify_uri
+        # after the item ended (Spotify Connect mode) the engine is on another one: the same uri is played again
+        same = spotify_uri == self.spotify_uri and not self._item_over
         marks = [time.monotonic()]
         self._xonos_switching = True
         self._xonos_seek_sent = False
@@ -1736,6 +2704,7 @@ LIVE_RUN_METHODS = '''    # ---- Xonos: la sessione che resta accesa tra un bran
         self._position_ms = None
         self._engine_playing = False
         self._item_over = False
+        self._xonos_holding = False
         self._delivery_done = False
         self._delivered = 0
         self._read_bytes = 0
@@ -1748,7 +2717,13 @@ LIVE_RUN_METHODS = '''    # ---- Xonos: la sessione che resta accesa tra un bran
             self._xonos_pause = None
             with suppress(ValueError):
                 self._tasks.remove(pause)
-            await pause
+            try:
+                await pause
+            except Exception:
+                # a pause may get no ack (Music Assistant's Spotify Connect provider tolerates that too): what counts is
+                # that the engine reports not playing
+                if self._engine_playing:
+                    raise
         marks.append(time.monotonic())
         await self._xonos_drain()
         marks.append(time.monotonic())
@@ -1802,6 +2777,87 @@ LIVE_RUN_METHODS = '''    # ---- Xonos: la sessione che resta accesa tra un bran
             if time.monotonic() - begun >= (_XONOS_SWITCH_S if loaded else _JUMP_TIMEOUT_S):
                 raise AudioError("Spotify Soloist did not start the asked item in time")
             await asyncio.sleep(_XONOS_POLL_S)
+
+    async def _xonos_connect_play(self, client: SoloistClient) -> None:
+        """
+        Spotify Connect mode: the engine started with no item; shuffle and repeat off, then play this run's item.
+
+        A bare play (no activate) plays locally without a Connect transfer, as the Spotify Connect provider of Music
+        Assistant notes: the Spotify apps are not handed this playback, as with --single-track.
+        """
+        begun = time.monotonic()
+        try:
+            await asyncio.wait_for(client.play(self.spotify_uri, await_result=True), _XONOS_COMMAND_S)
+        except TimeoutError:
+            raise AudioError("Spotify Soloist did not confirm play") from None
+        # shuffle and repeat off after the play (before it the engine has no item and may refuse them with no ack),
+        # while the item loads: they only matter at its end, and one refused does not stop the Spotify Connect mode
+        self._spawn_task(self._xonos_connect_options(client))
+        await self._xonos_await_playing(False, begun)
+        self._xonos_switching = False
+
+    async def _xonos_connect_options(self, client: SoloistClient) -> None:
+        """Spotify Connect mode: shuffle and repeat off; one not confirmed only goes in the log."""
+        for name, send in (
+            ("set_shuffle", client.set_shuffle),
+            ("set_repeat_track", client.set_repeat_track),
+            ("set_repeat_context", client.set_repeat_context),
+        ):
+            try:
+                await asyncio.wait_for(send(False, await_result=True), _XONOS_COMMAND_S)
+            except Exception as err:  # noqa: BLE001 - solo nel registro
+                self.logger.info("Soloist: %s non confermato (%s)", name, err or type(err).__name__)
+
+    def _xonos_item_ended(self) -> None:
+        """
+        Spotify Connect mode: the item ended (the engine moved on, or paused at its end).
+
+        The engine does not exit as with --single-track: its audio is done (_item_over), and it is paused so it plays
+        nothing more to nobody; then the run waits for the next item, which plays on the same session.
+        """
+        self._item_over = True
+        self._finish_delivery()
+        if not self._xonos_holding:
+            self._xonos_holding = True
+            self._spawn_task(self._xonos_hold())
+
+    async def _xonos_hold(self) -> None:
+        """Suspend the sink and pause the engine after its item, if it plays on (Spotify Connect mode)."""
+        await self._set_sink(running=False)
+        if not self._xonos_parked:
+            self._xonos_send_pause()
+
+    def _xonos_send_pause(self) -> None:
+        """
+        Pause the engine, once and only if it plays: a pause to an engine that stopped by itself may get no ack.
+
+        The ack is checked by xonos_unusable and xonos_switch, not here: an error does not fail the run.
+        """
+        client = self._client
+        if self._xonos_pause is not None or not self._engine_playing or client is None or not client.connected:
+            return
+        pause = asyncio.ensure_future(asyncio.wait_for(client.pause(await_result=True), _XONOS_COMMAND_S))
+        # an error is looked at by xonos_unusable or xonos_switch; here only so asyncio does not report it as lost
+        pause.add_done_callback(lambda task: task.cancelled() or task.exception())
+        self._xonos_pause = pause
+        # stop() cancels it, if the engine goes first
+        self._tasks.append(pause)
+
+    def _xonos_overrun(self) -> bool:
+        """Whether more audio than the item lasts was read: the engine started it over (Spotify Connect mode)."""
+        if not self._duration_ms:
+            return False
+        read_s = self._read_bytes / _BYTES_PER_SECOND
+        return read_s > (self._duration_ms - self._seek_target_ms) / 1000 + _XONOS_OVERRUN_S
+
+    def _xonos_near_end(self) -> bool:
+        """Whether the item is at its end: by the engine's position, or by the audio read (Spotify Connect mode)."""
+        if not self._duration_ms:
+            return False
+        if self._position_ms is not None and self._position_ms >= self._duration_ms - _XONOS_END_MS:
+            return True
+        read_s = self._read_bytes / _BYTES_PER_SECOND
+        return read_s >= (self._duration_ms - self._seek_target_ms) / 1000 - _XONOS_END_READ_S
 
     async def _xonos_drain(self) -> None:
         """Read away what the item before left in the FIFO (the sink is suspended: nothing new arrives)."""

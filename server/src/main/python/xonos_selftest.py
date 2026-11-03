@@ -6,7 +6,9 @@ xonos_server lo avvia dopo la partenza del server quando nella cartella dei dati
 si può: Music Assistant scarica Soloist (col consenso) e lo prova, avvia PulseAudio come per un brano, crea il
 "pipe sink" e ci passa un suono, poi accende Soloist con una chiave finta finché aspetta l'abbinamento.
 Poi lo ferma come lo ferma Music Assistant (AsyncProcess.close), guarda quanto processore usano proot e PulseAudio
-con dieci secondi di audio a tempo reale, e che PulseAudio si fermi quando non serve più.
+con dieci secondi di audio a tempo reale, con e senza la memoria condivisa di PulseAudio (memfd e srbchannel), e che
+PulseAudio si fermi quando non serve più. Prima di tutto, senza Spotify, il blocco di Spotify nel throttler di Music
+Assistant (spotify-blocco).
 Nel registro di Music Assistant: righe "XONOS_SELFTEST <prova> ok|fail <dettagli>" e alla fine
 "XONOS_SELFTEST fine <riuscite>/<prove>".
 """
@@ -14,10 +16,13 @@ Nel registro di Music Assistant: righe "XONOS_SELFTEST <prova> ok|fail <dettagli
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
+import re
 import signal
 import sys
+import threading
 import time
 from contextlib import suppress
 from pathlib import Path
@@ -28,6 +33,9 @@ SOLOIST_WAIT_S = 30
 GO_WAIT_S = 900
 FIFO_READ_S = 4
 CPU_AUDIO_S = 10
+# pulse-memfd: secondi di audio per ognuna delle due prove, e la latenza chiesta da pacat (pacchetti piccoli, come Soloist)
+PULSE_AB_S = 4
+PULSE_AB_LATENCY_MS = 20
 # Il tubo del pipe sink di Music Assistant: s32le, 44,1 kHz, stereo.
 FIFO_BYTES_PER_S = 44100 * 8
 
@@ -51,6 +59,21 @@ async def run(mass: Any) -> None:
         LOGGER.info("XONOS_SELFTEST fine 0/1")
         return
 
+    # Il blocco di Spotify (Retry-After lungo) nel throttler di Music Assistant, con un servizio finto: un secondo.
+    try:
+        block_ok, detail = await _spotify_block()
+        say("spotify-blocco", block_ok, detail)
+    except Exception as err:  # noqa: BLE001
+        say("spotify-blocco", False, repr(err))
+
+    # Il profilo di Python che xonos_server scrive quando Python lavora tanto: thread, lavori di Music Assistant e
+    # dove sta il ciclo. Qui con un ciclo occupato a scrivere JSON e thread che nascono e finiscono: tre secondi.
+    try:
+        profile_ok, detail = await _profile_check(_server_module())
+        say("profilo", profile_ok, detail)
+    except Exception as err:  # noqa: BLE001
+        say("profilo", False, repr(err))
+
     binary = None
     try:
         from music_assistant.providers.spotify_connect.soloist import SoloistBinaryManager  # noqa: PLC0415
@@ -58,6 +81,9 @@ async def run(mass: Any) -> None:
         manager = SoloistBinaryManager(mass)
         binary = await manager.ensure_fresh(consent=True)
         say("soloist-download", True, f"{binary} {manager.diagnostics()}")
+        # Le opzioni di Soloist: in modalità Spotify Connect si annuncia nella rete locale (zeroconf), e un'opzione per
+        # non farlo (come --disable-discovery di librespot) chiuderebbe la porta agli altri account. Solo per saperlo.
+        say("soloist-opzioni", True, await _soloist_help(binary))
     except Exception as err:  # noqa: BLE001
         say("soloist-download", False, repr(err))
 
@@ -116,6 +142,12 @@ async def run(mass: Any) -> None:
             say("cpu-audio", flowing, detail)
         except Exception as err:  # noqa: BLE001
             say("cpu-audio", False, repr(err))
+        # Lo stesso con poca latenza, senza e con la memoria condivisa di PulseAudio: cosa cambia per proot.
+        try:
+            played, detail = await _pulse_memfd(server, sink, Path(mass.cache_path))
+            say("pulse-memfd", played, detail)
+        except Exception as err:  # noqa: BLE001
+            say("pulse-memfd", False, repr(err))
 
     if sink is not None:
         with suppress(Exception):
@@ -127,6 +159,122 @@ async def run(mass: Any) -> None:
         left = await _still_running("pulseaudio")
         say("pulseaudio-ferma", not left, f"processi rimasti: {len(left)}")
     LOGGER.info("XONOS_SELFTEST fine %d/%d", sum(results), len(results))
+
+
+async def _spotify_block() -> tuple[bool, str]:
+    """
+    Il blocco di Spotify nel throttler di Music Assistant (_spotify_limits in prepare.py), con un servizio finto.
+
+    Un primo 429 con Retry-After 3555 s: errore subito, coi minuti che mancano e i testi di Spotify, e chi usa il
+    throttler lo viene a sapere una volta. Poi una chiamata della riproduzione (BYPASS_THROTTLER) si ferma senza
+    chiamare il servizio. Fuori da un blocco la riproduzione non aspetta un blocco breve, ma prende un posto nel limite:
+    con un limite di 3 al secondo, 6 chiamate di fila ci mettono circa un secondo.
+    """
+    from music_assistant_models.errors import RateLimited, RetriesExhausted  # noqa: PLC0415
+
+    from music_assistant.helpers.throttle_retry import (  # noqa: PLC0415
+        BYPASS_THROTTLER,
+        ThrottlerManager,
+        throttle_with_retries,
+    )
+
+    class Service:
+        """Un servizio finto con il throttler di Music Assistant: conta le chiamate, la prima può ricevere un 429."""
+
+        def __init__(self, rate_limit: int, refuse_first: bool = False) -> None:
+            self.logger = logging.getLogger("xonos.selftest.throttle")
+            self.throttler = ThrottlerManager(rate_limit=rate_limit, period=1)
+            self.calls = 0
+            self.refuse_first = refuse_first
+
+        @throttle_with_retries
+        async def get(self) -> int:
+            self.calls += 1
+            if self.refuse_first and self.calls == 1:
+                raise RateLimited("429 finto", backoff_time=3555)
+            return self.calls
+
+    async def error_of(call: Any) -> BaseException | None:
+        try:
+            await call
+        except Exception as err:  # noqa: BLE001 - è quello che si guarda
+            return err
+        return None
+
+    def key(err: BaseException | None) -> str:
+        if err is None:
+            return "nessun errore"
+        args = getattr(err, "translation_args", None)
+        return f"{type(err).__name__} {getattr(err, 'translation_key', None)} {args} {getattr(err, 'translation_owner', None)}"
+
+    problems: list[str] = []
+    blocked = Service(2, refuse_first=True)
+    told: list[float] = []
+    blocked.throttler.xonos_on_block = told.append
+    blocked.throttler.xonos_owner = "provider.spotify"
+    first = await error_of(blocked.get())
+    wanted = isinstance(first, RetriesExhausted) and first.translation_key == "xonos_rate_limited"
+    if not (wanted and first.translation_args == [59] and first.translation_owner == "provider.spotify"):
+        problems.append(f"primo errore: {key(first)}")
+    if told != [3555]:
+        problems.append(f"avvisi del blocco: {told}")
+    token = BYPASS_THROTTLER.set(True)
+    try:
+        second = await error_of(blocked.get())
+        free = Service(3)
+        free.throttler.set_cooldown(30)  # un blocco breve: la riproduzione non lo aspetta
+        start = time.monotonic()
+        await free.get()
+        short = time.monotonic() - start
+        start = time.monotonic()
+        await asyncio.gather(*(free.get() for _ in range(5)))
+        burst = time.monotonic() - start
+    finally:
+        BYPASS_THROTTLER.reset(token)
+    if not (isinstance(second, RetriesExhausted) and second.translation_key == "xonos_rate_limited"):
+        problems.append(f"riproduzione durante il blocco: {key(second)}")
+    if blocked.calls != 1:
+        problems.append(f"il servizio chiamato {blocked.calls} volte invece di una")
+    if short > 0.5:
+        problems.append(f"la riproduzione ha aspettato un blocco breve ({short:.2f} s)")
+    if free.calls != 6 or burst < 0.8:
+        problems.append(f"fuori dal blocco: {free.calls} chiamate in {burst:.2f} s (attese 6 in circa 1 s)")
+    detail = (
+        f"429 con Retry-After 3555 s: {key(first)}, avvisi {told}; la riproduzione durante il blocco: {key(second)},"
+        f" chiamate al servizio {blocked.calls}; fuori dal blocco: blocco breve aspettato {short:.2f} s,"
+        f" 6 chiamate col limite di 3 al secondo in {burst:.2f} s"
+    )
+    return not problems, f"{'; '.join(problems)} | {detail}" if problems else detail
+
+
+async def _profile_check(module: Any) -> tuple[bool, str]:
+    """Il profilo di Python: il ciclo che lavora (json) si vede, e thread che nascono e finiscono non fermano niente."""
+    stop = time.monotonic() + 3
+    payload = [{"n": i, "items": list(range(30))} for i in range(200)]
+
+    async def busy() -> None:
+        while time.monotonic() < stop:
+            end = time.perf_counter() + 0.012
+            while time.perf_counter() < end:
+                json.dumps(payload)
+            await asyncio.sleep(0.008)
+
+    def churn() -> None:
+        while time.monotonic() < stop:
+            short = threading.Thread(target=lambda: sum(range(20000)), name="breve")
+            short.start()
+            short.join()
+
+    work = asyncio.create_task(busy())
+    threading.Thread(target=churn, daemon=True).start()
+    ticks = os.sysconf("SC_CLK_TCK") or 100
+    first = module._thread_ticks()
+    tasks = await asyncio.to_thread(module._running_tasks)
+    sample = await asyncio.to_thread(module._loop_sample, None, 2.0)
+    threads = module._threads_line(first, module._thread_ticks(), ticks, 2.0)
+    await work
+    ok = "json/encoder.py" in sample and "xonos_selftest" in sample and "ha risposto" in tasks
+    return ok, f"{threads} | {tasks} | {sample}"
 
 
 def _server_module() -> Any:
@@ -273,7 +421,190 @@ async def _cpu_with_audio(server: Any, sink: Any) -> tuple[bool, str]:
     expected = int(seconds * FIFO_BYTES_PER_S)
     ranked = sorted(used.items(), key=lambda item: -item[1])
     parts = ", ".join(f"{name} {100 * value / seconds:.0f}%" for name, value in ranked)
-    return received >= expected // 2, f"{parts}; letti {received} byte su {expected} in {seconds:.0f} s"
+    return received >= expected // 2, (
+        f"{parts}; letti {received} byte su {expected} in {seconds:.0f} s"
+        f" (pacat con la latenza predefinita; client.conf del sistema Linux: {_client_conf()})"
+    )
+
+
+def _client_conf() -> str:
+    """La memoria condivisa nel client.conf del sistema Linux del pacchetto (quello che usano pacat e Soloist)."""
+    path = Path(os.environ.get("XONOS_BIN", "")).parent / "rootfs" / "etc" / "pulse" / "client.conf"
+    try:
+        lines = [line.strip() for line in path.read_text().splitlines()]
+    except OSError as err:
+        return f"non letto ({err.strerror})"
+    return ", ".join(line for line in lines if line.startswith(("enable-shm", "enable-memfd"))) or "senza righe sulla memoria"
+
+
+async def _pulse_memfd(server: Any, sink: Any, cache: Path) -> tuple[bool, str]:
+    """
+    PulseAudio senza e con la memoria condivisa (memfd e srbchannel), col demone di Music Assistant.
+
+    pacat suona con poca latenza (--latency-msec=PULSE_AB_LATENCY_MS: pacchetti piccoli, come Soloist) per PULSE_AB_S
+    secondi, letti dal tubo come li legge Music Assistant: prima con un client.conf senza memoria condivisa (com'era il
+    sistema Linux del pacchetto prima), poi con quello del sistema Linux. Per ognuna: quanto processore usano
+    PulseAudio, pacat e i loro proot, quante volte al secondo si fermano i proot (cambi di contesto da /proc/<pid>/status:
+    ogni chiamata che proot intercetta ne costa almeno due), cosa dice PulseAudio dell'accordo (SHM, srbchannel) e
+    quanti memfd ha aperto pacat. Va bene se in tutte e due l'audio di pacat arriva nel tubo; i numeri servono a capire.
+    """
+    plain = cache / "selftest-client-noshm.conf"
+    plain.write_text("autospawn = no\nenable-shm = no\nenable-memfd = no\n")
+    # Le righe sull'accordo PulseAudio le scrive a livello debug: le prove di prima, che leggono il tubo senza freni (un
+    # "underrun" a ogni pacchetto), possono averlo fatto passare a info (_xonos_pulse_chatty in prepare.py). Qui il tubo
+    # si legge al ritmo di Music Assistant; poi PulseAudio si ferma (pulseaudio-ferma).
+    if (send := getattr(server._controller, "_cli_send", None)) is not None:
+        await asyncio.to_thread(send, "set-log-level 4")
+    played_both = True
+    parts: list[str] = []
+    for label, conf in (("senza memoria condivisa", plain), ("con quella del sistema Linux", None)):
+        played, detail = await _pulse_run(server, sink, conf)
+        played_both = played_both and played
+        parts.append(f"{label}: {detail}")
+    return played_both, " || ".join(parts)
+
+
+async def _pulse_run(server: Any, sink: Any, client_conf: Path | None) -> tuple[bool, str]:
+    """Una prova di _pulse_memfd: pacat per PULSE_AB_S secondi con il client.conf dato (None: quello del sistema Linux)."""
+    from music_assistant.helpers import pulse_capture  # noqa: PLC0415
+
+    module = _server_module()
+    loop = asyncio.get_running_loop()
+    ticks_per_s = os.sysconf("SC_CLK_TCK") or 100
+    env = server.child_env(sink.sink_name)
+    if client_conf is not None:
+        env["PULSE_CLIENTCONFIG"] = str(client_conf)
+    since = time.monotonic()
+    fd = os.open(sink.fifo_path, os.O_RDONLY | os.O_NONBLOCK)
+    # quello che è rimasto nel tubo dalle prove di prima: via, sennò sembrerebbe di questo pacat
+    with suppress(BlockingIOError):
+        for _ in range(64):
+            if not os.read(fd, 65536):
+                break
+    received = 0
+    sound = False
+    memfds = ("?", "?")
+    proc = None
+    feeder = None
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "pacat", "--raw", "--format=s16le", "--rate=44100", "--channels=2",
+            f"--latency-msec={PULSE_AB_LATENCY_MS}",
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+            env=env,
+        )
+
+        async def feed() -> None:
+            assert proc is not None and proc.stdin is not None
+            for _ in range((PULSE_AB_S + 3) * 10):
+                proc.stdin.write(os.urandom(44100 * 4 // 10))
+                await proc.stdin.drain()
+
+        feeder = asyncio.create_task(feed())
+        await asyncio.sleep(1)
+        before = _guest_usage(module)
+        started = loop.time()
+        while (elapsed := loop.time() - started) < PULSE_AB_S:
+            allowed = int(elapsed * FIFO_BYTES_PER_S * 1.1) - received
+            if allowed > 0:
+                try:
+                    chunk = os.read(fd, min(allowed, 65536))
+                except BlockingIOError:
+                    chunk = b""
+                received += len(chunk)
+                # il rumore di pacat, non il silenzio che il sink scrive quando nessuno suona
+                sound = sound or bool(chunk.strip(b"\0"))
+            await asyncio.sleep(0.02)
+        seconds = loop.time() - started
+        after = _guest_usage(module)
+        memfds = (_memfds(module, "pacat", proc.pid), _memfds(module, "pulseaudio"))
+    finally:
+        if feeder is not None:
+            feeder.cancel()
+            with suppress(BaseException):
+                await feeder
+        if proc is not None and proc.returncode is None:
+            proc.kill()
+            with suppress(Exception):
+                await asyncio.wait_for(proc.wait(), 5)
+        os.close(fd)
+    used: dict[str, list[float]] = {}
+    for pid, (name, ticks, switches) in after.items():
+        old = before.get(pid, (name, 0, 0))
+        total = used.setdefault(name, [0.0, 0.0])
+        total[0] += (ticks - old[1]) / ticks_per_s
+        total[1] += switches - old[2]
+    ranked = sorted(used.items(), key=lambda item: -item[1][0])
+    usage = ", ".join(
+        f"{name} {100 * cpu / seconds:.0f}%" + (f" ({switches / seconds:.0f} cambi/s)" if name.startswith("proot") else "")
+        for name, (cpu, switches) in ranked
+    )
+    said = [_pulse_text(line) for when, line in list(pulse_capture._xonos_pulse_seen) if when >= since]
+    agreed = "; ".join(line for line in said if "SHM" in line or "srbchannel" in line or "memory pool" in line)
+    if not agreed:
+        agreed = "nessuna riga sull'accordo"
+    expected = int(seconds * FIFO_BYTES_PER_S)
+    heard = "sì" if sound else "no"
+    return sound, (
+        f"{usage}; letti {received} byte su {expected} in {seconds:.0f} s, audio di pacat: {heard};"
+        f" PulseAudio: {agreed}; zone memfd di pacat {memfds[0]}, di pulseaudio {memfds[1]}"
+    )
+
+
+def _guest_usage(server: Any) -> dict[int, tuple[str, int, int]]:
+    """
+    I processi dei gruppi di proot: pid -> (nome, tick di processore, cambi di contesto). Un proot si chiama
+    proot[<programma che segue>]: ogni proot parte in un gruppo suo, col programma che segue.
+    """
+    groups = set(server._guest_groups)
+    processes = {pid: info for pid, info in server._processes().items() if info[1] in groups}
+    followed = {
+        group: os.path.basename(argv[0])
+        for argv, group, _ in processes.values()
+        if not os.path.basename(argv[0]).startswith("libproot")
+    }
+    found: dict[int, tuple[str, int, int]] = {}
+    for pid, (argv, group, ticks) in processes.items():
+        name = os.path.basename(argv[0])
+        if name.startswith("libproot"):
+            name = f"proot[{followed.get(group, '?')}]"
+        found[pid] = (name, ticks, _switches(pid))
+    return found
+
+
+def _switches(pid: int) -> int:
+    """I cambi di contesto di un processo (volontari e no), da /proc/<pid>/status; 0 se non si legge."""
+    try:
+        with open(f"/proc/{pid}/status") as file:
+            return sum(
+                int(line.split()[1])
+                for line in file
+                if line.startswith(("voluntary_ctxt_switches:", "nonvoluntary_ctxt_switches:"))
+            )
+    except (OSError, ValueError, IndexError):
+        return 0
+
+
+def _memfds(server: Any, name: str, group: int | None = None) -> str:
+    """
+    Quante zone di memoria condivisa di PulseAudio (memfd, "/memfd:pulseaudio" in /proc/<pid>/maps) ha il programma Linux
+    [name] (del gruppo [group], se c'è). In un chroot col PulseAudio del pacchetto: pacat 0 senza, 4 con.
+    """
+    for pid, (argv, owner, _) in server._processes().items():
+        if os.path.basename(argv[0]) == name and (group is None or owner == group):
+            try:
+                with open(f"/proc/{pid}/maps") as file:
+                    return str(sum("/memfd:" in line for line in file))
+            except OSError as err:
+                return f"non lette ({err.strerror})"
+    return "processo non trovato"
+
+
+def _pulse_text(line: str) -> str:
+    """Una riga di PulseAudio senza il livello, il thread e il file davanti ("D: [pulseaudio] protocol-native.c: ")."""
+    return re.sub(r"^[A-Z]: \[[^]]*\] [\w.-]+: ", "", line.strip())
 
 
 async def _pulse_commands(server: Any, rounds: int = 5) -> tuple[bool, str]:
@@ -317,17 +648,37 @@ async def _pulse_commands(server: Any, rounds: int = 5) -> tuple[bool, str]:
     return used_socket and socket_ms < pactl_ms, detail
 
 
+async def _soloist_help(binary: Path) -> str:
+    """L'aiuto di Soloist (--help, poi quello dei comandi ctl), su una riga: opzioni e comandi."""
+    lines: list[str] = []
+    for args in (("--help",), ("ctl", "--help")):
+        flag = " ".join(args)
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                str(binary), *args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT
+            )
+            out, _ = await asyncio.wait_for(proc.communicate(), 20)
+        except Exception as err:  # noqa: BLE001 - nel risultato
+            lines.append(f"{flag}: {err!r}")
+            continue
+        lines.append(f"{flag} ({proc.returncode}): " + " | ".join(out.decode(errors="replace").split("\n")))
+    return " || ".join(lines)[:8000]
+
+
 async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
     """
-    La sessione di Soloist che resta accesa tra un brano e l'altro (_soloist_live in prepare.py).
+    La sessione di Soloist che resta accesa tra un brano e l'altro (_soloist_live e _soloist_connect in prepare.py).
 
     Col codice vero di Music Assistant (SoloistBackend, PulseAudio, il tubo, il ritmo di lettura) e un finto Soloist
-    (xonos_fake_soloist.py, avviato col Python del pacchetto al posto del programma di Spotify): un brano, un salto a un
-    altro, una ripresa a 1 s (Soloist in pausa è più avanti: deve ripartire dal punto chiesto), lo spegnimento dopo la
-    pausa, la fine naturale di un brano, un cambio annullato a metà (Soloist si spegne), un Soloist che non accetta
-    salti (allora si riparte da capo) e i salti riprovati dopo un po' quando ne sono falliti due. L'audio che arriva
-    deve essere sempre e solo del brano chiesto, dal secondo chiesto: il finto Soloist scrive un valore per brano e per
-    secondo, e a ogni pausa lascia nel tubo un po' del brano di prima.
+    (xonos_fake_soloist.py, avviato col Python del pacchetto al posto del programma di Spotify). Con un processo per
+    brano (--single-track): il salto riparte da capo (Soloist vero si chiude a un play di un altro brano), la ripresa a
+    1 s resta sullo stesso processo e parte dal punto chiesto (Soloist in pausa è più avanti), lo spegnimento dopo la
+    pausa, la fine naturale. In modalità Spotify Connect: il salto sullo stesso processo, la ripresa, la fine naturale
+    con l'autoplay e senza (Soloist resta acceso e il brano dopo suona sulla stessa sessione), un cambio annullato a metà
+    (Soloist si spegne), un Soloist che non accetta salti (allora si riparte da capo), i salti riprovati dopo un po'
+    quando ne sono falliti due, e la modalità Spotify Connect che non parte (allora un processo per brano). L'audio che
+    arriva deve essere sempre e solo del brano chiesto, dal secondo chiesto: il finto Soloist scrive un valore per brano
+    e per secondo, e a ogni pausa lascia nel tubo un po' del brano di prima.
     """
     from array import array  # noqa: PLC0415
     from types import SimpleNamespace  # noqa: PLC0415
@@ -365,6 +716,8 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
     backend = solo.SoloistBackend(provider)
     backend._server = server
     backend._binary = Path(python)
+    # come sul telefono: l'abbinamento a Spotify c'è (senza, un Soloist che non entra sarebbe "abbinamento perso")
+    backend._has_stored_session = lambda: True
 
     class FakeManager:
         """Il programma di Soloist c'è già: è il finto."""
@@ -375,8 +728,18 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
         async def ensure_fresh(self, _consent: bool, **_kwargs: Any) -> Path:
             return Path(python)
 
-    real_manager = solo.SoloistBinaryManager
-    real_park = solo._XONOS_PARK_S
+    real = {
+        name: getattr(solo, name)
+        for name in (
+            "SoloistBinaryManager",
+            "_XONOS_PARK_S",
+            "_XONOS_SWITCH_S",
+            "_JUMP_TIMEOUT_S",
+            "_XONOS_RETRY_S",
+            "_XONOS_CONNECT",
+            "_XONOS_CONNECT_LOGIN_S",
+        )
+    }
     solo.SoloistBinaryManager = FakeManager
     plain_args = backend._session_args
     # come modulo, come xonos_server: nel pacchetto il codice di Xonos può esserci solo compilato (.pyc)
@@ -392,7 +755,8 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
         """
         Uno stream come lo chiede Music Assistant: secondi al primo audio, i brani dei valori arrivati, byte.
 
-        In early i secondi del brano dei primi 0,3 s di audio.
+        In early i secondi del brano dei primi 0,3 s di audio. Al massimo 30 s: se la fine di un brano non si riconosce,
+        la prova non resta appesa (e le prove dopo partono).
         """
         details = SimpleNamespace(uri=f"spotify--xonos://track/{name}", queue_id="xonos_fake_queue", duration=duration)
         start = time.monotonic()
@@ -401,7 +765,9 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
         early.clear()
         got = 0
         gen = backend.stream_spotify_uri(uri, seek, streamdetails=details)
-        try:
+
+        async def read() -> None:
+            nonlocal first, got
             async for chunk in gen:
                 if first < 0:
                     first = time.monotonic() - start
@@ -412,6 +778,10 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
                 got += len(chunk)
                 if got >= seconds * FIFO_BYTES_PER_S:
                     break
+
+        try:
+            async with asyncio.timeout(30):
+                await read()
         finally:
             await gen.aclose()
         return first, values, got
@@ -419,112 +789,210 @@ async def _soloist_session(mass: Any, server: Any) -> tuple[bool, str]:
     def alive(run: Any) -> bool:
         return run is not None and run._proc is not None and run._proc.returncode is None
 
+    async def drop() -> None:
+        """Spegne il Soloist acceso: il prossimo brano parte con un processo nuovo (e le variabili d'ambiente nuove)."""
+        backend._xonos_cancel_park()
+        async with backend._run_lock:
+            if (left := backend._run) is not None:
+                await left.stop()
+                backend._run = None
+
     failed: list[str] = []
 
     def check(what: str, ok: bool, seen: Any = "") -> None:
         if not ok:
             failed.append(f"{what} ({seen})" if seen != "" else what)
 
-    a, b, c, d, e, f, g, h, i = (f"spotify:track:xonos{x}" for x in "abcdefghi")
-    first_a = first_b = first_r = first_g = first_h = first_i = -1.0
-    real_switch = solo._XONOS_SWITCH_S
-    real_jump = solo._JUMP_TIMEOUT_S
-    real_retry = solo._XONOS_RETRY_S
+    a, b, c, d, e, g, j, k, m, n, o, p, q, r, s = (f"spotify:track:xonos{x}" for x in "abcdegjkmnopqrs")
+    f, h = "spotify:track:xonosshortf", "spotify:track:xonosshorth"
+    first: dict[str, float] = {}
     try:
         os.environ["XONOS_FAKE_LEAK"] = "1"
         os.environ["XONOS_FAKE_DURATION_MS"] = "30000"
-        first_a, values, _ = await take(a, "a", seconds=1.5)
+
+        # --- un processo per brano (--single-track), come in Music Assistant ---
+        solo._XONOS_CONNECT = False
+        first["da capo"], values, _ = await take(a, "a", seconds=1.5)
         run = backend._run
         check("audio del primo brano", values == {mark(a)}, values)
         check("in pausa e acceso dopo lo stream", alive(run) and run.xonos_parked)
-        first_b, values, _ = await take(b, "b", seconds=3.0)
-        check("salto sullo stesso processo", backend._run is run and alive(run))
-        check("solo audio del brano saltato", values == {mark(b)}, values)
-        check("salto dall'inizio del brano", early == {0}, early)
-        # il resto della pausa è entrato nel tubo (sennò le prove "solo audio del brano..." non dicono niente)
-        rests = [r for r in records if "finto soloist: resto " in r]
-        check("resto della pausa nel tubo", any(not r.endswith(" 0") for r in rests), rests)
+        first["salto da capo"], values, _ = await take(b, "b", seconds=3.0)
+        run_b = backend._run
+        check(
+            "salto con un processo per brano: da capo",
+            run_b is not run and not alive(run) and values == {mark(b)} and early == {0},
+            (values, early),
+        )
+        check("salto da capo senza tentativi", backend._xonos_failures["salto"] == 0, backend._xonos_failures)
         # Soloist in pausa è oltre i 3 s (letti, più il tubo e il resto della pausa): la ripresa a 1 s deve partire
         # da lì, non dal punto in cui Soloist si era fermato
         solo._XONOS_PARK_S = 1.0
-        first_r, values, _ = await take(b, "b", seek=1, seconds=1.0)
-        check("ripresa sullo stesso processo", backend._run is run, backend._run)
+        first["ripresa"], values, _ = await take(b, "b", seek=1, seconds=1.0)
+        check("ripresa sullo stesso processo", backend._run is run_b, backend._run)
         check("solo audio del brano ripreso", values == {mark(b)}, values)
         check("ripresa dal punto chiesto", early == {1}, early)
+        # il resto della pausa è entrato nel tubo (sennò le prove "solo audio del brano..." non dicono niente)
+        rests = [r for r in records if "finto soloist: resto " in r]
+        check("resto della pausa nel tubo", any(not r.endswith(" 0") for r in rests), rests)
         await asyncio.sleep(2.5)
-        check("spento dopo la pausa", backend._run is None and not alive(run))
-        solo._XONOS_PARK_S = real_park
-        os.environ["XONOS_FAKE_DURATION_MS"] = "2500"
-        _, values, got = await take(c, "c", seconds=10, duration=3)
+        check("spento dopo la pausa", backend._run is None and not alive(run_b))
+        solo._XONOS_PARK_S = real["_XONOS_PARK_S"]
+        _, values, got = await take(f, "f", seconds=10, duration=3)
         await asyncio.sleep(0.5)
-        check("fine naturale del brano", got > 0 and values == {mark(c)} and backend._run is None, (got, values))
+        check("fine naturale del brano", got > 0 and values == {mark(f)} and backend._run is None, (got, values))
+
+        # --- modalità Spotify Connect: una sessione sola ---
+        solo._XONOS_CONNECT = True
+        first["Connect da capo"], values, _ = await take(c, "c", seconds=1.5)
+        run = backend._run
+        check(
+            "Spotify Connect: primo brano",
+            run is not None and run._xonos_connect and values == {mark(c)} and early == {0},
+            (getattr(run, "_xonos_connect", None), values, early),
+        )
+        rests_before = len([r for r in records if "finto soloist: resto " in r])
+        first["Connect salto"], values, _ = await take(d, "d", seconds=3.0)
+        check(
+            "Spotify Connect: salto sullo stesso processo",
+            backend._run is run and alive(run) and values == {mark(d)} and early == {0},
+            (values, early),
+        )
+        rests = [r for r in records if "finto soloist: resto " in r][rests_before:]
+        check("Spotify Connect: resto della pausa nel tubo", any(not r.endswith(" 0") for r in rests), rests)
+        first["Connect ripresa"], values, _ = await take(d, "d", seek=1, seconds=1.0)
+        check(
+            "Spotify Connect: ripresa dal punto chiesto",
+            backend._run is run and values == {mark(d)} and early == {1},
+            (values, early),
+        )
+        # fine naturale con l'autoplay: Soloist passa a un altro brano, va in pausa e resta acceso
+        _, values, got = await take(h, "h", seconds=10, duration=3)
+        await asyncio.sleep(0.5)
+        check("Spotify Connect: fine naturale, solo il brano", got > 0 and values == {mark(h)}, (got, values))
+        check("Spotify Connect: acceso dopo la fine", backend._run is run and alive(run) and run.xonos_parked)
+        first["Connect dopo la fine"], values, _ = await take(e, "e", seconds=1.0)
+        check(
+            "Spotify Connect: brano dopo sulla stessa sessione",
+            backend._run is run and values == {mark(e)} and early == {0},
+            (values, early),
+        )
+        # fine naturale senza autoplay: Soloist si ferma alla fine del brano, in pausa
+        await drop()
+        os.environ["XONOS_FAKE_AUTOPLAY"] = "0"
+        _, values, got = await take(f, "f", seconds=10, duration=3)
+        await asyncio.sleep(0.5)
+        run = backend._run
+        check(
+            "Spotify Connect senza autoplay: fine del brano",
+            got > 0 and values == {mark(f)} and alive(run) and run.xonos_parked,
+            (got, values, run),
+        )
+        os.environ.pop("XONOS_FAKE_AUTOPLAY")
         # un cambio annullato a metà (il brano chiesto si carica piano): Soloist si spegne, il brano dopo da capo
-        os.environ["XONOS_FAKE_DURATION_MS"] = "30000"
+        await drop()
         os.environ["XONOS_FAKE_DELAY_PLAY"] = "1500"
-        await take(d, "d", seconds=1.0)
-        run_d = backend._run
-        cancelled = asyncio.create_task(take(e, "e", seconds=1.0))
+        await take(g, "g", seconds=1.0)
+        run_g = backend._run
+        cancelled = asyncio.create_task(take(j, "j", seconds=1.0))
         await asyncio.sleep(0.3)
         cancelled.cancel()
         with suppress(asyncio.CancelledError):
             await cancelled
         for _ in range(40):
-            if backend._run is None and not alive(run_d):
+            if backend._run is None and not alive(run_g):
                 break
             await asyncio.sleep(0.05)
-        check("spento dopo un cambio annullato", backend._run is None and not alive(run_d), backend._run)
+        check("spento dopo un cambio annullato", backend._run is None and not alive(run_g), backend._run)
         os.environ.pop("XONOS_FAKE_DELAY_PLAY")
         # un Soloist che non accetta salti: dopo l'attesa si riparte da capo, e il fallimento si conta
         os.environ["XONOS_FAKE_NO_JUMP"] = "1"
         solo._XONOS_SWITCH_S = 2.0
         solo._JUMP_TIMEOUT_S = 2.0
-        await take(f, "f", seconds=1.0)
-        run_f = backend._run
-        first_g, values, _ = await take(g, "g", seconds=1.0)
-        check("da capo dopo un salto rifiutato", backend._run is not run_f and values == {mark(g)}, values)
+        await take(k, "k", seconds=1.0)
+        run_k = backend._run
+        first["da capo dopo un salto rifiutato"], values, _ = await take(m, "m", seconds=1.0)
+        check("da capo dopo un salto rifiutato", backend._run is not run_k and values == {mark(m)}, values)
         check("salto rifiutato contato", backend._xonos_failures["salto"] == 1, backend._xonos_failures)
         # due salti falliti di fila: per un po' niente tentativi (si riparte subito da capo)...
         backend._xonos_failures["salto"] = 2
-        backend._xonos_failed_at["salto"] = time.monotonic()
-        run_g = backend._run
-        first_h, values, _ = await take(h, "h", seconds=1.0)
+        failed_at = backend._xonos_failed_at["salto"] = solo._xonos_now()
+        run_m = backend._run
+        first["senza tentativo"], values, _ = await take(n, "n", seconds=1.0)
         check(
             "niente tentativi dopo due salti falliti",
-            backend._run is not run_g and values == {mark(h)} and first_h < 1.9,
-            (first_h, values),
+            backend._run is not run_m
+            and values == {mark(n)}
+            and backend._xonos_retries["salto"] == 0
+            and backend._xonos_failed_at["salto"] == failed_at,
+            (values, backend._xonos_retries, backend._xonos_failed_at),
         )
         # ... e passato quel tempo si riprova
         solo._XONOS_RETRY_S = 0.0
-        first_i, values, _ = await take(i, "i", seconds=1.0)
+        first["tentativo dopo un po'"], values, _ = await take(o, "o", seconds=1.0)
         check(
             "salto riprovato dopo un po'",
-            values == {mark(i)}
-            and first_i >= 2.0
+            values == {mark(o)}
+            and first["tentativo dopo un po'"] >= 2.0
             and backend._xonos_failures["salto"] == 2
             and backend._xonos_retries["salto"] == 1,
-            (first_i, backend._xonos_failures, backend._xonos_retries),
+            (first["tentativo dopo un po'"], backend._xonos_failures, backend._xonos_retries),
         )
+        os.environ.pop("XONOS_FAKE_NO_JUMP")
+        # la modalità Spotify Connect che non entra in Spotify: un processo per brano, e per un po' resta così
+        await drop()
+        os.environ["XONOS_FAKE_CONNECT_FAIL"] = "1"
+        solo._XONOS_CONNECT_LOGIN_S = 1.5
+        first["ripiego"], values, _ = await take(p, "p", seconds=1.0)
+        run = backend._run
+        check(
+            "Spotify Connect che non parte: un processo per brano",
+            values == {mark(p)} and run is not None and not run._xonos_connect,
+            (values, getattr(run, "_xonos_connect", None)),
+        )
+        check(
+            "Spotify Connect che non parte: per un po' niente tentativi",
+            backend._xonos_connect_blocked_until > solo._xonos_now() and backend._xonos_connect_fails == 1,
+            (backend._xonos_connect_blocked_until, backend._xonos_connect_fails),
+        )
+        await drop()
+        _, values, _ = await take(q, "q", seconds=1.0)
+        check(
+            "dopo il ripiego un processo per brano",
+            values == {mark(q)} and not backend._run._xonos_connect,
+            values,
+        )
+        os.environ.pop("XONOS_FAKE_CONNECT_FAIL")
+        # un altro account Spotify entra in Soloist dalla rete locale (modalità Spotify Connect): il brano dopo non
+        # suona su quell'account, si chiede di rifare l'abbinamento. Per ultima: dopo, questo Soloist non si usa più.
+        await drop()
+        backend._xonos_connect_blocked_until = 0.0
+        os.environ["XONOS_FAKE_TAKEOVER"] = "1"
+        _, values, _ = await take(r, "r", seconds=1.0)
+        check("prima della presa", values == {mark(r)}, values)
+        refused = ""
+        try:
+            await take(s, "s", seconds=1.0)
+        except Exception as err:  # noqa: BLE001 - è quello che si aspetta
+            refused = repr(err)
+        check("un altro account: niente brano, abbinamento da rifare", "LoginFailed" in refused, refused or "suonato")
     except Exception as err:  # noqa: BLE001 - nel risultato, con le ultime righe del motore
         failed.append(repr(err))
     finally:
         log.removeHandler(keep)
-        for key in ("XONOS_FAKE_LEAK", "XONOS_FAKE_DURATION_MS", "XONOS_FAKE_NO_JUMP", "XONOS_FAKE_DELAY_PLAY"):
+        for key in (
+            "XONOS_FAKE_LEAK",
+            "XONOS_FAKE_DURATION_MS",
+            "XONOS_FAKE_NO_JUMP",
+            "XONOS_FAKE_DELAY_PLAY",
+            "XONOS_FAKE_AUTOPLAY",
+            "XONOS_FAKE_CONNECT_FAIL",
+            "XONOS_FAKE_TAKEOVER",
+        ):
             os.environ.pop(key, None)
-        solo.SoloistBinaryManager = real_manager
-        solo._XONOS_PARK_S = real_park
-        solo._XONOS_SWITCH_S = real_switch
-        solo._JUMP_TIMEOUT_S = real_jump
-        solo._XONOS_RETRY_S = real_retry
-        backend._xonos_cancel_park()
-        async with backend._run_lock:
-            if (left := backend._run) is not None:
-                await left.stop()
-                backend._run = None
-    detail = (
-        f"primo audio: da capo {first_a:.2f} s, salto {first_b:.2f} s, ripresa {first_r:.2f} s,"
-        f" da capo dopo un salto rifiutato {first_g:.2f} s, senza tentativo {first_h:.2f} s,"
-        f" tentativo dopo un po' {first_i:.2f} s"
-    )
+        for name, value in real.items():
+            setattr(solo, name, value)
+        await drop()
+    detail = "primo audio: " + ", ".join(f"{what} {seconds:.2f} s" for what, seconds in first.items())
     if failed:
         detail += "; non va: " + ", ".join(failed) + " | motore: " + " / ".join(records[-15:])
     return not failed, detail

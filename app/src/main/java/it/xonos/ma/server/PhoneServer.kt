@@ -12,6 +12,7 @@ import android.system.Os
 import android.system.OsConstants
 import android.util.Log
 import it.xonos.ma.BuildConfig
+import it.xonos.ma.data.Logged
 import it.xonos.ma.phone.model.PhoneServerControl
 import it.xonos.ma.phone.model.PhoneServerControl.State
 import kotlinx.coroutines.Dispatchers
@@ -90,9 +91,11 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
 
     /**
      * Le righe di Xonos stesso dal logcat (tempi dei salti, Sendspin, uscita audio): un'app legge il suo logcat senza
-     * permessi. Solo i tag dell'app più i suoi arresti (AndroidRuntime), non XonosServer, che ripete il registro di
-     * Music Assistant qui sopra. Tutto il buffer e poi le ultime [XONOS_LOG_CHARS], da una riga intera: con un numero di
-     * righe (-t) logcat le conterebbe prima di filtrare i tag, e quelle di XonosServer ne prenderebbero il posto.
+     * permessi. I tag dell'app più i suoi arresti (AndroidRuntime). Anche XonosServer: non ripete più il registro di
+     * Music Assistant qui sopra (lo filtra [ServerLines]), ma dice quando il server parte, cambia stato o si ferma, le
+     * righe di xonos_server.py (processore, avvio) e quello che Python scrive se non parte, sullo stesso orologio dei
+     * salti. Tutto il buffer e poi le ultime [XONOS_LOG_CHARS], da una riga intera: con un numero di righe (-t) logcat
+     * le conterebbe prima di filtrare i tag, e quelle degli altri tag ne prenderebbero il posto.
      */
     private fun xonosLog(): String = try {
         val logcat = ProcessBuilder(listOf("logcat", "-d", "-v", "threadtime", "-s") + XONOS_TAGS)
@@ -234,9 +237,12 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
         }
     }
 
-    /** Il registro del processo nel logcat; le righe XONOS_STATE dicono a che punto è. */
+    /**
+     * L'uscita del processo: le righe XONOS_STATE dicono a che punto è, XONOS_MULTICAST quando serve il multicast; il
+     * resto va nel logcat attraverso [ServerLines], che ne toglie il registro di Music Assistant (titoli, uri, nomi).
+     */
     private fun follow(running: Process) {
-        val last = ArrayDeque<String>()
+        val lines = ServerLines()
         runCatching {
             running.inputStream.bufferedReader().forEachLine { line ->
                 // Con i startsWith anche una riga a cui si è attaccata una riga del registro (pacchetti fino al 2.10.8-5,
@@ -245,6 +251,8 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
                     multicast(line.removePrefix(MULTICAST_PREFIX).trim().startsWith("on"))
                 } else if (line.startsWith(STATE_PREFIX)) {
                     val said = line.removePrefix(STATE_PREFIX).trim()
+                    // "failed <tipo>: <testo>": nelle build vere solo il tipo dell'errore, il testo può avere nomi e indirizzi.
+                    Log.i(TAG, "Stato: " + Logged.text(said, said.substringBefore(':')))
                     when {
                         said.startsWith("running") -> state = State.RUNNING
                         said.startsWith("starting") -> state = State.STARTING
@@ -255,9 +263,7 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
                         }
                     }
                 } else {
-                    Log.i(TAG, line)
-                    last.addLast(line)
-                    if (last.size > LAST_LINES) last.removeFirst()
+                    lines.see(line)?.let { Log.i(TAG, it) }
                 }
             }
         }
@@ -272,7 +278,8 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
                 state = State.STOPPED
             } else if (state != State.FAILED) {
                 state = State.FAILED
-                error = "it stopped (exit $code): ${last.lastOrNull().orEmpty()}".trim()
+                // Solo righe fuori dal registro di Music Assistant: Python o il linker che non partono.
+                error = "it stopped (exit $code)" + (lines.last.lastOrNull()?.let { ": $it" } ?: "")
             }
         }
         Log.i(TAG, "Music Assistant sul telefono si è fermato ($code)")
@@ -322,6 +329,7 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
     companion object {
         const val URL = "http://127.0.0.1:8095"
         private const val TAG = "XonosServer"
+
         private const val LINKER = "/system/bin/linker64"
         /** Android 10: da qui le app non avviano più i programmi che scaricano (W^X). */
         private const val W_X_SDK = 29
@@ -340,15 +348,14 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
 
         /** Il numero del processo, da Process.toString() di Android: "Process[pid=1234, hasExited=false]". */
         private val PID = Regex("pid=(\\d+)")
-        private const val LAST_LINES = 20
         /** Quanto registro si condivide: le ultime righe bastano, e stanno in una condivisione di Android. */
         private const val LOG_BYTES = 96 * 1024
 
         /** Lo stesso per le righe di Xonos, in caratteri. */
         private const val XONOS_LOG_CHARS = 64 * 1024
 
-        /** I tag di Xonos nel logcat (tutto il codice dell'app usa "Xonos"), più gli arresti dell'app. */
-        private val XONOS_TAGS = listOf("Xonos:V", "AndroidRuntime:E")
+        /** I tag di Xonos nel logcat (il codice dell'app usa "Xonos", il server sul telefono "XonosServer"), più gli arresti dell'app. */
+        private val XONOS_TAGS = listOf("Xonos:V", "XonosServer:V", "AndroidRuntime:E")
         private const val LOGCAT_TIMEOUT_S = 10L
 
         /** Music Assistant sul telefono, dove può girare (un telefono a 64 bit); altrimenti null. */

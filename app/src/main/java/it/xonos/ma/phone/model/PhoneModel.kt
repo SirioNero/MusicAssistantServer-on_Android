@@ -114,6 +114,13 @@ class PhoneModel(
     /** Quante schermate ci sono sotto quella mostrata: con zero, "indietro" esce o torna alla Home. */
     val depth: Int get() = stacks.getValue(tab).size - 1
 
+    /**
+     * Vero mentre una scheda ha un flusso per aggiungere o configurare un servizio ([FlowPage]), anche sotto altre
+     * schermate o in una scheda non scelta: il flusso è ancora aperto in Music Assistant (per esempio mentre la persona
+     * entra in Spotify nel browser).
+     */
+    val inSetupFlow: Boolean get() = stacks.values.any { stack -> stack.any { it is FlowPage } }
+
     /** Il lettore a schermo intero, sopra tutto il resto. */
     var playerOpen by mutableStateOf(false)
 
@@ -543,13 +550,12 @@ class PhoneModel(
         }
     }
 
+    /** Un artista: i più ascoltati e gli album. Tutti i brani solo quando si aprono ([openArtistTracks]). */
     private fun loadArtist(page: ArtistPage) {
         val artist = page.artist
         page.top = Load.Loading
         page.albums = Load.Loading
-        page.tracks = Load.Loading
         page.albumsMore = false
-        page.tracksMore = false
         launchLoad({ page.top = Load.Failed(it) }) { page.top = Load.Ready(library.artistTopTracks(artist)) }
         // Prima la libreria, poi la discografia di ogni servizio appena risponde.
         val albums = parts({ page.albumsMore || page.albums is Load.Loading }) { part ->
@@ -560,12 +566,6 @@ class PhoneModel(
             val all = library.artistAlbums(artist, albums).sortedByDescending { it.year }
             page.albumsMore = false
             page.albums = Load.Ready(all)
-        }
-        val tracks = parts({ page.tracksMore || page.tracks is Load.Loading }) { page.tracksMore = true; page.tracks = Load.Ready(it) }
-        launchLoad({ error -> page.tracksMore = false; partFailed(error, page.tracks is Load.Ready) { page.tracks = Load.Failed(error) } }) {
-            val all = library.artistTracks(artist, tracks)
-            page.tracksMore = false
-            page.tracks = Load.Ready(all)
         }
     }
 
@@ -584,16 +584,31 @@ class PhoneModel(
 
     private fun load(page: ListPage) {
         page.items = Load.Loading
-        launchLoad({ page.items = Load.Failed(it) }) { page.items = Load.Ready(page.source()) }
+        page.more = false
+        val part = parts({ page.more || page.items is Load.Loading }) { page.more = true; page.items = Load.Ready(it) }
+        launchLoad({ error -> page.more = false; partFailed(error, page.items is Load.Ready) { page.items = Load.Failed(error) } }) {
+            val all = page.source(part)
+            page.more = false
+            page.items = Load.Ready(all)
+        }
     }
 
-    /** Tutti i brani di un artista, su una schermata loro. */
+    /**
+     * I brani più ascoltati ([top]) o tutti i brani di un artista, su una schermata loro. Tutti i brani si chiedono
+     * solo qui (prima la libreria, poi ogni servizio, a pezzi), e restano nella pagina dell'artista.
+     */
     fun openArtistTracks(page: ArtistPage, title: String, top: Boolean) {
-        // Se i brani arrivano ancora, la pagina se li carica interi.
-        val tracks = if (top) page.top.value else page.tracks.value.takeUnless { page.tracksMore }
+        val artist = page.artist
+        if (top) {
+            val tracks = page.top.value
+            push(ListPage(title, artist.name, artist.image) { tracks ?: library.artistTopTracks(artist) })
+            return
+        }
+        val tracks = page.tracks?.value
         push(
-            ListPage(title, page.artist.name, page.artist.image) {
-                tracks ?: if (top) library.artistTopTracks(page.artist) else library.artistTracks(page.artist)
+            ListPage(title, artist.name, artist.image) { part ->
+                // Arriva sul thread di [scope] (launchLoad), come gli altri caricamenti.
+                tracks ?: library.artistTracks(artist, part).also { page.tracks = Load.Ready(it) }
             },
         )
     }
@@ -634,8 +649,11 @@ class PhoneModel(
     /**
      * Cerca mentre si scrive: aspetta una breve pausa, e una ricerca nuova cancella la precedente.
      * La libreria risponde subito, i servizi (Spotify...) anche in secondi: intanto si vede lei.
+     * Nei servizi si cerca solo dopo una pausa più lunga ([EVERYWHERE_PAUSE_MS]): ogni ricerca costa richieste a
+     * Spotify, che blocca chi ne fa troppe, e scrivendo ogni lettera ne faceva una nuova. Con [now] si cerca subito
+     * dappertutto (per il tasto cerca della tastiera).
      */
-    fun search(page: SearchPage, text: String) {
+    fun search(page: SearchPage, text: String, now: Boolean = false) {
         page.query = text
         page.job?.cancel()
         val query = text.trim()
@@ -645,7 +663,7 @@ class PhoneModel(
             return
         }
         page.job = scope.launch {
-            delay(SEARCH_PAUSE_MS)
+            if (!now) delay(SEARCH_PAUSE_MS)
             page.searching = true
             if (page.results !is Load.Ready) page.results = Load.Loading
             try {
@@ -657,6 +675,8 @@ class PhoneModel(
                 coroutineScope {
                     // Un errore di una delle due ricerche non deve fermare l'altra.
                     val everywhere = async {
+                        // Scrivendo ancora, la ricerca si cancella prima di arrivare ai servizi.
+                        if (!now) delay(EVERYWHERE_PAUSE_MS - SEARCH_PAUSE_MS)
                         try {
                             Result.success(library.search(rest))
                         } catch (e: CancellationException) {
@@ -763,9 +783,12 @@ class PhoneModel(
         }
     }
 
-    /** Aspetta che il telefono sia un lettore di Music Assistant: appena aperta l'app ci vuole un attimo. */
+    /**
+     * Aspetta che il telefono sia un lettore di Music Assistant: appena aperta l'app ci vuole un attimo. Col server sul
+     * telefono di più: fermato perché nessuno lo usava, riparte quando si torna nell'app.
+     */
     private suspend fun awaitReady() {
-        withTimeoutOrNull(READY_TIMEOUT_MS) { ready.first { it } }
+        withTimeoutOrNull(if (onPhoneServer) PHONE_READY_TIMEOUT_MS else READY_TIMEOUT_MS) { ready.first { it } }
             ?: throw MaException("Il lettore del telefono non è pronto", problem = Problem.NOT_CONNECTED)
     }
 
@@ -1060,14 +1083,27 @@ class PhoneModel(
 
     // ---------- Music Assistant sul telefono ----------
 
+    /**
+     * Avvisa chi tiene acceso il server sul telefono (ServerKeeper) che lo si avvia qui, fuori da lui (alla fine del
+     * download, "Riprova"): un suo arresto in arrivo non deve fermarlo mentre parte, e dopo deve poterlo fermare.
+     */
+    var keepServer: () -> Unit = {}
+
     /** Xonos può far girare Music Assistant su questo telefono (a 64 bit), scaricandolo su richiesta. */
     val phoneServerAvailable: Boolean get() = phoneServer != null
 
     /** Il pacchetto c'era ma per una versione precedente di Xonos: va riscaricato. */
     val phoneServerOutdated: Boolean get() = phoneServer?.outdated == true
 
-    /** Xonos usa il Music Assistant sul telefono e quello sta ancora partendo (all'apertura dell'app ci vuole un po'). */
-    val phoneServerStarting: Boolean get() = onPhoneServer && phoneServer?.state == PhoneServerControl.State.STARTING
+    /**
+     * Xonos usa il Music Assistant sul telefono e quello sta ancora partendo (all'apertura dell'app ci vuole un po').
+     * Anche fermo, se il pacchetto c'è: quando nessuno lo usa ServerKeeper lo ferma, e all'apertura riparte da solo.
+     */
+    val phoneServerStarting: Boolean
+        get() = onPhoneServer && phoneServer?.let {
+            it.state == PhoneServerControl.State.STARTING ||
+                (it.state == PhoneServerControl.State.STOPPED && it.installed && !it.outdated)
+        } == true
 
     /** Xonos usa il Music Assistant sul telefono e quello non è partito o si è fermato: il perché. */
     val phoneServerFailure: String?
@@ -1085,6 +1121,7 @@ class PhoneModel(
         phoneServerRetrying = true
         scope.launch {
             try {
+                keepServer()
                 if (server.start() && repo.connection.value !is Connection.Connected) repo.reconnect()
             } finally {
                 phoneServerRetrying = false
@@ -1151,6 +1188,7 @@ class PhoneModel(
         scope.launch {
             var connecting = false
             try {
+                keepServer()
                 if (!server.start()) {
                     page.phoneServerError = server.error.ifBlank { server.state.name }
                     return@launch
@@ -1421,7 +1459,7 @@ class PhoneModel(
         is HomePage -> page.job?.isActive != true && (page.recent is Load.Failed || page.rows is Load.Failed || !page.fresh)
         is LibraryPage -> page.lists.values.any { it.error != null }
         is ItemPage -> page.tracks is Load.Failed || page.albums is Load.Failed
-        is ArtistPage -> page.top is Load.Failed || page.albums is Load.Failed || page.tracks is Load.Failed
+        is ArtistPage -> page.top is Load.Failed || page.albums is Load.Failed
         is ListPage -> page.items is Load.Failed
         is ServicesPage -> page.services is Load.Failed
         is AddServicePage -> page.kinds is Load.Failed
@@ -1450,8 +1488,14 @@ class PhoneModel(
         const val MAX_QUEUE = 200
         const val MIN_QUERY = 2
         const val SEARCH_PAUSE_MS = 350L
+
+        /** Quanto si aspetta senza scrivere prima di cercare anche nei servizi (Spotify...): circa un secondo. */
+        const val EVERYWHERE_PAUSE_MS = 1_000L
         const val CONNECT_TIMEOUT_MS = 20_000L
         const val READY_TIMEOUT_MS = 20_000L
+
+        /** Lo stesso col Music Assistant sul telefono, che può star ripartendo (vedi [awaitReady]). */
+        const val PHONE_READY_TIMEOUT_MS = 60_000L
         const val LYRICS_KEPT = 20
 
         /** Per quanto, dopo una modifica da qui, i brani di una playlist si chiedono senza cache. */

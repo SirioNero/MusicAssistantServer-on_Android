@@ -295,11 +295,14 @@ def write_config(out: Path) -> None:
     # Il DNS e l'identità della macchina li mette Xonos quando avvia (qui ci sono solo per le prove).
     (etc / "resolv.conf").write_text("nameserver 10.0.2.3\nnameserver 8.8.8.8\n")
     (etc / "os-release").write_text('NAME="Xonos"\nID=xonos\nPRETTY_NAME="Xonos (Android)"\n')
-    # Sul telefono non c'è /dev/shm: l'audio passa dal socket.
-    (etc / "pulse" / "client.conf").write_text("autospawn = no\nenable-shm = no\nenable-memfd = no\n")
+    # La memoria condivisa con memfd (non vuole /dev/shm, che sul telefono non c'è): così l'audio fra Soloist e PulseAudio
+    # passa dallo srbchannel (un anello in memoria, avvisi con eventfd) invece che da send e recv sul socket, che proot
+    # intercetta a ogni pacchetto. Se memfd non va, PulseAudio torna da solo alla memoria normale e al socket ("Failed to
+    # allocate ... memory pool. Falling back to a normal memory pool.", nel registro di Music Assistant).
+    (etc / "pulse" / "client.conf").write_text("autospawn = no\nenable-shm = yes\nenable-memfd = yes\n")
     (etc / "pulse" / "daemon.conf").write_text(
         # Niente D-Bus né rtkit nell'app: senza queste due righe il demone li cerca e lo scrive a ogni avvio.
-        "enable-shm = no\nenable-memfd = no\nflat-volumes = no\nexit-idle-time = -1\n"
+        "enable-shm = yes\nenable-memfd = yes\nflat-volumes = no\nexit-idle-time = -1\n"
         "realtime-scheduling = no\nhigh-priority = no\n"
     )
     bundle = Path("/etc/ssl/certs/ca-certificates.crt")

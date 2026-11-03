@@ -125,25 +125,34 @@ class ItemPage(val item: MaItem) : Page() {
 class ArtistPage(val artist: MaItem) : Page() {
     var top by mutableStateOf<Load<List<MaItem>>>(Load.Loading)
     var albums by mutableStateOf<Load<List<MaItem>>>(Load.Loading)
-    var tracks by mutableStateOf<Load<List<MaItem>>>(Load.Loading)
 
-    /** Veri mentre rispondono ancora dei servizi: intanto si vede la libreria. */
+    /**
+     * Tutti i brani: null finché non li si apre. Si chiedono solo allora (PhoneModel.openArtistTracks): per un artista
+     * di Spotify sono circa tre richieste per album, e Spotify blocca chi ne fa troppe. Arrivati, restano qui: tornando
+     * all'artista la riga dice quanti sono, e riaprendoli non si richiedono.
+     */
+    var tracks by mutableStateOf<Load<List<MaItem>>?>(null)
+
+    /** Vero mentre rispondono ancora dei servizi: intanto si vede la libreria. */
     var albumsMore by mutableStateOf(false)
-    var tracksMore by mutableStateOf(false)
     var favorite by mutableStateOf(artist.favorite)
 }
 
 /**
  * Un elenco qualsiasi: i brani di un artista, una riga di "Per te", una cartella di un servizio,
- * tutti i risultati di un tipo. [source] lo carica.
+ * tutti i risultati di un tipo. [source] lo carica; se l'elenco arriva a pezzi (i brani di un artista, prima dalla
+ * libreria e poi da ogni servizio), li passa alla funzione che riceve, e quelli arrivati si vedono subito.
  */
 class ListPage(
     val title: String,
     val subtitle: String?,
     val image: MaImage?,
-    internal val source: suspend () -> List<MaItem>,
+    internal val source: suspend (part: (List<MaItem>) -> Unit) -> List<MaItem>,
 ) : Page() {
     var items by mutableStateOf<Load<List<MaItem>>>(Load.Loading)
+
+    /** Vero mentre arrivano altri elementi: quelli già arrivati si vedono. */
+    var more by mutableStateOf(false)
 }
 
 /** La ricerca: ciò che si è scritto e i risultati divisi per tipo. */

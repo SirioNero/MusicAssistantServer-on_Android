@@ -3,6 +3,7 @@ package it.xonos.ma.playback
 import android.util.Log
 import android.util.LruCache
 import it.xonos.ma.data.Library
+import it.xonos.ma.data.Logged
 import it.xonos.ma.data.MaImage
 import it.xonos.ma.data.MaItem
 import kotlinx.coroutines.async
@@ -175,7 +176,7 @@ class Menu(
             }
             // Le cartelle di brani suonano tutto, dal primo.
             TRACK_FOLDERS.any(id::startsWith) -> playList(queue, id, 0)
-            else -> Log.w(TAG, "Non so suonare $id")
+            else -> Log.w(TAG, "Non so suonare ${Logged.id(id)}")
         }
     }
 
@@ -283,23 +284,22 @@ class Menu(
         }
     }
 
-    /** Un artista: i brani più ascoltati, tutti gli album (dal più recente) e tutti i brani. */
+    /**
+     * Un artista: i brani più ascoltati, tutti gli album (dal più recente) e tutti i brani. Tutti i brani si chiedono
+     * solo quando si apre (o si suona) la loro cartella, come per un genere ([tracksOf]): per un artista di Spotify sono
+     * circa tre richieste per album, Spotify blocca chi ne fa troppe, e l'auto aspettava l'artista per minuti.
+     */
     private suspend fun artist(id: String, artist: MaItem): List<MenuNode> = coroutineScope {
         val top = async { library.artistTopTracks(artist) }
         val albums = async { library.artistAlbums(artist) }
-        val tracks = async { library.artistTracks(artist) }
         val topTracks = top.await()
-        val allTracks = tracks.await()
         lists.put("top|${artist.uri}", topTracks)
-        lists.put("tracks|${artist.uri}", allTracks)
         buildList {
             if (topTracks.isNotEmpty()) {
                 add(folder("top|${artist.uri}", labels.topTracks, labels.count("tracks", topTracks.size), "track", artist.image, playable = true))
             }
             addAll(entries(id, albums.await().sortedByDescending { it.year }))
-            if (allTracks.isNotEmpty()) {
-                add(folder("tracks|${artist.uri}", labels.allTracks, labels.count("tracks", allTracks.size), "track", playable = true))
-            }
+            add(folder("tracks|${artist.uri}", labels.allTracks, null, "track", playable = true))
         }.onEach { known.put(it.id, it) }
     }
 

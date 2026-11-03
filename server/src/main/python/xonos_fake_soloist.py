@@ -1,19 +1,31 @@
 """
 Solo per l'autotest in CI (xonos_selftest, prova soloist-sessione): un finto Soloist.
 
-Serve a provare la sessione che resta accesa tra un brano e l'altro (_soloist_live in server/ma/prepare.py) senza un
-account Spotify. Parla lo stesso protocollo locale di Soloist: la WebSocket su 127.0.0.1, l'indirizzo e la porta nei
-file ws.addr e ws.port della cartella dei dati, gli eventi (auth_state, track_changed, playback_state,
-playback_changed, position_sync) e la conferma di ogni comando (command_result). Al posto della musica scrive nel tubo
-del pipe sink di Music Assistant un valore per brano e per secondo (sample_value): l'autotest riconosce di quale brano,
-e da quale secondo, è l'audio che gli arriva. Come Soloist con --single-track suona un brano, accetta pausa, ripresa,
-seek (anche in pausa) e play di un altro brano, e a fine brano passa a un altro (autoplay) e si chiude.
+Serve a provare la sessione che resta accesa tra un brano e l'altro (_soloist_live e _soloist_connect in
+server/ma/prepare.py) senza un account Spotify. Parla lo stesso protocollo locale di Soloist: la WebSocket su
+127.0.0.1, l'indirizzo e la porta nei file ws.addr e ws.port della cartella dei dati, gli eventi (auth_state,
+track_changed, playback_state, playback_changed, position_sync) e la conferma di ogni comando (command_result). Al posto
+della musica scrive nel tubo del pipe sink di Music Assistant un valore per brano e per secondo (sample_value):
+l'autotest riconosce di quale brano, e da quale secondo, è l'audio che gli arriva.
 
-Variabili d'ambiente: XONOS_FAKE_DURATION_MS (durata dei brani, 30 s di base), XONOS_FAKE_NO_JUMP=1 (il play di un
-altro brano non fa niente, come un Soloist che non accettasse salti), XONOS_FAKE_LEAK=1 (alla pausa smette di
-suonare, 0,2 s dopo scrive ancora fino a 0,2 s del brano nel tubo, riga "finto soloist: resto N", e solo allora
-conferma: chi svuotasse il tubo prima di aspettare la conferma se lo ritroverebbe nel brano dopo), XONOS_FAKE_DELAY_PLAY=<ms> (il play
-di un altro brano parte dopo tanto, come un brano che si carica piano).
+Due modi, come Soloist:
+- con --single-track <uri> suona quel brano e accetta pausa, ripresa e seek (anche in pausa); un play di un altro brano
+  lo chiude, come il Soloist vero sul telefono dell'utente ("websocket connection closed"); a fine brano passa
+  all'autoplay e si chiude;
+- senza --single-track (Spotify Connect) parte senza brano, entra, accetta casuale e ripeti, e play(uri) cambia brano;
+  a fine brano passa all'autoplay e lo suona finché non lo si mette in pausa, o (XONOS_FAKE_AUTOPLAY=0) si ferma alla
+  fine, in pausa; non si chiude mai da solo.
+
+I brani con "short" nell'uri durano 2,5 s, gli altri XONOS_FAKE_DURATION_MS (30 s di base). Altre variabili d'ambiente:
+XONOS_FAKE_NO_JUMP=1 (in modalità Spotify Connect il play di un altro brano non fa niente), XONOS_FAKE_LEAK=1 (alla
+pausa smette di suonare, 0,2 s dopo scrive ancora fino a 0,2 s del brano nel tubo, riga "finto soloist: resto N", e solo
+allora conferma: chi svuotasse il tubo prima di aspettare la conferma se lo ritroverebbe nel brano dopo),
+XONOS_FAKE_DELAY_PLAY=<ms> (il play di un altro brano parte dopo tanto, come un brano che si carica piano),
+XONOS_FAKE_CONNECT_FAIL=1 (in modalità Spotify Connect non entra mai in Spotify), XONOS_FAKE_TAKEOVER=1 (dopo il primo
+brano entra un altro account, come da un'altra app nella rete locale: settings/Users/altro-user nella cartella dei dati).
+
+Una pausa a un Soloist già fermo riceve un errore e nessuna conferma: il Soloist vero può fare così (il plugin Spotify
+Connect di Music Assistant tollera "a rejected or unacknowledged pause"), e Xonos non deve contarci.
 """
 
 from __future__ import annotations
@@ -41,6 +53,7 @@ FIONREAD = 0x541B
 ROOM = 32768
 # alla pausa il resto arriva tanto dopo, poco prima della conferma
 LEAK_DELAY_S = 0.2
+SHORT_MS = 2500
 
 
 def marker(uri: str) -> int:
@@ -56,13 +69,18 @@ def sample_value(uri: str, position_ms: float) -> int:
 class FakeSoloist:
     """Un brano alla volta, comandato dalla WebSocket come Soloist."""
 
-    def __init__(self, uri: str) -> None:
+    def __init__(self, uri: str | None) -> None:
         self.uri = uri
-        self.duration_ms = int(os.environ.get("XONOS_FAKE_DURATION_MS", "30000"))
+        # senza --single-track: Spotify Connect
+        self.connect = uri is None
         self.no_jump = os.environ.get("XONOS_FAKE_NO_JUMP") == "1"
         self.leak = os.environ.get("XONOS_FAKE_LEAK") == "1"
         self.delay_play_s = int(os.environ.get("XONOS_FAKE_DELAY_PLAY", "0")) / 1000
-        self.playing = True
+        self.autoplay = os.environ.get("XONOS_FAKE_AUTOPLAY", "1") != "0"
+        self.connect_fail = os.environ.get("XONOS_FAKE_CONNECT_FAIL") == "1"
+        self.takeover = os.environ.get("XONOS_FAKE_TAKEOVER") == "1"
+        self.data_dir: Path | None = None
+        self.playing = uri is not None
         self.position_ms = 0.0
         self.sockets: set[web.WebSocketResponse] = set()
         native = os.environ["PULSE_SERVER"].removeprefix("unix:")
@@ -70,7 +88,15 @@ class FakeSoloist:
         self.fd: int | None = None
         self.done = asyncio.Event()
 
-    def item(self) -> dict:
+    @property
+    def duration_ms(self) -> int:
+        if self.uri and "short" in self.uri:
+            return SHORT_MS
+        return int(os.environ.get("XONOS_FAKE_DURATION_MS", "30000"))
+
+    def item(self) -> dict | None:
+        if self.uri is None:
+            return None
         return {
             "uri": self.uri,
             "entity_type": "track",
@@ -89,10 +115,11 @@ class FakeSoloist:
                 self.sockets.discard(ws)
 
     async def state(self, kind: str = "playback_changed") -> None:
+        status = "playing" if self.playing else ("paused" if self.uri else "stopped")
         await self.send(
             {
                 "type": kind,
-                "status": "playing" if self.playing else "paused",
+                "status": status,
                 "item": self.item(),
                 "position": self.position(),
                 "is_active": True,
@@ -103,9 +130,11 @@ class FakeSoloist:
         ws = web.WebSocketResponse()
         await ws.prepare(request)
         self.sockets.add(ws)
-        await self.send({"type": "auth_state", "logged_in": True, "is_active": True, "device_name": "Xonos finto"})
+        logged_in = not (self.connect and self.connect_fail)
+        await self.send({"type": "auth_state", "logged_in": logged_in, "is_active": True, "device_name": "Xonos finto"})
         await self.send({"type": "device_changed", "is_active": True})
-        await self.send({"type": "track_changed", "item": self.item()})
+        if self.uri is not None:
+            await self.send({"type": "track_changed", "item": self.item()})
         await self.state("playback_state")
         async for msg in ws:
             if msg.type == WSMsgType.TEXT:
@@ -115,8 +144,17 @@ class FakeSoloist:
 
     async def command(self, cmd: dict) -> None:
         name = str(cmd.get("command") or "")
-        print(f"finto soloist: comando {name} {cmd.get('uri') or cmd.get('position_ms') or ''}", flush=True)
-        if name == "pause" and self.leak:
+        uri = cmd.get("uri")
+        print(f"finto soloist: comando {name} {uri or cmd.get('position_ms') or cmd.get('enabled') or ''}", flush=True)
+        if name == "play" and uri and uri != self.uri and not self.connect:
+            # come il Soloist vero con --single-track: un altro brano lo chiude
+            print("finto soloist: un altro brano con --single-track, mi chiudo", flush=True)
+            os._exit(0)
+        if name == "pause" and not self.playing:
+            # già fermo: un errore, nessuna conferma
+            await self.send({"type": "error", "command": name, "message": "nothing is playing"})
+            return
+        if name == "pause" and self.leak and self.playing:
             # Soloist si ferma, ma un po' del brano arriva nel tubo poco prima della conferma
             self.playing = False
             await asyncio.sleep(LEAK_DELAY_S)
@@ -126,9 +164,8 @@ class FakeSoloist:
             self.playing = False
             await self.state()
         elif name == "play":
-            uri = cmd.get("uri")
-            if uri and uri != self.uri:
-                if self.no_jump:
+            if uri and (uri != self.uri or self.position_ms >= self.duration_ms):
+                if self.no_jump and self.uri is not None:
                     return
                 if self.delay_play_s:
                     await asyncio.sleep(self.delay_play_s)
@@ -136,6 +173,11 @@ class FakeSoloist:
                 self.position_ms = 0.0
                 self.playing = True
                 await self.send({"type": "track_changed", "item": self.item()})
+                if self.takeover and self.data_dir is not None:
+                    # un altro account entra dalla rete locale
+                    (self.data_dir / "settings" / "Users" / "altro-user").mkdir(parents=True, exist_ok=True)
+            if self.uri is None:
+                return
             self.playing = True
             await self.state()
         elif name == "seek":
@@ -153,6 +195,8 @@ class FakeSoloist:
 
     def write(self, frames: int) -> int:
         """Fino a frames campioni del brano nel tubo; quanti ne sono entrati (il tubo può essere pieno)."""
+        if self.uri is None:
+            return 0
         if self.fd is None:
             try:
                 self.fd = os.open(self.fifo, os.O_WRONLY | os.O_NONBLOCK)
@@ -182,7 +226,9 @@ class FakeSoloist:
             if (now := time.monotonic()) - last_sync > 1:
                 last_sync = now
                 await self.send({"type": "position_sync", "position": self.position()})
-            if self.position_ms >= self.duration_ms:
+            if self.position_ms < self.duration_ms:
+                continue
+            if not self.connect:
                 # come Soloist --single-track: a fine brano passa all'autoplay e si chiude
                 self.uri = AUTOPLAY
                 await self.send({"type": "track_changed", "item": self.item()})
@@ -191,15 +237,28 @@ class FakeSoloist:
                 await asyncio.sleep(0.3)
                 self.done.set()
                 return
+            if self.autoplay:
+                # Spotify Connect: a fine brano passa all'autoplay e lo suona, finché non lo si mette in pausa
+                self.uri = AUTOPLAY
+                self.position_ms = 0.0
+                await self.send({"type": "track_changed", "item": self.item()})
+                await self.state()
+                await asyncio.sleep(0.3)
+            else:
+                # Spotify Connect senza autoplay: si ferma alla fine del brano, in pausa
+                self.playing = False
+                self.position_ms = float(self.duration_ms)
+                await self.state()
 
 
 async def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--single-track", required=True)
+    parser.add_argument("--single-track", default=None)
     parser.add_argument("--data-dir", required=True)
     parser.add_argument("--ws", default="127.0.0.1:0")
     args, _ = parser.parse_known_args()
     fake = FakeSoloist(args.single_track)
+    fake.data_dir = Path(args.data_dir)
     app = web.Application()
     app.router.add_get("/", fake.handle)
     runner = web.AppRunner(app)
@@ -211,7 +270,8 @@ async def main() -> None:
     data = Path(args.data_dir)
     (data / "ws.addr").write_text(host)
     (data / "ws.port").write_text(str(bound))
-    print(f"finto soloist: {fake.uri} su {host}:{bound}", flush=True)
+    mode = "Spotify Connect" if fake.connect else fake.uri
+    print(f"finto soloist: {mode} su {host}:{bound}", flush=True)
     loop = asyncio.create_task(fake.play_loop())
     await fake.done.wait()
     loop.cancel()

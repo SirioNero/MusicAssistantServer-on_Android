@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import it.xonos.ma.XonosApp
+import it.xonos.ma.phone.model.ServerKeeper
 
 /**
  * Passa l'account di Music Assistant di Xonos a myCar, che ha Xonos dentro di sé: indirizzi, token
@@ -37,8 +38,9 @@ class AccountProvider : ContentProvider() {
             return null
         }
         val app = context.applicationContext as XonosApp
-        // myCar si collega da sé: se Xonos usa il server sul telefono e si è fermato (Android l'ha chiuso), ripartire.
-        app.startPhoneServerIfUsed()
+        // myCar si collega subito dopo: se Xonos usa il server sul telefono e non gira (fermo perché nessuno lo usava, o
+        // chiuso da Android), parte adesso e resta acceso qualche minuto (vedi ServerKeeper).
+        app.keeper.touch(ServerKeeper.Need.ACCOUNT)
         val settings = app.settings
         val config = settings.load()
         // Xonos non ancora configurato: niente da passare, ma la risposta dice che Xonos c'è.

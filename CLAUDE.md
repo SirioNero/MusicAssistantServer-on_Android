@@ -73,7 +73,7 @@ prima di cominciare: le cose scritte qui sono già state verificate, non vanno r
   (F-Droid rifiuta quel blocco). Build riproducibili: il workflow "Riproducibile" compila la release
   come F-Droid (la loro immagine `fdroidserver:buildserver-trixie`, OpenJDK 21, Gradle del wrapper,
   senza `tools/`) e la confronta byte per byte con l'APK della release tolta la firma: per la 0.1.38, la
-  0.1.42, la 0.1.49, la 0.1.50, la 0.1.52 e la 0.1.53 identici. Così la ricetta ha `Binaries` e `AllowedAPKSigningKeys` (SHA-256 del certificato
+  0.1.42, la 0.1.49, la 0.1.50, la 0.1.52, la 0.1.53 e la 0.1.56 identici. Così la ricetta ha `Binaries` e `AllowedAPKSigningKeys` (SHA-256 del certificato
   `18ef3fc3…2c836`): F-Droid pubblica l'APK con la nostra firma e si passa da GitHub/Obtainium a F-Droid
   senza disinstallare. Dopo ogni release va lanciato a mano "Riproducibile": una versione non identica
   F-Droid non la pubblica. Il modello delle richieste di fdroiddata vuole in `commit` l'hash completo e
@@ -1122,7 +1122,10 @@ del workflow `indagine-0157` della sessione.
   brano che non entra (`XONOS_FAKE_SINGLE_FAIL`: il blocco si toglie). Le prove di prima
   lasciavano `_XONOS_SWITCH_S`/`_JUMP_TIMEOUT_S` a 2 s anche per il precarico: ora si rimettono dopo la prova del salto
   rifiutato.
-- **Riproducibile** per la 0.1.56 lanciato dopo la release (proot cambiato).
+- **Riproducibile** per la 0.1.56 (proot col filtro di ioctl): identica, F-Droid può pubblicarla con la nostra firma.
+- Verificato in CI (Server MA, emulatore Android 14 x86_64, 19 prove su 19): «Connect da capo a freddo» 5,85 s (resta in
+  modalità Spotify Connect), «Connect salto dopo un avvio a freddo» 0,27 s sulla stessa sessione, «Connect che non parte,
+  ripiego» 8,69 s; il resto come nella 0.1.56.
 - Da portare in myCar: `SkipPlan` (Stay a fine coda), insieme al resto di 0.1.53-0.1.56.
 
 ## Lingue

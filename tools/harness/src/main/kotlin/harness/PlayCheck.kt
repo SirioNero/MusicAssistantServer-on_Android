@@ -28,7 +28,11 @@ fun main(): Unit = runBlocking {
     withTimeout(15_000) { repo.connection.first { it is Connection.Connected } }
     val outputs = mutableListOf<FakeOutput>()
     val engine = AudioEngine({ r, c -> FakeOutput(r, c).also { outputs += it } }, { f -> PcmDecoder(f.channels, f.bitDepth) }, TimeFilter())
-    val identity = SendspinClient.Identity(playerId, "Prova menu", "JVM", "test", listOf(StreamFormat("pcm", 48000, 2, 16)), 800, 300, 50, false)
+    // MODERN=1: saluto e stato senza i campi superati (come col server sul telefono e Music Assistant 2.10.8 o più nuovo).
+    val identity = SendspinClient.Identity(
+        playerId, "Prova menu", "JVM", "test", listOf(StreamFormat("pcm", 48000, 2, 16)), 800, 300, 50, false,
+        modernWire = System.getenv("MODERN") == "1",
+    )
     val client = SendspinClient(repo.http, engine, { identity }) { _, _ -> }
     client.start(url, token)
     withTimeout(20_000) { client.phase.first { it == SendspinClient.Phase.READY } }
@@ -56,7 +60,10 @@ fun main(): Unit = runBlocking {
     menu.children("cat|artists")
     val vasco = menu.search("vasco")
     val podcast = menu.search("morning").first { it.type == "podcast" }
-    val episodes = menu.children(podcast.id)
+    // Un podcast lungo si divide in cartelle anche lui: gli episodi della prima.
+    val episodes = menu.children(podcast.id).let { list ->
+        list.firstOrNull()?.takeIf { it.id.startsWith("part|") }?.let { menu.children(it.id) } ?: list
+    }
     val genre = menu.children("cat|genres").firstOrNull()
 
     check("episodio di un podcast trovato con la ricerca", episodes[2].id)
@@ -64,8 +71,11 @@ fun main(): Unit = runBlocking {
     check("cartella Brani di una ricerca", vasco.first { it.id.startsWith("find|tracks|") }.id)
     check("brano dai risultati", vasco.first { it.id.startsWith("play|") }.id)
     // Una lettera con almeno sei brani (nella libreria di prova la "A" ne ha uno solo).
-    val letter = letters.first { menu.children(it.id).size >= 6 }
-    val inLetter = menu.children(letter.id)
+    // Oltre Menu.PART voci la lettera si divide in cartelle ("1–150"...): allora si entra nella prima.
+    val letter = letters.first { l -> menu.children(l.id).let { it.size >= 6 || it.firstOrNull()?.id?.startsWith("part|") == true } }
+    val inLetter = menu.children(letter.id).let { list ->
+        list.firstOrNull()?.takeIf { it.id.startsWith("part|") }?.let { menu.children(it.id) } ?: list
+    }
     check("brano 6 della lettera ${letter.title}, da lì in poi", inLetter[5].id)
     check("tutti i brani di un artista", menu.children(vasco.first { it.type == "artist" }.id).first { it.id.startsWith("tracks|") }.id)
     genre?.let { check("genere ${it.title}", it.id) }

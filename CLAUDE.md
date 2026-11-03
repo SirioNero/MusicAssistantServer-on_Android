@@ -37,6 +37,12 @@ prima di cominciare: le cose scritte qui sono già state verificate, non vanno r
   Un buffer temporaneo per la riproduzione in corso va bene; un archivio da ascoltare dopo no.
 - Prima di dire che una cosa funziona, provala (vedi "Come si verifica"). Quello che non si è potuto
   provare (sul telefono, con Gearslip, con Spotify vero) va detto all'utente.
+- Nel logcat niente dati personali (regola di myCar, dalla 0.1.55 anche qui): titoli, artisti, album, uri e id dei
+  servizi, parole cercate, nomi (utenti, lettori, server, servizi), indirizzi, token, né i testi d'errore del server o
+  della rete, che li possono contenere. Si passa da `data/Logged.kt` (`Logged.error/id/text/trace`); i dettagli solo
+  nella build di prova (`Logged.details = BuildConfig.DEBUG`). Il registro di Music Assistant resta in
+  musicassistant.log; nel logcat le righe del server passano da `server/ServerLines.kt`. La CI ("Server MA",
+  `privacy()` in `tools/server/emulator.sh`) si ferma se nel logcat compaiono i nomi della musica di prova.
 
 ## Compilare e pubblicare
 
@@ -143,6 +149,9 @@ prima di cominciare: le cose scritte qui sono già state verificate, non vanno r
 | `data/AccountProvider.kt` | L'account (indirizzi, token, nome utente) per myCar, che ha Xonos dentro di sé: `content://it.xonos.ma.account`, metodo `account`; risponde solo a `io.github.sirionero.mycar` (e `.dev`) firmati col certificato di myCar (SHA-256 `e477a479…cccc31`), a nessun altro |
 | `data/MyCarBridge.kt` | Il ponte per myCar lasciata fuori da Tailscale (dalla 0.1.40): myCar si lega al servizio (azione `io.github.sirionero.mycar.BRIDGE`) e gli chiede una connessione verso Music Assistant; Xonos la apre e le passa l'altro capo di un socket locale. Solo a myCar firmata col suo certificato (la build di prova anche a myCar `.dev`), solo verso gli indirizzi scritti qui. Risposte: OK 1, NOT_MYCAR 2, NOT_OURS 3, NO_ANSWER 4, OTHER 0 |
 | `phone/MainActivity.kt` | L'app sul telefono: Compose, lingua, MediaController verso il servizio finché è in vista |
+| `phone/model/ServerKeeper.kt` | Quando il server sul telefono serve (schermo, musica, auto, myCar, account): lo avvia e lo ferma dopo un'attesa (dalla 0.1.55, `KeeperCheckKt`) |
+| `data/Logged.kt` | Cosa può finire nel logcat: tipi d'errore e forme degli id, mai titoli, nomi, indirizzi (`LoggedCheckKt`) |
+| `server/ServerLines.kt` | Le righe del server verso il logcat: solo `XONOS_LOG`, stati e uscita grezza, mai i record di Music Assistant (`ServerLinesCheckKt`) |
 | `phone/ControllerLink.kt` | `PlayerLink` dal MediaController: lo stesso `MaPlayer` che vede Gearslip |
 | `phone/model/` | `PhoneModel` (schede con pile di pagine, caricamenti, ricerca, suona/dopo/in coda, preferiti, testi, impostazioni, "Suona su"), `Pages.kt`, `Player.kt` (`NowPlaying`, `PlayerLink`), `ConnectionCheck.kt`, `Discovery.kt` (server trovati con mDNS), `ServicesModel.kt` e `ServicePages.kt` (i servizi), `RemoteLink.kt` (un lettore di MA comandato dallo schermo). Senza Android: si prova sulla JVM |
 | `phone/NsdFinder.kt` | Cerca Music Assistant nella rete con NsdManager (`_mass._tcp`) |
@@ -497,7 +506,8 @@ di Xonos suona dal server sul telefono; la release ridotta con R8, da capo come 
     di iter_stdout, come in un brano: fermo in 0,0 s, codice 0, nessun processo rimasto), `pulseaudio-ferma`
     (nessuno rimasto dopo release()); `cpu-audio`, 10 s di rumore con pacat letti dal tubo a 1,1 volte il tempo
     reale: PulseAudio 1%, proot 1%, pacat 0% (3,87 MB letti su 3,53 MB del tempo reale).
-  - **Il processore nel registro**: ogni minuto (`CPU_EVERY_S`), finché gira un programma Linux, una riga
+  - **Il processore nel registro** (dalla 0.1.55 la riga si chiama «Processore negli ultimi 60 s» e conta tutti i
+    processi: vedi "Server più leggero" sotto): ogni minuto (`CPU_EVERY_S`), finché gira un programma Linux, una riga
     "Processore dei programmi Linux negli ultimi 60 s: soloist N%, proot N%, pulseaudio N%" (100% = un core, i nomi
     dall'argv[0] di /proc; gli zombie non contano), così dal registro di una persona si vede quanto pesa proot. Sul
     telefono dell'utente (0.1.50, Soloist che suona): soloist 16%, proot 14% (2 processi), pulseaudio 13%. Dal
@@ -688,8 +698,9 @@ di Xonos suona dal server sul telefono; la release ridotta con R8, da capo come 
   conferma); in uso: "Usa un altro Music Assistant". In uso ma senza il pacchetto di questa versione (Xonos
   aggiornato, il server non parte) dalla 0.1.51 la scheda dice di aggiornarlo e ha "Aggiorna Music Assistant su
   questo telefono" (fino alla 0.1.50 il tasto compariva solo dopo "Usa un altro Music Assistant", e l'utente non lo
-  trovava), e la Home lo dice nel `ConnectionBanner`, con un tasto per le Impostazioni. I dati restano. `XonosApp` riavvia il server all'avvio e quando la
-  connessione cade, se l'indirizzo salvato è il suo e il pacchetto c'è. `PhoneServerControl` è l'interfaccia
+  trovava), e la Home lo dice nel `ConnectionBanner`, con un tasto per le Impostazioni. I dati restano. Dalla 0.1.55 il server lo avvia e lo ferma
+  `ServerKeeper` (sotto, "Server più leggero"); `XonosApp` lo riavvia quando la connessione cade solo finché qualcuno
+  lo vuole, se l'indirizzo salvato è il suo e il pacchetto c'è. `PhoneServerControl` è l'interfaccia
   senza Android: `PhoneServerCheckKt` (banco JVM) la prova con un download finto contro il server avviato sul
   computer.
 - **La musica del telefono**: l'app dichiara `READ_MEDIA_AUDIO` (`READ_EXTERNAL_STORAGE` fino ad Android 12) e
@@ -850,7 +861,7 @@ Da una caccia ai bug con più agenti (8 aree, un giudice avversario per area) e 
   - Server sul telefono: schermo acceso (`KeepScreenOn` in Platform.kt) finché la scheda scarica, prepara o controlla;
     l'attesa dell'avvio conta solo il tempo passato davvero (a schermo spento Android congela l'app); la cartella Music
     del profilo (`XONOS_MUSIC_DIR`, in un profilo secondario non è /storage/emulated/0); testo per
-    `music_directory_not_found`; myCar che chiede l'account fa ripartire il server (`startPhoneServerIfUsed`).
+    `music_directory_not_found`; myCar che chiede l'account fa ripartire il server (dalla 0.1.55 `keeper.touch(ACCOUNT)`).
   - Flussi sul server del telefono (`_flows` in prepare.py): `IDLE_FLOW_TTL` 3 ore; `config/flows/get` dà ancora
     l'ultimo passo dei 16 flussi finiti più recenti (prima "Unknown (or finished) setup flow" a chi tornava dal
     browser; con gli altri Music Assistant l'app lo dice a parole, `ENDED_AWAY`). Spotify: passo `xonos_finishing`
@@ -883,10 +894,86 @@ Da una caccia ai bug con più agenti (8 aree, un giudice avversario per area) e 
   automatica; pausa non arrivata per la rete → `onPauseLost` → `engine.silence()` (torna su solo con un play
   USER_REQUEST); uscita esterna staccata mentre la musica parte → silenzio e pausa; i salti falliti vanno a
   `onFailure`.
-- Proposte non fatte: PulseAudio senza shm né memfd (`rootfs.py`: `enable-shm = no`, `enable-memfd = no`) non apre lo
-  srbchannel, e ogni pacchetto audio tra Soloist e PulseAudio passa da sendto/recvmsg, che proot intercetta: con memfd
-  (che non usa /dev/shm) il peso di proot (14% sul telefono) potrebbe scendere. Da provare sul telefono prima di
-  pubblicarlo. Il backup di Android porta con sé token e dati di Music Assistant (nessun `allowBackup`): da decidere.
+- Proposte non fatte: il backup di Android porta con sé token e dati di Music Assistant (nessun `allowBackup`): da
+  decidere. (PulseAudio con memfd: fatto nella 0.1.55, sotto.)
+
+## Server più leggero (0.1.55, ramo `claude/server-leggero`, pacchetto 2.10.8-10)
+
+Dal registro dell'utente con la 0.1.53 (3 novembre 2026): il server costava il 50-75% di un core mentre suonava
+Spotify (circa 370 s di processore in 12 minuti); chiusa l'app dai Recenti restava acceso, il servizio lasciava il
+primo piano e alle 05:11 Android uccideva Python per "excessive cpu" (38% in 5 minuti, il limite è 25%); Spotify ha
+bloccato il Music Assistant del telefono per un'ora (Retry-After 3555 s, anche Xonos dentro myCar); aiosendspin dice
+che il client Sendspin è "non-compliant" (in chiaro, tollerato solo in "transition mode"); il registro di Music
+Assistant finiva nel logcat a livello INFO (titoli, id di Spotify, nome utente). Un'analisi (5 aree, un verificatore
+per area) e una revisione avversaria; analisi in `scratchpad/analisi-ottimizza` della sessione (non nel repository).
+- **Ciclo di vita** (`ServerKeeper`): bisogni SCREEN (un'Activity aperta; 3 min dopo, 15 durante un flusso di
+  configurazione, `PhoneModel.inSetupFlow`: accesso a Spotify nel browser, abbinamento di Soloist nell'app Spotify),
+  PLAYING (il test di Media3: playWhenReady e READY/BUFFERING; 8 min, dentro i 10 in cui Media3 tiene il servizio in
+  primo piano dopo una pausa, così l'arresto non trova il processo congelato), CAR (un controller esterno, non Xonos
+  né SystemUI; i browser vecchi come Gearslip non dicono quando se ne vanno: `onUnbind` dell'azione
+  MediaBrowserService; 2 min), MYCAR (`MyCarBridge` legato; 1 min), ACCOUNT (2 min). Chiusa dai Recenti: SCREEN a 0
+  (`onTaskRemoved`). Il server si ferma quando tutti sono scaduti; start e stop uno alla volta. Niente più avvio a ogni
+  creazione del processo (anche per una copertina chiesta da Gearslip). Riavvio quando serve: play, ripresa, salti e
+  scelte dall'auto aspettano il server (`MaPlayer.wake`, 60 s; pausa e stop no), il menu dell'auto 45 s, myCar riceve
+  NO_ANSWER e riprova. Android (da AOSP, non verificato qui): un'app in background senza servizio in primo piano viene
+  congelata dopo circa 10 s; i processi figli (PhantomProcessList) si controllano ogni 5 minuti, limiti 25/25/10/2%
+  di un core.
+- **Python** (`xonos_server.py`): sullo stderr solo le righe del logger di Xonos (`XONOS_LOG <livello> <testo>`), il
+  resto solo in musicassistant.log (un Filter: MA sposta gli handler in un QueueListener che ignora i livelli). 12 s
+  dopo SIGTERM esce da solo (`xonos-stop`), e si ferma se l'app non c'è più (getppid cambia). All'avvio una riga coi
+  cgroup di Python e dell'app (se uguali, congelando l'app si congela anche il server) e «proot: seccomp lo aiuta /
+  NON lo aiuta» (`proot -v 1` nella prova di ptrace: senza seccomp ogni chiamata di sistema si ferma in proot).
+- **Processore nel registro**: «Processore negli ultimi 60 s: python N%, soloist N%, proot[soloist] N% (N risvegli/s),
+  pulseaudio N%, ffmpeg N%, app N%» ogni minuto se gira un programma Linux o il totale è almeno 5%, sennò ogni 15
+  minuti (il costo a riposo). Sopra il 20% di Python (al massimo ogni 10 minuti) una riga «Python al N% …»: thread
+  (da /proc/self/task, non pthread_getcpuclockid, che su bionic con un thread finito chiude il processo), lavori di
+  Music Assistant in corso (solo il tipo, mai i nomi), dove sta il ciclo (occhiate ogni 20 ms per 4 s).
+- **PulseAudio con memoria condivisa** (`rootfs.py`: `enable-shm = yes`, `enable-memfd = yes`): con memfd (niente
+  /dev/shm) lo srbchannel porta l'audio fra Soloist e PulseAudio senza sendto/recvmsg, che proot intercetta. Provato in
+  locale in un chroot (memfd negoziato, srbchannel acceso); sull'emulatore la prova `pulse-memfd` (pacat a 20 ms, con e
+  senza memoria condivisa: processore, risvegli di proot, righe dell'accordo). PulseAudio parte a livello debug e le
+  righe dell'accordo (tlength/minreq, latenza, SHM, srbchannel) vanno a INFO; oltre 1200 righe in un minuto passa a
+  info col socket dei comandi (a ogni "underrun" ne scrive una).
+- **Proxy Sendspin senza compressione** (`sendspin_proxy.py`, `compress=False`): OkHttp offre permessage-deflate e
+  aiohttp comprimeva ogni pezzo di PCM da 25 ms sul ciclo di Music Assistant (e Xonos lo decomprimeva).
+- **Spotify** (`_spotify_limits`): durante un blocco lungo (Retry-After oltre 60 s) anche le chiamate della
+  riproduzione (BYPASS_THROTTLER) si fermano subito, e fuori dal blocco prendono un posto nel limite (prima lo
+  saltavano: suonare un artista non in cache erano circa 3 richieste per album senza freni); il rinnovo del token
+  rifiutato con 429 o 5xx è temporaneo (backport della 2.11: prima diventava LoginFailed e il servizio si scaricava
+  per sempre); il blocco si salva in `.xonos-spotify-block-<istanza>` (massimo 3 ore, con l'impronta del Client ID) e
+  al riavvio il servizio si carica con l'account salvato senza chiamare /me; un WARNING per blocco con le richieste
+  degli ultimi 5 minuti per tipo e per chi (bg, play, user), e una riga INFO se sono più di 100 in 5 minuti; il
+  messaggio `xonos_rate_limited` dice quanti minuti mancano (9 lingue); ricerca con limite 10 per tipo (una richiesta
+  invece di tre). Il blocco è misurato con time.monotonic (si ferma col telefono in sospensione).
+- **App**: la pagina dell'artista e il menu dell'auto non scaricano più tutti i brani all'apertura (cartella
+  «Tutti i brani» caricata quando si apre: `ArtistPage.tracks` null = non ancora); la ricerca in tutti i servizi parte
+  dopo 1 s senza scrivere (la libreria sempre dopo 350 ms). Sendspin: `Identity.modernWire` (server sul telefono o
+  Music Assistant 2.10.8 o più nuovo) toglie `supported_commands` dal saluto e lo `state` in testa a client/state;
+  `server/error` (Music Assistant che accetta solo lettori cifrati) finisce con un motivo chiaro e riprova dopo 5
+  minuti; dal motore di myCar la socket chiusa al timeout del saluto e i messaggi di una sessione vecchia ignorati.
+- **Sendspin cifrato, non fatto**: Music Assistant 2.10.8 accetta i lettori in chiaro solo con `allow_legacy_clients`
+  (nascosta, di serie accesa, "will be removed in a future release"). Un lettore conforme fa client/init con una
+  chiave X25519 (che diventa il suo client_id), l'handshake Noise_KKpsk2 (25519_AESGCM_SHA256), la PSK "Sentinel"
+  per gli ospiti, frame binari cifrati, intestazione audio di 13 byte. Su Android X25519 c'è solo dall'API 33 (minSdk
+  26): Bouncy Castle o una versione propria. Cambia una volta l'id del lettore (coda e impostazioni del telefono da
+  capo su ogni Music Assistant) e va fatto anche in myCar. Il server sul telefono non ne ha bisogno (aiosendspin
+  10.2.1 fissato). Dettagli in `sendspin.md` dell'analisi; da decidere con l'utente.
+- **Da portare in myCar**: `Logged` e i log del motore, `MaPlayer.wake` (no-op), `awaitReady` che dà Boolean, Menu
+  dell'artista, SendspinClient (`modernWire`, `server/error`, Outcome.kind). La riga del CLAUDE.md di myCar che dice
+  che Soloist «non gira sul telefono» è superata (gira sotto proot nel server di Xonos).
+- Verificato in CI (Server MA di 8d3880a, emulatore Android 14 x86_64, 17 prove su 17): `pulse-memfd` con pacat a 20 ms
+  senza memoria condivisa proot[pulseaudio] 207 risvegli/s e proot[pacat] 265, con memfd 22 e 0 ("Negotiated SHM type:
+  shared memfd", "Client enabled srbchannel"); `spotify-blocco` (429 con Retry-After 3555: "59 minuti", la
+  riproduzione non chiama il servizio, un blocco breve non la ferma); `profilo` (il ciclo occupato a scrivere JSON si
+  vede); seccomp aiuta proot; Python è nel cgroup dell'app (`0::/uid_…/pid_<app>`): congelando l'app si congela anche
+  il server; nel logcat della release solo stati e righe di Xonos (guardia `privacy()` passata). `soloist ctl --help`:
+  status, now, queue, trace, play, pause, next, prev, seek, volume, shuffle, repeat, add-to-queue, activate,
+  deactivate; nessuna opzione per non annunciarsi in rete. Sul banco JVM con il Music Assistant in Docker: PlayCheck
+  (anche con `MODERN=1`: Music Assistant non segnala più supported_commands né lo state in testa, resta solo
+  "connected unencrypted"), PhoneCheck, MenuCheck (l'artista ha «All tracks», 28 brani caricati all'apertura),
+  LongListCheck, SearchCheck.
+- Non provato: tutto sul telefono (arresto e riavvio veri, Gearslip che aspetta il menu, memfd sotto GrapheneOS, il
+  peso del processore dopo), Spotify vero (429, rinnovo del token), un Music Assistant con `allow_legacy_clients` spento.
 
 ## Lingue
 

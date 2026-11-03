@@ -1,0 +1,914 @@
+--------- beginning of kernel
+11-03 17:46:25.139 I/logd    (    0): logdr: UID=2000 GID=2000 PID=7383 b tail=0 logMask=99 pid=0 start=0ns deadline=0ns
+--------- beginning of system
+11-03 17:46:24.967 W/ActivityTaskManager(  545): callingPackage for (uid=2000, pid=7387) has no WPC
+11-03 17:46:24.967 D/CompatibilityChangeReporter(  545): Compat change id reported: 244637991; UID 2000; state: ENABLED
+11-03 17:46:24.968 D/CompatibilityChangeReporter(  545): Compat change id reported: 265464455; UID 10192; state: DISABLED
+11-03 17:46:24.968 D/CompatibilityChangeReporter(  545): Compat change id reported: 265452344; UID 10192; state: DISABLED
+11-03 17:46:24.968 D/CompatibilityChangeReporter(  545): Compat change id reported: 266124927; UID 10192; state: DISABLED
+11-03 17:46:24.968 D/CompatibilityChangeReporter(  545): Compat change id reported: 265451093; UID 10192; state: DISABLED
+11-03 17:46:24.968 D/CompatibilityChangeReporter(  545): Compat change id reported: 265456536; UID 10192; state: DISABLED
+11-03 17:46:24.968 D/CompatibilityChangeReporter(  545): Compat change id reported: 255940284; UID 10192; state: DISABLED
+11-03 17:46:24.968 D/CompatibilityChangeReporter(  545): Compat change id reported: 236283604; UID 10192; state: DISABLED
+11-03 17:46:24.968 D/CompatibilityChangeReporter(  545): Compat change id reported: 263959004; UID 10192; state: DISABLED
+11-03 17:46:24.968 D/CompatibilityChangeReporter(  545): Compat change id reported: 264304459; UID 10192; state: DISABLED
+11-03 17:46:24.968 D/CompatibilityChangeReporter(  545): Compat change id reported: 264301586; UID 10192; state: DISABLED
+11-03 17:46:24.968 D/CompatibilityChangeReporter(  545): Compat change id reported: 254631730; UID 10192; state: DISABLED
+11-03 17:46:24.968 D/CompatibilityChangeReporter(  545): Compat change id reported: 273509367; UID 10192; state: DISABLED
+11-03 17:46:24.968 D/CompatibilityChangeReporter(  545): Compat change id reported: 263259275; UID 10192; state: DISABLED
+11-03 17:46:24.968 D/CompatibilityChangeReporter(  545): Compat change id reported: 174042980; UID 10192; state: DISABLED
+11-03 17:46:24.968 D/CompatibilityChangeReporter(  545): Compat change id reported: 174042936; UID 10192; state: DISABLED
+11-03 17:46:24.968 D/CompatibilityChangeReporter(  545): Compat change id reported: 181136395; UID 10192; state: DISABLED
+11-03 17:46:24.969 D/CompatibilityChangeReporter(  545): Compat change id reported: 194480991; UID 10192; state: ENABLED
+11-03 17:46:24.971 D/CompatibilityChangeReporter(  545): Compat change id reported: 184838306; UID 10192; state: DISABLED
+11-03 17:46:24.971 D/CompatibilityChangeReporter(  545): Compat change id reported: 185004937; UID 10192; state: DISABLED
+11-03 17:46:24.972 V/SplashScreenExceptionList(  545): SplashScreen checking exception for package it.xonos.ma (target sdk:34) -> false
+11-03 17:46:24.973 D/CompatibilityChangeReporter(  545): Compat change id reported: 205907456; UID 10192; state: ENABLED
+11-03 17:46:24.975 V/WindowManagerShell(  912): Transition requested: android.os.BinderProxy@e24a207 TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=9 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=it.xonos.ma/.ServerCheckActivity } baseActivity=ComponentInfo{it.xonos.ma/it.xonos.ma.ServerCheckActivity} topActivity=ComponentInfo{it.xonos.ma/it.xonos.ma.ServerCheckActivity} origActivity=null realActivity=ComponentInfo{it.xonos.ma/it.xonos.ma.ServerCheckActivity} numActivities=1 lastActiveTime=194477 supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{android.window.IWindowContainerToken$Stub$Proxy@7614f34} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=Rect(0, 128 - 0, 0) topActivityInfo=ActivityInfo{c8c15d it.xonos.ma.ServerCheckActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=false isVisible=false isVisibleRequested=false isSleeping=false topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= false topActivityLetterboxed= false isFromDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 locusId=null displayAreaFeatureId=1 cameraCompatControlState=hidden}, remoteTransition = null, displayChange = null }
+11-03 17:46:24.976 I/ActivityTaskManager(  545): START u0 {flg=0x10000000 cmp=it.xonos.ma/.ServerCheckActivity (has extras)} with LAUNCH_MULTIPLE from uid 2000 (BAL_ALLOW_PERMISSION) result code=0
+11-03 17:46:24.985 D/CompatibilityChangeReporter(  545): Compat change id reported: 135634846; UID 10192; state: DISABLED
+11-03 17:46:24.985 D/CompatibilityChangeReporter(  545): Compat change id reported: 143937733; UID 10192; state: ENABLED
+--------- beginning of main
+11-03 17:46:25.001 D/SplashScreenView(  912): Build android.window.SplashScreenView{7ea84fc V.E...... ......ID 0,0-0,0}
+11-03 17:46:25.001 D/SplashScreenView(  912): Icon: view: android.widget.ImageView{a479785 V.ED..... ......I. 0,0-0,0 #10204f0 android:id/splashscreen_icon_view} drawable: com.android.wm.shell.startingsurface.SplashscreenIconDrawableFactory$ImmobileIconDrawable@68439da size: 504
+11-03 17:46:25.001 D/SplashScreenView(  912): Branding: view: android.view.View{8893e0b G.ED..... ......I. 0,0-0,0 #10204ef android:id/splashscreen_branding_view} drawable: null size w: 0 h: 0
+11-03 17:46:25.003 D/CompatibilityChangeReporter(  545): Compat change id reported: 265195908; UID 10192; state: ENABLED
+11-03 17:46:25.004 D/Zygote  (  359): Forked child process 7391
+11-03 17:46:25.005 I/ActivityManager(  545): Start proc 7391:it.xonos.ma/u0a192 for next-top-activity {it.xonos.ma/it.xonos.ma.ServerCheckActivity}
+11-03 17:46:25.008 I/BpBinder(  424): onLastStrongRef automatically unlinking death recipients: 
+11-03 17:46:25.023 D/CoreBackPreview(  545): Window{ae80d94 u0 Splash Screen it.xonos.ma}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@4dcb032, mPriority=0, mIsAnimationCallback=false}
+11-03 17:46:25.042 I/it.xonos.ma( 7391): Late-enabling -Xcheck:jni
+11-03 17:46:25.067 I/it.xonos.ma( 7391): Using CollectorTypeCC GC.
+11-03 17:46:25.070 W/it.xonos.ma( 7391): Unexpected CPU variant for x86: x86_64.
+11-03 17:46:25.070 W/it.xonos.ma( 7391): Known variants: atom, sandybridge, silvermont, goldmont, goldmont-plus, tremont, kabylake, default
+11-03 17:46:25.094 W/ActivityTaskManager(  545): takeTaskSnapshot: taskId=9 not found or not visible
+11-03 17:46:25.131 D/CompatibilityChangeReporter( 7391): Compat change id reported: 171979766; UID 10192; state: ENABLED
+11-03 17:46:25.136 D/CompatibilityChangeReporter( 7391): Compat change id reported: 242716250; UID 10192; state: ENABLED
+11-03 17:46:25.144 D/CompatibilityChangeReporter(  545): Compat change id reported: 170503758; UID 10192; state: ENABLED
+11-03 17:46:25.158 I/adbd    (  435): jdwp connection from 7391
+11-03 17:46:25.159 W/ziparchive( 7391): Unable to open '/data/app/~~ZBjnHUriKevMfKCb6yH_fg==/it.xonos.ma-9EhgVI-njOsUuUHyYciqYA==/base.dm': No such file or directory
+11-03 17:46:25.159 W/ziparchive( 7391): Unable to open '/data/app/~~ZBjnHUriKevMfKCb6yH_fg==/it.xonos.ma-9EhgVI-njOsUuUHyYciqYA==/base.dm': No such file or directory
+11-03 17:46:25.177 V/WindowManagerShell(  912): onTransitionReady android.os.BinderProxy@e24a207: {id=10 t=OPEN f=0x0 trk=0 r=[0@Point(0, 0)] c=[{WCT{android.window.IWindowContainerToken$Stub$Proxy@a42b77e} m=OPEN f=NONE leash=Surface(name=Task=9)/@0x8596383 sb=Rect(0, 0 - 1080, 2400) eb=Rect(0, 0 - 1080, 2400) d=0},{WCT{android.window.IWindowContainerToken$Stub$Proxy@bc4b4df} m=TO_BACK f=SHOW_WALLPAPER leash=Surface(name=Task=1)/@0x4b37900 sb=Rect(0, 0 - 1080, 2400) eb=Rect(0, 0 - 1080, 2400) d=0}]}
+11-03 17:46:25.177 V/WindowManagerShell(  912): Playing animation for (#10)android.os.BinderProxy@e24a207@0
+11-03 17:46:25.177 V/WindowManagerShell(  912):  try handler com.android.wm.shell.transition.DefaultMixedHandler@9410550
+11-03 17:46:25.177 V/WindowManagerShell(  912):  try handler com.android.wm.shell.keyguard.KeyguardTransitionHandler@c2dd349
+11-03 17:46:25.177 V/WindowManagerShell(  912):  try handler com.android.wm.shell.activityembedding.ActivityEmbeddingController@959644e
+11-03 17:46:25.177 V/WindowManagerShell(  912):  try handler com.android.wm.shell.recents.RecentsTransitionHandler@9f3a96f
+11-03 17:46:25.177 V/ShellRecents(  912): RecentsTransitionHandler.startAnimation: no controller found
+11-03 17:46:25.177 V/WindowManagerShell(  912):  try handler com.android.wm.shell.pip.PipTransition@539267c
+11-03 17:46:25.177 V/WindowManagerShell(  912):  try handler com.android.wm.shell.splitscreen.StageCoordinator@2f75b05
+11-03 17:46:25.177 V/WindowManagerShell(  912):  try handler com.android.wm.shell.transition.RemoteTransitionHandler@beb775a
+11-03 17:46:25.177 V/WindowManagerShell(  912): Transition doesn't have explicit remote, search filters for match for {id=10 t=OPEN f=0x0 trk=0 r=[0@Point(0, 0)] c=[{WCT{android.window.IWindowContainerToken$Stub$Proxy@a42b77e} m=OPEN f=NONE leash=Surface(name=Task=9)/@0x8596383 sb=Rect(0, 0 - 1080, 2400) eb=Rect(0, 0 - 1080, 2400) d=0},{WCT{android.window.IWindowContainerToken$Stub$Proxy@bc4b4df} m=TO_BACK f=SHOW_WALLPAPER leash=Surface(name=Task=1)/@0x4b37900 sb=Rect(0, 0 - 1080, 2400) eb=Rect(0, 0 - 1080, 2400) d=0}]}
+11-03 17:46:25.177 V/WindowManagerShell(  912):  Checking filter Pair{{types=[] flags=0x0] notFlags=0x0 checks=[{atype=dream independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=ANY topActivity=null},{atype=home independent=true modes=[CLOSE,TO_BACK] flags=NONE mustBeTask=false order=ANY topActivity=null}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@3d40596, appThread = android.app.IApplicationThread$Stub$Proxy@2fe4517, debugName = LauncherToDream }}
+11-03 17:46:25.178 V/WindowManagerShell(  912):  Checking filter Pair{{types=[] flags=0x0] notFlags=0x100 checks=[{atype=home independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=TOP topActivity=ComponentInfo{com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity}},{atype=standard independent=true modes=[CLOSE,TO_BACK] flags=NONE mustBeTask=false order=ANY topActivity=null}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@61a9d04, appThread = android.app.IApplicationThread$Stub$Proxy@a4442ed, debugName = QuickstepLaunchHome }}
+11-03 17:46:25.178 V/WindowManagerShell(  912):  Delegate animation for #10 to null
+11-03 17:46:25.178 V/WindowManagerShell(  912):  try handler com.android.wm.shell.transition.DefaultTransitionHandler@bf15767
+11-03 17:46:25.178 V/WindowManagerShell(  912): start default transition animation, info = {id=10 t=OPEN f=0x0 trk=0 r=[0@Point(0, 0)] c=[{WCT{android.window.IWindowContainerToken$Stub$Proxy@a42b77e} m=OPEN f=NONE leash=Surface(name=Task=9)/@0x8596383 sb=Rect(0, 0 - 1080, 2400) eb=Rect(0, 0 - 1080, 2400) d=0},{WCT{android.window.IWindowContainerToken$Stub$Proxy@bc4b4df} m=TO_BACK f=SHOW_WALLPAPER leash=Surface(name=Task=1)/@0x4b37900 sb=Rect(0, 0 - 1080, 2400) eb=Rect(0, 0 - 1080, 2400) d=0}]}
+11-03 17:46:25.180 V/WindowManager(  545): Sent Transition #10 createdAt=11-03 17:46:24.969 via request=TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=9 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=it.xonos.ma/.ServerCheckActivity } baseActivity=ComponentInfo{it.xonos.ma/it.xonos.ma.ServerCheckActivity} topActivity=ComponentInfo{it.xonos.ma/it.xonos.ma.ServerCheckActivity} origActivity=null realActivity=ComponentInfo{it.xonos.ma/it.xonos.ma.ServerCheckActivity} numActivities=1 lastActiveTime=194477 supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{RemoteToken{d40a2df Task{fe68c0b #9 type=standard A=10192:it.xonos.ma}}} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=Rect(0, 128 - 0, 0) topActivityInfo=ActivityInfo{d9f7b2c it.xonos.ma.ServerCheckActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=false isVisible=false isVisibleRequested=false isSleeping=false topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= false topActivityLetterboxed= false isFromDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 locusId=null displayAreaFeatureId=1 cameraCompatControlState=hidden}, remoteTransition = null, displayChange = null }
+11-03 17:46:25.180 V/WindowManager(  545):     startWCT=WindowContainerTransaction { changes = {} hops = [] errorCallbackToken=null taskFragmentOrganizer=null }
+11-03 17:46:25.180 V/WindowManager(  545):     info={id=10 t=OPEN f=0x0 trk=0 r=[0@Point(0, 0)] c=[{WCT{RemoteToken{d40a2df Task{fe68c0b #9 type=standard A=10192:it.xonos.ma}}} m=OPEN f=NONE leash=Surface(name=Task=9)/@0xdb7339 sb=Rect(0, 0 - 1080, 2400) eb=Rect(0, 0 - 1080, 2400) d=0},{WCT{RemoteToken{d73f356 Task{8f395b5 #1 type=home}}} m=TO_BACK f=SHOW_WALLPAPER leash=Surface(name=Task=1)/@0x15dcd3b sb=Rect(0, 0 - 1080, 2400) eb=Rect(0, 0 - 1080, 2400) d=0}]}
+11-03 17:46:25.184 V/WindowManagerShell(  912): loadAnimation: anim=android.view.animation.AnimationSet@f766bf5 animAttr=0x13 type=OPEN isEntrance=false
+11-03 17:46:25.186 V/WindowManagerShell(  912): loadAnimation: anim=android.view.animation.AnimationSet@a8ed271 animAttr=0x12 type=OPEN isEntrance=true
+11-03 17:46:25.187 V/WindowManagerShell(  912):  animated by com.android.wm.shell.transition.DefaultTransitionHandler@bf15767
+11-03 17:46:25.190 V/WindowManagerShell(  912): Transition animation finished (aborted=false), notifying core (#10)android.os.BinderProxy@e24a207@0
+11-03 17:46:25.191 V/WindowManager(  545): Finish Transition #10: created at 11-03 17:46:24.969 collect-started=0.044ms request-sent=6.166ms started=18.353ms ready=141.099ms sent=207.226ms finished=221.701ms
+11-03 17:46:25.195 V/WindowManagerShell(  912): Track 0 became idle
+11-03 17:46:25.195 V/WindowManagerShell(  912): All active transition animations finished
+11-03 17:46:25.393 D/WifiNl80211Manager(  545): Scan result ready event
+11-03 17:46:25.394 D/WifiNative(  545): Scan result ready event
+11-03 17:46:25.571 D/nativeloader( 7391): Configuring clns-6 for other apk /data/app/~~ZBjnHUriKevMfKCb6yH_fg==/it.xonos.ma-9EhgVI-njOsUuUHyYciqYA==/base.apk. target_sdk_version=34, uses_libraries=, library_path=/data/app/~~ZBjnHUriKevMfKCb6yH_fg==/it.xonos.ma-9EhgVI-njOsUuUHyYciqYA==/lib/x86_64:/data/app/~~ZBjnHUriKevMfKCb6yH_fg==/it.xonos.ma-9EhgVI-njOsUuUHyYciqYA==/base.apk!/lib/x86_64, permitted_path=/data:/mnt/expand:/data/user/0/it.xonos.ma
+11-03 17:46:25.578 V/GraphicsEnvironment( 7391): Currently set values for:
+11-03 17:46:25.578 V/GraphicsEnvironment( 7391):   angle_gl_driver_selection_pkgs=[]
+11-03 17:46:25.578 V/GraphicsEnvironment( 7391):   angle_gl_driver_selection_values=[]
+11-03 17:46:25.578 V/GraphicsEnvironment( 7391): ANGLE GameManagerService for it.xonos.ma: false
+11-03 17:46:25.578 V/GraphicsEnvironment( 7391): it.xonos.ma is not listed in per-application setting
+11-03 17:46:25.578 V/GraphicsEnvironment( 7391): Neither updatable production driver nor prerelease driver is supported.
+11-03 17:46:25.648 I/ActivityManager(  545): Flag disabled. Ignoring finishAttachApplication from uid: 10192. pid: 7391
+11-03 17:46:25.654 D/libEGL  ( 7391): loaded /vendor/lib64/egl/libEGL_emulation.so
+11-03 17:46:25.656 D/libEGL  ( 7391): loaded /vendor/lib64/egl/libGLESv1_CM_emulation.so
+11-03 17:46:25.658 D/libEGL  ( 7391): loaded /vendor/lib64/egl/libGLESv2_emulation.so
+11-03 17:46:25.666 D/CompatibilityChangeReporter( 7391): Compat change id reported: 210923482; UID 10192; state: ENABLED
+11-03 17:46:25.672 D/StatusBarIconController(  912): ignoring old pipeline callbacks, because the new mobile icons are enabled
+11-03 17:46:25.682 D/CompatibilityChangeReporter( 7391): Compat change id reported: 237531167; UID 10192; state: DISABLED
+11-03 17:46:25.683 W/OpenGLRenderer( 7391): Unknown dataspace 0
+11-03 17:46:25.691 D/CoreBackPreview(  545): Window{c02c173 u0 it.xonos.ma/it.xonos.ma.ServerCheckActivity}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@2e622e, mPriority=0, mIsAnimationCallback=false}
+11-03 17:46:25.696 D/TrafficStats( 7391): tagSocket(81) with statsTag=0xffffffff, statsUid=-1
+11-03 17:46:25.718 I/XonosServer( 7391): Pacchetto: 75 MB
+11-03 17:46:25.729 W/OpenGLRenderer( 7391): Failed to initialize 101010-2 format, error = EGL_SUCCESS
+11-03 17:46:25.733 D/TrafficStats( 7391): tagSocket(87) with statsTag=0xffffffff, statsUid=-1
+11-03 17:46:25.749 D/TrafficStats( 7391): tagSocket(87) with statsTag=0xffffffff, statsUid=-1
+11-03 17:46:25.786 I/hwservicemanager(  156): getTransport: Cannot find entry android.hardware.graphics.mapper@4.0::IMapper/default in either framework or device VINTF manifest.
+11-03 17:46:25.787 I/Gralloc4( 7391): mapper 4.x is not supported
+11-03 17:46:25.963 I/servicemanager(    0): Could not find android.hardware.graphics.allocator.IAllocator/default in the VINTF manifest.
+11-03 17:46:26.002 W/ziparchive(  545): Unable to open '/data/app/~~ZBjnHUriKevMfKCb6yH_fg==/it.xonos.ma-9EhgVI-njOsUuUHyYciqYA==/base.dm': No such file or directory
+11-03 17:46:26.004 I/ActivityTaskManager(  545): Displayed it.xonos.ma/.ServerCheckActivity for user 0: +1s34ms
+11-03 17:46:26.016 D/CompatibilityChangeReporter( 7391): Compat change id reported: 270306772; UID 10192; state: ENABLED
+11-03 17:46:26.016 W/WindowOnBackDispatcher(  912): sendCancelIfRunning: isInProgress=falsecallback=android.view.ViewRootImpl$$ExternalSyntheticLambda17@4fc19a6
+11-03 17:46:26.016 D/CoreBackPreview(  545): Window{ae80d94 u0 Splash Screen it.xonos.ma EXITING}: Setting back callback null
+11-03 17:46:26.017 D/CompatibilityChangeReporter( 7391): Compat change id reported: 235355681; UID 10192; state: ENABLED
+11-03 17:46:26.021 W/InputManager-JNI(  545): Input channel object 'ae80d94 Splash Screen it.xonos.ma (client)' was disposed without first being removed with the input manager!
+11-03 17:46:26.052 W/SearchServiceCore( 1895): Abort, client detached.
+11-03 17:46:26.056 D/OneSearchSuggestProvider( 1187): Shut down the binder channel
+11-03 17:46:26.068 I/ImeTracker( 1187): com.google.android.apps.nexuslauncher:b300ba63: onRequestHide at ORIGIN_CLIENT_HIDE_SOFT_INPUT reason HIDE_SOFT_INPUT
+11-03 17:46:26.082 D/BtGatt.ScanManager( 1120): uid 10127 isForeground true scanMode -1
+11-03 17:46:26.082 D/BtGatt.ScanManager( 1120): uid 10127 isForeground true scanMode 1
+11-03 17:46:26.082 D/BtGatt.ScanManager( 1120): uid 10127 isForeground true scanMode -1
+11-03 17:46:26.087 I/IPCThreadState( 1187): oneway function results for code 2 on binder at 0x7cb008703290 will be dropped but finished with status UNKNOWN_TRANSACTION
+11-03 17:46:26.087 I/ImeTracker( 1187): com.google.android.apps.nexuslauncher:b300ba63: onFailed at PHASE_CLIENT_VIEW_SERVED
+11-03 17:46:26.106 I/PBSessionCacheImpl( 1895): Deleted sessionId[8336091866371852] from persistence.
+11-03 17:46:26.208 D/BtGatt.ScanManager( 1120): uid 10127 isForeground true scanMode -1
+11-03 17:46:26.208 D/BtGatt.ScanManager( 1120): uid 10127 isForeground true scanMode 1
+11-03 17:46:26.208 D/BtGatt.ScanManager( 1120): uid 10127 isForeground true scanMode -1
+11-03 17:46:26.212 I/FontLog ( 5535): Received query Noto Color Emoji Compat, URI content://com.google.android.gms.fonts [CONTEXT service_id=132 ]
+11-03 17:46:26.212 I/FontLog ( 5535): Query [emojicompat-emoji-font] resolved to {Noto Color Emoji Compat, wdth 100.0, wght 400, ital 0.0, bestEffort false} [CONTEXT service_id=132 ]
+11-03 17:46:26.218 I/FontLog ( 5535): Fetch {Noto Color Emoji Compat, wdth 100.0, wght 400, ital 0.0, bestEffort false} end status Status{statusCode=SUCCESS, resolution=null} [CONTEXT service_id=132 ]
+11-03 17:46:26.237 I/FontLog ( 5535): Pulling font file for id = 3, cache size = 3 [CONTEXT service_id=132 ]
+11-03 17:46:26.249 I/FontLog ( 5535): Pulling font file for id = 3, cache size = 3 [CONTEXT service_id=132 ]
+11-03 17:46:26.390 I/XonosServer( 7391): Pacchetto: 10 di 75 MB
+11-03 17:46:26.676 D/StatusBarIconController(  912): ignoring old pipeline callbacks, because the new mobile icons are enabled
+11-03 17:46:26.718 I/XonosServer( 7391): Pacchetto: 20 di 75 MB
+11-03 17:46:26.854 I/netd    (  358): tetherGetStats() -> {[]} <0.61ms>
+11-03 17:46:26.859 I/netd    (  358): bandwidthSetGlobalAlert(2097152) <0.11ms>
+11-03 17:46:26.862 I/netd    (  358): bandwidthRemoveInterfaceQuota(eth0) <1.21ms>
+11-03 17:46:26.863 I/netd    (  358): bandwidthSetInterfaceQuota(eth0, 9223372036854775807) <0.73ms>
+11-03 17:46:26.996 I/XonosServer( 7391): Pacchetto: 30 di 75 MB
+11-03 17:46:27.233 I/XonosServer( 7391): Pacchetto: 40 di 75 MB
+11-03 17:46:27.544 I/XonosServer( 7391): Pacchetto: 50 di 75 MB
+11-03 17:46:27.562 D/EGL_emulation( 7391): app_time_stats: avg=261.31ms min=104.58ms max=316.11ms count=6
+11-03 17:46:27.622 E/TaskPersister(  545): File error accessing recents directory (directory doesn't exist?).
+11-03 17:46:27.778 I/XonosServer( 7391): Pacchetto: 60 di 75 MB
+11-03 17:46:27.938 I/netd    (  358): tetherGetStats() -> {[]} <0.60ms>
+11-03 17:46:27.943 I/netd    (  358): bandwidthSetGlobalAlert(2097152) <0.08ms>
+11-03 17:46:27.986 I/XonosServer( 7391): Pacchetto: 70 di 75 MB
+11-03 17:46:28.078 I/XonosServer( 7391): Pacchetto: 75 di 75 MB
+11-03 17:46:28.679 D/TelephonyManager( 1136): requestModemActivityInfo: Sending result to app: ModemActivityInfo{ mTimestamp=198181 mSleepTimeMs=0 mIdleTimeMs=198154 mActivityStatsTechSpecificInfo=[{mRat=UNKNOWN,mFrequencyRange=UNKNOWN,mTxTimeMs[]=[0, 0, 0, 0, 0],mRxTimeMs=0}]}
+11-03 17:46:28.709 D/StatusBarIconController(  912): ignoring old pipeline callbacks, because the new mobile icons are enabled
+11-03 17:46:29.010 I/netd    (  358): tetherGetStats() -> {[]} <0.45ms>
+11-03 17:46:29.013 I/netd    (  358): bandwidthSetGlobalAlert(2097152) <0.12ms>
+11-03 17:46:29.015 I/netd    (  358): bandwidthRemoveInterfaceQuota(eth0) <0.50ms>
+11-03 17:46:29.016 I/netd    (  358): bandwidthSetInterfaceQuota(eth0, 9223372036854775807) <0.65ms>
+11-03 17:46:29.318 I/BugleDataModel( 4587): ActionExecutorImpl: Timestamp for ACTION_EXECUTE_QUEUED_CountryCodeDetectorAction elapsedRealTime: 198820 currentTimeMillis: 1793727989318
+11-03 17:46:29.318 I/BugleDataModel( 4587): ActionExecutorImpl: Timestamp for ACTION_EXECUTE_QUEUED_SelfParticipantsRefreshAction elapsedRealTime: 198820 currentTimeMillis: 1793727989318
+11-03 17:46:29.319 I/BugleDataModel( 4587): ActionExecutorImpl: Timestamp for ACTION_BACKGROUND_QUEUED_CountryCodeDetectorAction elapsedRealTime: 198821 currentTimeMillis: 1793727989319
+11-03 17:46:29.319 I/BugleDataModel( 4587): ActionExecutorImpl: Timestamp for ACTION_BACKGROUND_QUEUED_SelfParticipantsRefreshAction elapsedRealTime: 198821 currentTimeMillis: 1793727989319
+11-03 17:46:29.319 I/Bugle   ( 4587): CountryCodeDetector: updateMainDeviceCountry from default subscription network country. detected country: us
+11-03 17:46:29.319 I/BugleDataModel( 4587): ActionExecutorImpl: Timestamp for ACTION_RESPONSE_QUEUED_CountryCodeDetectorAction elapsedRealTime: 198822 currentTimeMillis: 1793727989319
+11-03 17:46:29.320 I/BugleDataModel( 4587): ParticipantRefresh: ContactContentObserver created
+11-03 17:46:29.320 I/BugleDataModel( 4587): ParticipantFullRefresh: Start participant refresh. refreshMode: SELF_ONLY
+11-03 17:46:29.324 I/BugleDataModel( 4587): SelfParticipantsData#refreshSelfParticipantList([1])
+11-03 17:46:29.326 I/BugleDataModel( 4587): SelfParticipantsData#findSelfParticipantForSim cant find self by serial for sub=1
+11-03 17:46:29.328 I/BugleDataModel( 4587): SelfParticipantsData: insertSelfParticipant. participantId: 2, selfParticipantId: 2, subId: 1
+11-03 17:46:29.334 I/Bugle   ( 4587): CountryCodeDetector: updateMainDeviceCountry from default subscription network country. detected country: us
+11-03 17:46:29.353 I/BugleDataModel( 4587): SubscriptionsTracker bindToTrackingMap bound participants: [ParticipantId=1 subId=-1, ParticipantId=2 subId=1]
+11-03 17:46:29.387 I/BugleDataModel( 4587): ParticipantFullRefresh: Number of participants refreshed: 2
+11-03 17:46:29.393 I/BugleDataModel( 4587): ActionExecutorImpl: Timestamp for ACTION_RESPONSE_QUEUED_SelfParticipantsRefreshAction elapsedRealTime: 198895 currentTimeMillis: 1793727989393
+11-03 17:46:29.396 W/Bugle   ( 4587): TextClassifierLibManagerImpl: Reclaiming memory at level: 40
+11-03 17:46:29.681 D/StatusBarIconController(  912): ignoring old pipeline callbacks, because the new mobile icons are enabled
+11-03 17:46:30.077 D/WifiNl80211Manager(  545): Scan result ready event
+11-03 17:46:30.077 D/WifiNative(  545): Scan result ready event
+11-03 17:46:30.104 I/DropBoxManagerService(  545): add tag=system_server_strictmode isTagEnabled=true flags=0x2
+11-03 17:46:31.391 D/OomAdjuster(  545): Not killing cached processes
+11-03 17:46:31.393 I/BugleDataModel( 4587): ActionExecutorImpl: Timestamp for ACTION_EXECUTE_QUEUED_GenericWorkerQueueAction elapsedRealTime: 200895 currentTimeMillis: 1793727991393
+11-03 17:46:31.393 I/BugleDataModel( 4587): ActionExecutorImpl: Timestamp for ACTION_BACKGROUND_QUEUED_GenericWorkerQueueAction elapsedRealTime: 200895 currentTimeMillis: 1793727991393
+11-03 17:46:31.395 I/BugleJobs( 4587): GenericWorkerQueueAction: Work found
+11-03 17:46:31.396 I/BugleJobs( 4587): GenericWorkerQueueAction: Rescheduling immediately to continue processing since we didn't yet reach the end.
+11-03 17:46:31.398 I/BugleDataModel( 4587): ActionExecutorImpl: Timestamp for ACTION_RESPONSE_QUEUED_GenericWorkerQueueAction elapsedRealTime: 200900 currentTimeMillis: 1793727991398
+11-03 17:46:31.402 W/Bugle   ( 4587): TextClassifierLibManagerImpl: Reclaiming memory at level: 40
+11-03 17:46:31.405 I/BugleDataModel( 4587): ActionExecutorImpl: Timestamp for ACTION_EXECUTE_QUEUED_GenericWorkerQueueAction elapsedRealTime: 200907 currentTimeMillis: 1793727991405
+11-03 17:46:31.406 I/BugleDataModel( 4587): ActionExecutorImpl: Timestamp for ACTION_BACKGROUND_QUEUED_GenericWorkerQueueAction elapsedRealTime: 200908 currentTimeMillis: 1793727991406
+11-03 17:46:31.407 I/ChimeraConfigurator( 5639): Starting update, reason: 4 urgentFeatures: vision.ocr:-1
+11-03 17:46:31.410 I/BugleJobs( 4587): GenericWorkerQueueAction: Bailing early, no work found, no failed work found
+11-03 17:46:31.410 I/BugleDataModel( 4587): ActionExecutorImpl: Timestamp for ACTION_RESPONSE_QUEUED_GenericWorkerQueueAction elapsedRealTime: 200912 currentTimeMillis: 1793727991410
+11-03 17:46:31.413 W/Bugle   ( 4587): TextClassifierLibManagerImpl: Reclaiming memory at level: 40
+11-03 17:46:31.426 D/StrictMode( 1623): StrictMode policy violation: android.os.strictmode.SqliteObjectLeakedViolation: Finalizing a Cursor that has not been deactivated or closed. database = /data/user/0/com.android.providers.contacts/databases/contacts2.db, table = raw_contacts, query = SELECT contacts_view._id AS _id, contacts_view.display_name AS display_name, contacts_view.photo_thumb_uri AS photo_thumb_uri, data1 AS number, data2 AS type, data3 AS label, contacts_view.lookup AS lookup FROM raw_contacts JOIN view_contacts as contacts_view ON (contacts_view._id = raw_contacts.contact_id) JOIN (SELECT data_id,normalized_number FROM phone_lookup WHERE (phone_lookup.min_match = '7654321')) AS lookup ON lookup.data_id=data._id JOIN data ON data.raw_contact_id=raw_contacts._id WHERE (PHONE_NUMBERS_EQUAL(data.data1, '+15551234567', 0, 7)) ORDER BY  length(lookup.normalized_number) DESC
+11-03 17:46:31.426 D/StrictMode( 1623): 	at android.os.StrictMode.onSqliteObjectLeaked(StrictMode.java:2222)
+11-03 17:46:31.426 D/StrictMode( 1623): 	at android.database.sqlite.SQLiteCursor.finalize(SQLiteCursor.java:282)
+11-03 17:46:31.426 D/StrictMode( 1623): 	at java.lang.Daemons$FinalizerDaemon.doFinalize(Daemons.java:339)
+11-03 17:46:31.426 D/StrictMode( 1623): 	at java.lang.Daemons$FinalizerDaemon.processReference(Daemons.java:324)
+11-03 17:46:31.426 D/StrictMode( 1623): 	at java.lang.Daemons$FinalizerDaemon.runInternal(Daemons.java:300)
+11-03 17:46:31.426 D/StrictMode( 1623): 	at java.lang.Daemons$Daemon.run(Daemons.java:145)
+11-03 17:46:31.426 D/StrictMode( 1623): 	at java.lang.Thread.run(Thread.java:1012)
+11-03 17:46:31.427 D/StrictMode( 1623): StrictMode policy violation: android.os.strictmode.LeakedClosableViolation: A resource was acquired at attached stack trace but never released. See java.io.Closeable for information on avoiding resource leaks.
+11-03 17:46:31.427 D/StrictMode( 1623): 	at android.os.StrictMode$AndroidCloseGuardReporter.report(StrictMode.java:1994)
+11-03 17:46:31.427 D/StrictMode( 1623): 	at dalvik.system.CloseGuard.warnIfOpen(CloseGuard.java:336)
+11-03 17:46:31.427 D/StrictMode( 1623): 	at android.database.AbstractCursor.finalize(AbstractCursor.java:531)
+11-03 17:46:31.427 D/StrictMode( 1623): 	at android.database.sqlite.SQLiteCursor.finalize(SQLiteCursor.java:291)
+11-03 17:46:31.427 D/StrictMode( 1623): 	at java.lang.Daemons$FinalizerDaemon.doFinalize(Daemons.java:339)
+11-03 17:46:31.427 D/StrictMode( 1623): 	at java.lang.Daemons$FinalizerDaemon.processReference(Daemons.java:324)
+11-03 17:46:31.427 D/StrictMode( 1623): 	at java.lang.Daemons$FinalizerDaemon.runInternal(Daemons.java:300)
+11-03 17:46:31.427 D/StrictMode( 1623): 	at java.lang.Daemons$Daemon.run(Daemons.java:145)
+11-03 17:46:31.427 D/StrictMode( 1623): 	at java.lang.Thread.run(Thread.java:1012)
+11-03 17:46:31.427 D/StrictMode( 1623): Caused by: java.lang.Throwable: Explicit termination method 'AbstractCursor.close' not called
+11-03 17:46:31.427 D/StrictMode( 1623): 	at dalvik.system.CloseGuard.openWithCallSite(CloseGuard.java:288)
+11-03 17:46:31.427 D/StrictMode( 1623): 	at dalvik.system.CloseGuard.open(CloseGuard.java:257)
+11-03 17:46:31.427 D/StrictMode( 1623): 	at android.database.AbstractCursor.<init>(AbstractCursor.java:227)
+11-03 17:46:31.427 D/StrictMode( 1623): 	at android.database.AbstractWindowedCursor.<init>(AbstractWindowedCursor.java:39)
+11-03 17:46:31.427 D/StrictMode( 1623): 	at android.database.sqlite.SQLiteCursor.<init>(SQLiteCursor.java:98)
+11-03 17:46:31.427 D/StrictMode( 1623): 	at android.database.sqlite.SQLiteDirectCursorDriver.query(SQLiteDirectCursorDriver.java:52)
+11-03 17:46:31.427 D/StrictMode( 1623): 	at android.database.sqlite.SQLiteDatabase.rawQueryWithFactory(SQLiteDatabase.java:1714)
+11-03 17:46:31.427 D/StrictMode( 1623): 	at android.database.sqlite.SQLiteQueryBuilder.query(SQLiteQueryBuilder.java:592)
+11-03 17:46:31.427 D/StrictMode( 1623): 	at com.android.providers.contacts.ContactsProvider2.doQuery(ContactsProvider2.java:7543)
+11-03 17:46:31.427 D/StrictMode( 1623): 	at com.android.providers.contacts.ContactsProvider2.queryLocal(ContactsProvider2.java:7249)
+11-03 17:46:31.427 D/StrictMode( 1623): 	at com.android.providers.contacts.ContactsProvider2.queryCorpLookupIfNecessary(ContactsProvider2.java:7728)
+11-03 17:46:31.427 D/StrictMode( 1623): 	at com.android.providers.contacts.ContactsProvider2.queryLookupEnterprise(ContactsProvider2.java:7867)
+11-03 17:46:31.427 D/StrictMode( 1623): 	at com.android.providers.contacts.ContactsProvider2.queryPhoneLookupEnterprise(ContactsProvider2.java:7838)
+11-03 17:46:31.427 D/StrictMode( 1623): 	at com.android.providers.contacts.ContactsProvider2.queryLocal(ContactsProvider2.java:7172)
+11-03 17:46:31.427 D/StrictMode( 1623): 	at com.android.providers.contacts.ContactsProvider2.queryDirectoryIfNecessary(ContactsProvider2.java:5883)
+11-03 17:46:31.427 D/StrictMode( 1623): 	at com.android.providers.contacts.ContactsProvider2.queryInternal(ContactsProvider2.java:5728)
+11-03 17:46:31.427 D/StrictMode( 1623): 	at com.android.providers.contacts.ContactsProvider2.query(ContactsProvider2.java:5673)
+11-03 17:46:31.427 D/StrictMode( 1623): 	at android.content.ContentProvider.query(ContentProvider.java:1692)
+11-03 17:46:31.427 D/StrictMode( 1623): 	at android.content.ContentProvider$Transport.query(ContentProvider.java:292)
+11-03 17:46:31.427 D/StrictMode( 1623): 	at android.content.ContentProviderNative.onTransact(ContentProviderNative.java:107)
+11-03 17:46:31.427 D/StrictMode( 1623): 	at android.os.Binder.execTransactInternal(Binder.java:1339)
+11-03 17:46:31.427 D/StrictMode( 1623): 	at android.os.Binder.execTransact(Binder.java:1275)
+11-03 17:46:31.431 I/ChimeraConfigurator( 5639): Detected pending changes for urgent request: [vision.ocr]. Pending module sets: container:2318189190800+mlkit.ocr.common,tflite_dynamite:2640104055100800+tflite_dynamite,vision_ocr:2316024025100000+vision.ocr
+11-03 17:46:31.438 I/GmsDebugLogger( 5639): [73] 1801
+11-03 17:46:31.440 W/ZappDownloader( 5639): No successful module downloads for requested features [vision.ocr].
+11-03 17:46:31.440 I/GmsDebugLogger( 5639): [30] [VisionOcrDynamite.integ:231602402100000],[TfliteDynamiteDynamite.integ:264010405100800],[MlkitOcrCommon.optional:231818100800]
+11-03 17:46:31.443 W/ChimeraConfigService( 5639): Retry attempt was throttled. [CONTEXT service_id=264 ]
+11-03 17:46:31.443 I/GmsDebugLogger( 5639): [83] 1 [vision.ocr]
+11-03 17:46:31.446 W/Vision  ( 5639): Request for optional module download of ocr failed. Request again.
+11-03 17:46:31.446 W/Vision  ( 5639): Would have logged:
+11-03 17:46:31.446 W/Vision  ( 5639): # dsae@37884fe7
+11-03 17:46:31.446 I/Vision  ( 5639): Schedule retrying download ocr at 200948 with backoff 40 seconds
+11-03 17:46:31.467 I/AidlLazyServiceRegistrar( 7318): Process has 0 (of 1 available) client(s) in use after notification artd has clients: 0
+11-03 17:46:31.467 I/AidlLazyServiceRegistrar( 7318): Trying to shut down the service. No clients in use for any service in process.
+11-03 17:46:31.645 I/servicemanager(    0): Notifying artd they don't (previously: do) have clients when we now have no record of a client
+11-03 17:46:31.647 I/servicemanager(    0): Unregistering artd
+11-03 17:46:31.648 I/BpBinder(    0): onLastStrongRef automatically unlinking death recipients:
+11-03 17:46:31.471 I/AidlLazyServiceRegistrar( 7318): Unregistered all clients and exiting
+11-03 17:46:31.654 I/init    (    0): Service 'artd' (pid 7318) exited with status 0 oneshot service took 6.890000 seconds in background
+11-03 17:46:31.655 I/init    (    0): Sending signal 9 to service 'artd' (pid 7318) process group...
+11-03 17:46:31.657 I/libprocessgroup(    0): Successfully killed process cgroup uid 1082 pid 7318 in 0ms
+11-03 17:46:31.587 D/ProfileInstaller( 7391): Installing profile for it.xonos.ma
+11-03 17:46:31.684 D/StatusBarIconController(  912): ignoring old pipeline callbacks, because the new mobile icons are enabled
+11-03 17:46:32.271 D/BtGatt.ScanManager( 1120): uid 10127 isForeground true scanMode -1
+11-03 17:46:32.271 D/BtGatt.ScanManager( 1120): uid 10127 isForeground true scanMode 1
+11-03 17:46:32.271 D/BtGatt.ScanManager( 1120): uid 10127 isForeground true scanMode -1
+11-03 17:46:32.370 I/XonosServer( 7391): Pacchetto scaricato e controllato in 6.692 s
+11-03 17:46:32.374 D/ConnectivityService(  545): requestNetwork for uid/pid:10192/7391 activeRequest: null callbackRequest: 149 [NetworkRequest [ REQUEST id=150, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10192 RequestorUid: 10192 RequestorPkg: it.xonos.ma UnderlyingNetworks: Null] ]] callback flags: 0 order: 2147483647
+11-03 17:46:32.376 D/ConnectivityService(  545): NetReassign [150 : null → 101] [c 1] [a 0] [i 1]
+11-03 17:46:32.376 D/WifiNetworkFactory(  545): got request NetworkRequest [ REQUEST id=150, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10192 RequestorUid: 10192 RequestorPkg: it.xonos.ma UnderlyingNetworks: Null] ]
+11-03 17:46:32.376 D/UntrustedWifiNetworkFactory(  545): got request NetworkRequest [ REQUEST id=150, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10192 RequestorUid: 10192 RequestorPkg: it.xonos.ma UnderlyingNetworks: Null] ]
+11-03 17:46:32.376 D/OemPaidWifiNetworkFactory(  545): got request NetworkRequest [ REQUEST id=150, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10192 RequestorUid: 10192 RequestorPkg: it.xonos.ma UnderlyingNetworks: Null] ]
+11-03 17:46:32.376 D/MultiInternetWifiNetworkFactory(  545): got request NetworkRequest [ REQUEST id=150, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10192 RequestorUid: 10192 RequestorPkg: it.xonos.ma UnderlyingNetworks: Null] ]
+11-03 17:46:32.398 I/GMS_MM_Logger( 5535): Memory Metric Logging not allowed. Stopping.
+11-03 17:46:32.398 D/EGL_emulation( 7391): app_time_stats: avg=1208.91ms min=83.70ms max=4302.44ms count=4
+11-03 17:46:32.399 I/XonosServer( 7391): Avvio di Music Assistant sul telefono
+11-03 17:46:32.397 W/linker64( 7442): type=1400 audit(0.0:2818): avc:  granted  { execute } for  path="/data/data/it.xonos.ma/no_backup/music-assistant-server/2.10.8-11/bin/python3" dev="dm-40" ino=140887 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c192,c256,c512,c768 tclass=file app=it.xonos.ma
+11-03 17:46:32.397 W/linker64( 7442): type=1400 audit(0.0:2819): avc:  denied  { search } for  name="tests" dev="dm-40" ino=196612 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:object_r:shell_test_data_file:s0 tclass=dir permissive=0 app=it.xonos.ma
+11-03 17:46:32.397 W/linker64( 7442): type=1400 audit(0.0:2820): avc:  denied  { search } for  name="tests" dev="dm-40" ino=196612 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:object_r:shell_test_data_file:s0 tclass=dir permissive=0 app=it.xonos.ma
+11-03 17:46:32.397 W/linker64( 7442): type=1400 audit(0.0:2821): avc:  denied  { search } for  name="tests" dev="dm-40" ino=196612 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:object_r:shell_test_data_file:s0 tclass=dir permissive=0 app=it.xonos.ma
+11-03 17:46:32.397 W/linker64( 7442): type=1400 audit(0.0:2822): avc:  denied  { search } for  name="tests" dev="dm-40" ino=196612 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:object_r:shell_test_data_file:s0 tclass=dir permissive=0 app=it.xonos.ma
+11-03 17:46:32.401 W/linker64( 7442): type=1400 audit(0.0:2823): avc:  granted  { execute } for  path="/data/data/it.xonos.ma/no_backup/music-assistant-server/2.10.8-11/lib/libpython3.13.so" dev="dm-40" ino=140896 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c192,c256,c512,c768 tclass=file app=it.xonos.ma
+11-03 17:46:32.405 W/linker64( 7442): type=1400 audit(0.0:2824): avc:  denied  { read } for  name="overcommit_memory" dev="proc" ino=67753 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:object_r:proc_overcommit_memory:s0 tclass=file permissive=0 app=it.xonos.ma
+11-03 17:46:32.433 W/linker64( 7442): type=1400 audit(0.0:2825): avc:  granted  { execute } for  path="/data/data/it.xonos.ma/no_backup/music-assistant-server/2.10.8-11/lib/python3.13/lib-dynload/zlib.cpython-313-x86_64-linux-android.so" dev="dm-40" ino=140964 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c192,c256,c512,c768 tclass=file app=it.xonos.ma
+11-03 17:46:32.493 W/linker64( 7442): type=1400 audit(0.0:2826): avc:  granted  { execute } for  path="/data/data/it.xonos.ma/no_backup/music-assistant-server/2.10.8-11/lib/python3.13/lib-dynload/_heapq.cpython-313-x86_64-linux-android.so" dev="dm-40" ino=140923 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c192,c256,c512,c768 tclass=file app=it.xonos.ma
+11-03 17:46:32.678 W/audit   (    0): audit_lost=2506 audit_rate_limit=5 audit_backlog_limit=64
+11-03 17:46:32.684 E/audit   (    0): rate limit exceeded
+11-03 17:46:32.683 I/XonosServer( 7391): Server: STARTING dopo 7.007 s
+11-03 17:46:32.711 I/XonosServer( 7391): Stato: starting
+11-03 17:46:32.715 I/XonosServer( 7391): INFO Gruppi (cgroup) di Python: 4:memory:/ | 3:cpuset:/top-app | 2:cpu:/top-app | 1:blkio:/ | 0::/uid_10192/pid_7391; dell'app (pid 7391): 4:memory:/ | 3:cpuset:/top-app | 2:cpu:/top-app | 1:blkio:/ | 0::/uid_10192/pid_7391 (uguali); processori: 0-3
+11-03 17:46:33.541 D/ActivityManager(  545): freezing 1698 com.google.android.apps.wellbeing
+11-03 17:46:33.541 D/ActivityManager(  545): freezing 2356 android.process.media
+11-03 17:46:33.593 W/linker64( 7442): type=1400 audit(0.0:2907): avc:  granted  { execute } for  path="/data/data/it.xonos.ma/no_backup/music-assistant-server/2.10.8-11/site-packages/multidict/_multidict.cpython-313-x86_64-linux-android.so" dev="dm-40" ino=155708 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c192,c256,c512,c768 tclass=file app=it.xonos.ma
+11-03 17:46:33.653 W/linker64( 7442): type=1400 audit(0.0:2908): avc:  granted  { execute } for  path="/data/data/it.xonos.ma/no_backup/music-assistant-server/2.10.8-11/site-packages/aiohttp/_http_writer.cpython-313-x86_64-linux-android.so" dev="dm-40" ino=147564 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c192,c256,c512,c768 tclass=file app=it.xonos.ma
+11-03 17:46:33.657 W/linker64( 7442): type=1400 audit(0.0:2909): avc:  granted  { execute } for  path="/data/data/it.xonos.ma/no_backup/music-assistant-server/2.10.8-11/site-packages/aiohttp/_http_parser.cpython-313-x86_64-linux-android.so" dev="dm-40" ino=147562 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c192,c256,c512,c768 tclass=file app=it.xonos.ma
+11-03 17:46:33.661 W/linker64( 7442): type=1400 audit(0.0:2910): avc:  granted  { execute } for  path="/data/data/it.xonos.ma/no_backup/music-assistant-server/2.10.8-11/site-packages/aiohttp/_websocket/mask.cpython-313-x86_64-linux-android.so" dev="dm-40" ino=147569 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c192,c256,c512,c768 tclass=file app=it.xonos.ma
+11-03 17:46:33.665 W/linker64( 7442): type=1400 audit(0.0:2911): avc:  granted  { execute } for  path="/data/data/it.xonos.ma/no_backup/music-assistant-server/2.10.8-11/site-packages/aiohttp/_websocket/reader_c.cpython-313-x86_64-linux-android.so" dev="dm-40" ino=147574 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c192,c256,c512,c768 tclass=file app=it.xonos.ma
+11-03 17:46:34.076 W/audit   (    0): audit_lost=2586 audit_rate_limit=5 audit_backlog_limit=64
+11-03 17:46:34.077 E/audit   (    0): rate limit exceeded
+11-03 17:46:33.930 D/BoundBrokerSvc( 5639): onUnbind: Intent { act=com.google.android.gms.feedback.internal.IFeedbackService dat=chimera-action:/... cmp=com.google.android.gms/.chimera.GmsBoundBrokerService }
+11-03 17:46:34.310 D/CompatibilityChangeReporter( 5275): Compat change id reported: 150939131; UID 10118; state: ENABLED
+11-03 17:46:34.312 D/SliceBuilder( 6690): Creating slice for: com.android.settings.deviceinfo.firmwareversion.FirmwareVersionDetailPreferenceController
+11-03 17:46:34.315 D/SliceBuilder( 6690): Creating slice for: com.android.settings.deviceinfo.firmwareversion.FirmwareVersionDetailPreferenceController
+11-03 17:46:34.342 D/SliceBuilder( 6690): Creating slice for: com.android.settings.notification.MediaVolumePreferenceController
+11-03 17:46:34.344 D/MediaVolumePreCtrl( 6690): The slice doesn't support end item
+11-03 17:46:34.345 D/SliceBuilder( 6690): Creating slice for: com.android.settings.notification.MediaVolumePreferenceController
+11-03 17:46:34.345 D/VolumeSliceHelper( 6690): Unregistering uri broadcast relay: content://com.android.settings.slices/action/media_volume
+11-03 17:46:34.345 D/SettingsSliceProvider( 6690): Stopping background worker for: content://com.android.settings.slices/action/media_volume
+11-03 17:46:34.346 I/MR2ServiceImpl(  545): stopScan | manager: 3
+11-03 17:46:34.346 D/MediaVolumePreCtrl( 6690): The slice doesn't support end item
+11-03 17:46:34.359 D/SliceBuilder( 6690): Creating slice for: com.android.settings.notification.SeparateRingVolumePreferenceController
+11-03 17:46:34.362 D/SliceBuilder( 6690): Creating slice for: com.android.settings.notification.CallVolumePreferenceController
+11-03 17:46:34.362 D/VolumeSliceHelper( 6690): Unregistering uri broadcast relay: content://com.android.settings.slices/action/separate_ring_volume
+11-03 17:46:34.365 D/VolumeSliceHelper( 6690): Unregistering uri broadcast relay: content://com.android.settings.slices/action/call_volume
+11-03 17:46:34.365 D/SlicesIndexer( 6690): Slices already indexed - returning.
+11-03 17:46:34.366 D/VolumeSliceHelper( 6690): Registering uri for broadcast relay: content://com.android.settings.slices/action/call_volume
+11-03 17:46:34.366 D/SettingsSliceProvider( 6690): Built slice (content://com.android.settings.slices/action/call_volume) in: 1
+11-03 17:46:34.367 W/ElapsedTimeUtils( 6690): getElapsedTime: sSuwFinishedTimeStamp is null
+11-03 17:46:34.367 D/SlicesIndexer( 6690): Slices already indexed - returning.
+11-03 17:46:34.367 D/SlicesIndexer( 6690): Slices already indexed - returning.
+11-03 17:46:34.367 D/VolumeSliceHelper( 6690): Registering uri for broadcast relay: content://com.android.settings.slices/action/separate_ring_volume
+11-03 17:46:34.368 D/SettingsSliceProvider( 6690): Built slice (content://com.android.settings.slices/action/separate_ring_volume) in: 1
+11-03 17:46:34.368 D/VolumeSliceHelper( 6690): Registering uri for broadcast relay: content://com.android.settings.slices/action/separate_ring_volume
+11-03 17:46:34.368 D/SliceBuilder( 6690): Creating slice for: com.android.settings.notification.NotificationVolumePreferenceController
+11-03 17:46:34.368 D/SettingsSliceProvider( 6690): Built slice (content://com.android.settings.slices/action/separate_ring_volume) in: 1
+11-03 17:46:34.373 D/VolumeSliceHelper( 6690): Unregistering uri broadcast relay: content://com.android.settings.slices/action/notification_volume
+11-03 17:46:34.390 D/SliceBuilder( 6690): Creating slice for: com.android.settings.deviceinfo.hardwareinfo.DeviceModelPreferenceController
+11-03 17:46:34.663 I/DropBoxManagerService(  545): add tag=system_server_strictmode isTagEnabled=true flags=0x2
+11-03 17:46:34.664 I/DropBoxManagerService(  545): add tag=system_server_strictmode isTagEnabled=true flags=0x2
+11-03 17:46:34.664 I/DropBoxManagerService(  545): add tag=system_server_strictmode isTagEnabled=true flags=0x2
+11-03 17:46:34.664 I/DropBoxManagerService(  545): add tag=system_server_strictmode isTagEnabled=true flags=0x2
+11-03 17:46:34.665 I/DropBoxManagerService(  545): add tag=system_server_strictmode isTagEnabled=true flags=0x2
+11-03 17:46:34.665 I/DropBoxManagerService(  545): add tag=system_server_strictmode isTagEnabled=true flags=0x2
+11-03 17:46:34.665 I/DropBoxManagerService(  545): add tag=system_server_strictmode isTagEnabled=true flags=0x2
+11-03 17:46:34.712 D/ActivityManager(  545): freezing 2933 com.android.chrome
+11-03 17:46:34.724 D/ActivityManager(  545): freezing 3135 com.android.externalstorage
+11-03 17:46:34.724 D/ActivityManager(  545): freezing 3548 com.google.android.documentsui
+11-03 17:46:34.756 D/ActivityManager(  545): freezing 915 com.google.android.permissioncontroller
+11-03 17:46:34.792 W/gs.intelligence( 5275): Cleared Reference was only reachable from finalizer (only reported once)
+11-03 17:46:34.985 W/linker64( 7442): type=1400 audit(0.0:2917): avc:  granted  { execute } for  path="/data/data/it.xonos.ma/no_backup/music-assistant-server/2.10.8-11/lib/python3.13/lib-dynload/pyexpat.cpython-313-x86_64-linux-android.so" dev="dm-40" ino=140954 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c192,c256,c512,c768 tclass=file app=it.xonos.ma
+11-03 17:46:34.989 W/linker64( 7442): type=1400 audit(0.0:2918): avc:  granted  { execute } for  path="/data/data/it.xonos.ma/no_backup/music-assistant-server/2.10.8-11/lib/python3.13/lib-dynload/_elementtree.cpython-313-x86_64-linux-android.so" dev="dm-40" ino=140921 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c192,c256,c512,c768 tclass=file app=it.xonos.ma
+11-03 17:46:34.993 W/linker64( 7442): type=1400 audit(0.0:2919): avc:  granted  { execute } for  path="/data/data/it.xonos.ma/no_backup/music-assistant-server/2.10.8-11/site-packages/PIL/_imaging.so" dev="dm-40" ino=141483 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c192,c256,c512,c768 tclass=file app=it.xonos.ma
+11-03 17:46:34.993 W/linker64( 7442): type=1400 audit(0.0:2920): avc:  granted  { execute } for  path="/data/data/it.xonos.ma/no_backup/music-assistant-server/2.10.8-11/site-packages/chaquopy/lib/libjpeg_chaquopy.so" dev="dm-40" ino=148757 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c192,c256,c512,c768 tclass=file app=it.xonos.ma
+11-03 17:46:35.155 I/keystore2(  180): system/security/keystore2/src/watchdog.rs:319 - Watchdog thread idle -> terminating. Have a great day.
+11-03 17:46:35.309 W/linker64( 7442): type=1400 audit(0.0:2921): avc:  granted  { execute } for  path="/data/data/it.xonos.ma/no_backup/music-assistant-server/2.10.8-11/lib/python3.13/lib-dynload/resource.cpython-313-x86_64-linux-android.so" dev="dm-40" ino=140955 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c192,c256,c512,c768 tclass=file app=it.xonos.ma
+11-03 17:46:35.835 W/audit   (    0): audit_lost=2591 audit_rate_limit=5 audit_backlog_limit=64
+11-03 17:46:35.837 E/audit   (    0): rate limit exceeded
+11-03 17:46:35.691 D/StatusBarIconController(  912): ignoring old pipeline callbacks, because the new mobile icons are enabled
+11-03 17:46:36.626 D/OomAdjuster(  545): Not killing cached processes
+11-03 17:46:36.693 D/StatusBarIconController(  912): ignoring old pipeline callbacks, because the new mobile icons are enabled
+11-03 17:46:37.337 W/linker64( 7442): type=1400 audit(0.0:2946): avc:  granted  { execute } for  path="/data/data/it.xonos.ma/no_backup/music-assistant-server/2.10.8-11/site-packages/chaquopy/lib/libgfortran.so.3" dev="dm-40" ino=148756 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c192,c256,c512,c768 tclass=file app=it.xonos.ma
+11-03 17:46:37.337 W/linker64( 7442): type=1400 audit(0.0:2947): avc:  granted  { execute } for  path="/data/data/it.xonos.ma/no_backup/music-assistant-server/2.10.8-11/site-packages/chaquopy/lib/libopenblas.so" dev="dm-40" ino=148758 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c192,c256,c512,c768 tclass=file app=it.xonos.ma
+11-03 17:46:37.337 W/linker64( 7442): type=1400 audit(0.0:2948): avc:  granted  { execute } for  path="/data/data/it.xonos.ma/no_backup/music-assistant-server/2.10.8-11/site-packages/numpy/core/_multiarray_umath.so" dev="dm-40" ino=155961 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c192,c256,c512,c768 tclass=file app=it.xonos.ma
+11-03 17:46:37.337 W/linker64( 7442): type=1400 audit(0.0:2949): avc:  granted  { execute } for  path="/data/data/it.xonos.ma/no_backup/music-assistant-server/2.10.8-11/site-packages/chaquopy/lib/libc++_shared.so" dev="dm-40" ino=148753 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c192,c256,c512,c768 tclass=file app=it.xonos.ma
+11-03 17:46:37.361 W/linker64( 7442): type=1400 audit(0.0:2950): avc:  granted  { execute } for  path="/data/data/it.xonos.ma/no_backup/music-assistant-server/2.10.8-11/site-packages/numpy/core/_multiarray_tests.so" dev="dm-40" ino=155960 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c192,c256,c512,c768 tclass=file app=it.xonos.ma
+11-03 17:46:37.550 W/audit   (    0): audit_lost=2615 audit_rate_limit=5 audit_backlog_limit=64
+11-03 17:46:37.553 E/audit   (    0): rate limit exceeded
+11-03 17:46:37.505 I/XonosServer( 7391): INFO Music Assistant pronto sul telefono
+11-03 17:46:37.505 I/XonosServer( 7391): INFO proot: seccomp lo aiuta (ptrace acceleration (seccomp mode 2, new syscall order) enabled)
+11-03 17:46:37.574 I/XonosServer( 7391): Stato: running
+11-03 17:46:37.685 I/XonosServer( 7391): Server: RUNNING dopo 12.009 s
+11-03 17:46:37.693 D/EGL_emulation( 7391): app_time_stats: avg=2647.49ms min=297.88ms max=4997.10ms count=2
+11-03 17:46:37.699 D/StatusBarIconController(  912): ignoring old pipeline callbacks, because the new mobile icons are enabled
+11-03 17:46:37.820 D/TrafficStats( 7391): tagSocket(127) with statsTag=0xffffffff, statsUid=-1
+11-03 17:46:37.899 D/TrafficStats( 7391): tagSocket(129) with statsTag=0xffffffff, statsUid=-1
+11-03 17:46:37.919 D/TrafficStats( 7391): tagSocket(130) with statsTag=0xffffffff, statsUid=-1
+11-03 17:46:37.921 D/TrafficStats( 7391): tagSocket(131) with statsTag=0xffffffff, statsUid=-1
+11-03 17:46:37.929 I/Xonos   ( 7391): Collegato a Music Assistant 0.0.0 (sul telefono) Music Assistant (localhost) su http://127.0.0.1:8095
+11-03 17:46:37.935 D/TrafficStats( 7391): tagSocket(129) with statsTag=0xffffffff, statsUid=-1
+11-03 17:46:37.965 I/XonosServer( 7391): Xonos: collegato al server sul telefono = true [Ok(place=HOME, version=0.0.0, playlists=0, audio=Ready)]
+11-03 17:46:38.075 I/XonosServer( 7391): Xonos: cartella del telefono come servizio (finish)
+11-03 17:46:38.701 D/StatusBarIconController(  912): ignoring old pipeline callbacks, because the new mobile icons are enabled
+11-03 17:46:38.708 D/StatusBarIconController(  912): ignoring old pipeline callbacks, because the new mobile icons are enabled
+11-03 17:46:39.115 I/XonosServer( 7391): Xonos: 2 brani
+11-03 17:46:39.124 I/MediaController( 7391): Init efda5b8 [AndroidXMedia3/1.11.1] [emu64xa, sdk_gphone64_x86_64, Google, 34]
+11-03 17:46:39.140 D/CompatibilityChangeReporter(  545): Compat change id reported: 261072174; UID 10192; state: ENABLED
+11-03 17:46:39.149 D/EGL_emulation( 7391): app_time_stats: avg=485.19ms min=116.80ms max=1053.50ms count=3
+11-03 17:46:39.186 D/BoundBrokerSvc( 5535): onUnbind: Intent { act=com.google.android.gms.auth.account.data.service.START pkg=com.google.android.gms }
+11-03 17:46:39.195 D/CompatibilityChangeReporter( 7391): Compat change id reported: 160794467; UID 10192; state: ENABLED
+11-03 17:46:39.205 I/MediaSessionImpl( 7391): Init af3fcfc [AndroidXMedia3/1.11.1] [emu64xa, sdk_gphone64_x86_64, Google, 34]
+11-03 17:46:39.212 D/BoundBrokerSvc( 5535): onUnbind: Intent { act=com.google.android.contextmanager.service.ContextManagerService.START pkg=com.google.android.gms }
+11-03 17:46:39.216 I/MediaSessionCompat( 7391): Couldn't find a unique registered media button receiver in the given context.
+11-03 17:46:39.218 I/MediaSessionStack(  545): addSession to bottom of stack | record: it.xonos.ma/androidx.media3.session.id. (userId=0)
+11-03 17:46:39.219 V/MediaPlayerList( 1120): onActiveSessionsChanged: number of controllers: 1
+11-03 17:46:39.220 D/MediaPlayerList( 1120): onActiveSessionsChanged: controller: com.google.android.googlequicksearchbox
+11-03 17:46:39.223 I/MediaPlayerList( 1120): sendMediaUpdate: Creating a one item queue for a player with no queue
+11-03 17:46:39.223 D/MediaPlayerList( 1120): sendMediaUpdate state=PlaybackState {state=NONE(0), position=0, buffered position=0, speed=0.0, updated=40670, actions=2409991, custom actions=[Action:mName='Rewind 10 seconds, mIcon=2131234345, mExtras=null, Action:mName='Fast forward 30 second, mIcon=2131234125, mExtras=null, Action:mName='Skip to next episode, mIcon=2131234405, mExtras=null], active item id=-1, error=null}
+11-03 17:46:39.223 D/AvrcpTargetJni( 1120): sendMediaUpdateNative
+11-03 17:46:39.223 I/bt_stack( 1120): [INFO:avrcp_service.cc(515)] virtual void bluetooth::avrcp::AvrcpService::SendMediaUpdate(bool, bool, bool) track_changed=0 :  play_state=0 :  queue=0
+11-03 17:46:39.224 V/MediaPlayerList( 1120): onActiveSessionsChanged: number of controllers: 1
+11-03 17:46:39.224 D/MediaPlayerList( 1120): onActiveSessionsChanged: controller: com.google.android.googlequicksearchbox
+11-03 17:46:39.225 I/MediaPlayerList( 1120): sendMediaUpdate: Creating a one item queue for a player with no queue
+11-03 17:46:39.225 D/MediaPlayerList( 1120): sendMediaUpdate state=PlaybackState {state=NONE(0), position=0, buffered position=0, speed=0.0, updated=40670, actions=2409991, custom actions=[Action:mName='Rewind 10 seconds, mIcon=2131234345, mExtras=null, Action:mName='Fast forward 30 second, mIcon=2131234125, mExtras=null, Action:mName='Skip to next episode, mIcon=2131234405, mExtras=null], active item id=-1, error=null}
+11-03 17:46:39.228 D/CompatibilityChangeReporter(  545): Compat change id reported: 161145287; UID 10192; state: ENABLED
+11-03 17:46:39.229 W/MediaControlGattService( 1120): Feature PLAYER_NAME(BIT 1) support: true
+11-03 17:46:39.229 W/MediaControlGattService( 1120): Feature PLAYER_NAME(BIT 1) support: true
+11-03 17:46:39.229 W/MediaControlGattService( 1120): Feature MEDIA_STATE(BIT 17) support: true
+11-03 17:46:39.230 E/ActivityThread( 7391): Failed to find provider info for androidx.car.app.connection
+11-03 17:46:39.234 V/MediaPlayerList( 1120): onActiveSessionsChanged: number of controllers: 2
+11-03 17:46:39.234 D/MediaPlayerList( 1120): onActiveSessionsChanged: controller: com.google.android.googlequicksearchbox
+11-03 17:46:39.235 I/MediaPlayerList( 1120): sendMediaUpdate: Creating a one item queue for a player with no queue
+11-03 17:46:39.236 D/MediaPlayerList( 1120): sendMediaUpdate state=PlaybackState {state=NONE(0), position=0, buffered position=0, speed=0.0, updated=40670, actions=2409991, custom actions=[Action:mName='Rewind 10 seconds, mIcon=2131234345, mExtras=null, Action:mName='Fast forward 30 second, mIcon=2131234125, mExtras=null, Action:mName='Skip to next episode, mIcon=2131234405, mExtras=null], active item id=-1, error=null}
+11-03 17:46:39.236 W/MediaControlGattService( 1120): Feature PLAYER_NAME(BIT 1) support: true
+11-03 17:46:39.236 W/MediaControlGattService( 1120): Feature PLAYER_NAME(BIT 1) support: true
+11-03 17:46:39.236 W/MediaControlGattService( 1120): Feature MEDIA_STATE(BIT 17) support: true
+11-03 17:46:39.237 D/MediaPlayerList( 1120): onActiveSessionsChanged: controller: it.xonos.ma
+11-03 17:46:39.237 I/MediaPlayerList( 1120): Adding wrapped media player: it.xonos.ma at key: 2
+11-03 17:46:39.237 V/MediaPlayerList( 1120): onActiveSessionsChanged: number of controllers: 2
+11-03 17:46:39.238 D/MediaPlayerList( 1120): onActiveSessionsChanged: controller: com.google.android.googlequicksearchbox
+11-03 17:46:39.239 I/MediaPlayerList( 1120): sendMediaUpdate: Creating a one item queue for a player with no queue
+11-03 17:46:39.240 D/MediaPlayerList( 1120): sendMediaUpdate state=PlaybackState {state=NONE(0), position=0, buffered position=0, speed=0.0, updated=40670, actions=2409991, custom actions=[Action:mName='Rewind 10 seconds, mIcon=2131234345, mExtras=null, Action:mName='Fast forward 30 second, mIcon=2131234125, mExtras=null, Action:mName='Skip to next episode, mIcon=2131234405, mExtras=null], active item id=-1, error=null}
+11-03 17:46:39.240 D/AvrcpTargetJni( 1120): sendMediaUpdateNative
+11-03 17:46:39.240 I/bt_stack( 1120): [INFO:avrcp_service.cc(515)] virtual void bluetooth::avrcp::AvrcpService::SendMediaUpdate(bool, bool, bool) track_changed=0 :  play_state=0 :  queue=0
+11-03 17:46:39.240 D/MediaPlayerList( 1120): onActiveSessionsChanged: controller: it.xonos.ma
+11-03 17:46:39.240 I/MediaPlayerList( 1120): Adding wrapped media player: it.xonos.ma at key: 2
+11-03 17:46:39.244 D/ConnectivityService(  545): requestNetwork for uid/pid:10192/7391 activeRequest: null callbackRequest: 151 [NetworkRequest [ REQUEST id=152, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10192 RequestorUid: 10192 RequestorPkg: it.xonos.ma UnderlyingNetworks: Null] ]] callback flags: 0 order: 2147483647
+11-03 17:46:39.245 D/WifiNetworkFactory(  545): got request NetworkRequest [ REQUEST id=152, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10192 RequestorUid: 10192 RequestorPkg: it.xonos.ma UnderlyingNetworks: Null] ]
+11-03 17:46:39.247 D/UntrustedWifiNetworkFactory(  545): got request NetworkRequest [ REQUEST id=152, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10192 RequestorUid: 10192 RequestorPkg: it.xonos.ma UnderlyingNetworks: Null] ]
+11-03 17:46:39.247 D/OemPaidWifiNetworkFactory(  545): got request NetworkRequest [ REQUEST id=152, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10192 RequestorUid: 10192 RequestorPkg: it.xonos.ma UnderlyingNetworks: Null] ]
+11-03 17:46:39.247 D/MultiInternetWifiNetworkFactory(  545): got request NetworkRequest [ REQUEST id=152, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10192 RequestorUid: 10192 RequestorPkg: it.xonos.ma UnderlyingNetworks: Null] ]
+11-03 17:46:39.248 D/ConnectivityService(  545): NetReassign [152 : null → 101] [c 0] [a 1] [i 3]
+11-03 17:46:39.259 I/MediaController( 7391): Init 97cef94 [AndroidXMedia3/1.11.1] [emu64xa, sdk_gphone64_x86_64, Google, 34]
+11-03 17:46:39.294 D/TrafficStats( 7391): tagSocket(133) with statsTag=0xffffffff, statsUid=-1
+11-03 17:46:39.317 I/Xonos   ( 7391): Sendspin: server pronto Music Assistant (localhost), ruoli ["player@v1"], porta diretta
+11-03 17:46:39.318 D/Xonos   ( 7391): Gruppo: stopped
+11-03 17:46:39.331 I/Xonos   ( 7391): Lettore pronto in Music Assistant
+11-03 17:46:39.546 I/XonosServer( 7391): Xonos: lettore pronto
+11-03 17:46:39.557 W/linker64( 7494): type=1400 audit(0.0:2988): avc:  granted  { execute } for  path="/data/data/it.xonos.ma/no_backup/music-assistant-server/2.10.8-11/bin/ffmpeg" dev="dm-40" ino=140884 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c192,c256,c512,c768 tclass=file app=it.xonos.ma
+11-03 17:46:39.557 W/linker64( 7494): type=1400 audit(0.0:2989): avc:  denied  { search } for  name="tests" dev="dm-40" ino=196612 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:object_r:shell_test_data_file:s0 tclass=dir permissive=0 app=it.xonos.ma
+11-03 17:46:39.741 W/audit   (    0): audit_lost=2652 audit_rate_limit=5 audit_backlog_limit=64
+11-03 17:46:39.756 E/audit   (    0): rate limit exceeded
+11-03 17:46:39.557 W/linker64( 7494): type=1400 audit(0.0:2990): avc:  denied  { search } for  name="tests" dev="dm-40" ino=196612 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:object_r:shell_test_data_file:s0 tclass=dir permissive=0 app=it.xonos.ma
+11-03 17:46:39.557 W/linker64( 7494): type=1400 audit(0.0:2991): avc:  denied  { search } for  name="tests" dev="dm-40" ino=196612 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:object_r:shell_test_data_file:s0 tclass=dir permissive=0 app=it.xonos.ma
+11-03 17:46:39.557 W/linker64( 7494): type=1400 audit(0.0:2992): avc:  denied  { search } for  name="tests" dev="dm-40" ino=196612 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:object_r:shell_test_data_file:s0 tclass=dir permissive=0 app=it.xonos.ma
+11-03 17:46:39.640 D/Xonos   ( 7391): Gruppo: playing
+11-03 17:46:39.665 D/CompatibilityChangeReporter(  545): Compat change id reported: 197654537; UID 10192; state: ENABLED
+11-03 17:46:39.684 I/MediaSessionStack(  545): onPlaybackStateChanged - Pushing session to top | record: it.xonos.ma/androidx.media3.session.id. (userId=0)
+11-03 17:46:39.684 I/Xonos   ( 7391): Server sul telefono: serve per PLAYING
+11-03 17:46:39.695 I/ActivityManager(  545): Background started FGS: Allowed [callingPackage: it.xonos.ma; callingUid: 10192; uidState: TOP ; uidBFSL: [BFSL]; intent: Intent { act=androidx.media3.session.MediaSessionService cmp=it.xonos.ma/.playback.PlaybackService }; code:PROC_STATE_TOP; tempAllowListReason:<null>; targetSdkVersion:34; callerTargetSdkVersion:34; startForegroundCount:0; bindFromPackage:null: isBindService:true]
+11-03 17:46:39.697 D/CompatibilityChangeReporter(  545): Compat change id reported: 170668199; UID 10192; state: ENABLED
+11-03 17:46:39.760 I/Xonos   ( 7391): Sendspin: stream/start (pcm)
+11-03 17:46:39.762 I/Xonos   ( 7391): Sendspin: primo audio dopo stream/start, con 296 ms di anticipo
+11-03 17:46:39.765 I/Xonos   ( 7391): Stream pcm 48000 Hz, 2 canali
+11-03 17:46:39.769 W/AudioFlinger(  418): createTrack_l(): mismatch between requested flags (00000008) and output flags (00000002)
+11-03 17:46:39.770 D/AudioFlinger(  418): Client defaulted notificationFrames to 6000 for frameCount 12000
+11-03 17:46:39.771 D/AF::TrackHandle(  418): OpPlayAudio: track:55 usage:1 not muted
+11-03 17:46:39.777 D/audioserver(  418): FGS Logger Transaction failed
+11-03 17:46:39.777 D/audioserver(  418): -129
+11-03 17:46:39.778 I/Xonos   ( 7391): Uscita audio aperta in 12 ms (altoparlante)
+11-03 17:46:39.778 D/CompatibilityChangeReporter(  545): Compat change id reported: 171306433; UID 1000; state: ENABLED
+11-03 17:46:39.778 D/CompatibilityChangeReporter(  545): Compat change id reported: 218533173; UID 1000; state: ENABLED
+11-03 17:46:39.778 D/MediaSessionService(  545): Media button session is changed to it.xonos.ma/androidx.media3.session.id. (userId=0)
+11-03 17:46:39.779 I/AiAiEcho( 1775): Settings changed for uri: content://settings/secure/media_button_receiver
+11-03 17:46:39.780 I/MediaPlayerList( 1120): onMediaKeyEventSessionChanged: token=it.xonos.ma
+11-03 17:46:39.780 I/AiAiEcho( 1775): Predicting[0]: 
+11-03 17:46:39.780 I/AiAiEcho( 1775): EchoTargets: 
+11-03 17:46:39.780 I/AiAiEcho( 1775): Filtered by AiAi flag check: 
+11-03 17:46:39.780 I/AiAiEcho( 1775): Ranked targets strategy: SORT, count: 0, ranking metadata: 
+11-03 17:46:39.781 I/AiAiEcho( 1775): Predicting[0]: 
+11-03 17:46:39.781 I/AiAiEcho( 1775): EchoTargets: 
+11-03 17:46:39.781 I/AiAiEcho( 1775): Filtered by AiAi flag check: 
+11-03 17:46:39.781 I/AiAiEcho( 1775): Ranked targets strategy: SORT, count: 0, ranking metadata: 
+11-03 17:46:39.781 D/MediaPlayerList( 1120): setActivePlayer(): setting player to it.xonos.ma
+11-03 17:46:39.781 I/AiAiEcho( 1775): #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+11-03 17:46:39.782 I/MediaSessionService(  545): tempAllowlistTargetPkgIfPossible callingPackage:com.google.android.bluetooth targetPackage:it.xonos.ma reason:MediaSessionRecord:android.support.v4.media.session.command.GET_EXTRA_BINDER [WIU] [FGS]
+11-03 17:46:39.784 I/AiAiEcho( 1775): #postPredictionTargets: Sending updates to UISurface lockscreen with targets# 0 (types=[])
+11-03 17:46:39.784 W/PageIndicator(  912): Total number of pages invalid: 0. Assuming 1 page.
+11-03 17:46:39.787 D/AudioMediaPlayerWrapper( 1120): it.xonos.ma Only Title and Artist info sync for metadata
+11-03 17:46:39.787 D/MediaPlayerList( 1120): sendMediaUpdate state=PlaybackState {state=BUFFERING(6), position=0, buffered position=0, speed=0.0, updated=209187, actions=3145651, custom actions=[], active item id=0, error=null}
+11-03 17:46:39.788 D/AvrcpTargetJni( 1120): sendMediaUpdateNative
+11-03 17:46:39.788 I/bt_stack( 1120): [INFO:avrcp_service.cc(515)] virtual void bluetooth::avrcp::AvrcpService::SendMediaUpdate(bool, bool, bool) track_changed=1 :  play_state=1 :  queue=1
+11-03 17:46:39.788 I/MediaPlayerList( 1120): onMediaKeyEventSessionChanged: token=it.xonos.ma
+11-03 17:46:39.790 D/MediaPlayerList( 1120): setActivePlayer(): setting player to it.xonos.ma
+11-03 17:46:39.794 D/AudioTrack( 7391): getTimestamp_l(15): device stall time corrected using current time 209297145976
+11-03 17:46:39.798 I/Xonos   ( 7391): Uscita audio: primo tempo vero dopo 19 ms (altoparlante), ritardo dopo il buffer 22 ms
+11-03 17:46:39.798 I/Xonos   ( 7391): Avvio a -202 ms dal momento giusto, si sente fra 259 ms
+11-03 17:46:39.799 D/AudioMediaPlayerWrapper( 1120): it.xonos.ma Only Title and Artist info sync for metadata
+11-03 17:46:39.799 D/MediaPlayerList( 1120): sendMediaUpdate state=PlaybackState {state=BUFFERING(6), position=0, buffered position=0, speed=0.0, updated=209187, actions=3145651, custom actions=[], active item id=0, error=null}
+11-03 17:46:39.800 D/MediaControlGattService( 1120): updatePlayerState: playbackState= PAUSED
+11-03 17:46:39.800 W/MediaControlGattService( 1120): Feature PLAYBACK_SPEED(BIT 8) support: true
+11-03 17:46:39.800 W/MediaControlGattService( 1120): Feature PLAYBACK_SPEED(BIT 8) support: true
+11-03 17:46:39.801 W/MediaControlGattService( 1120): Feature PLAYBACK_SPEED(BIT 8) support: true
+11-03 17:46:39.802 W/MediaControlGattService( 1120): Feature PLAYBACK_SPEED_NOTIFY support: true
+11-03 17:46:39.803 W/MediaControlGattService( 1120): Feature TRACK_POSITION(BIT 7) support: true
+11-03 17:46:39.804 W/MediaControlGattService( 1120): Feature TRACK_POSITION_NOTIFY support: true
+11-03 17:46:39.804 W/MediaControlGattService( 1120): Feature MEDIA_STATE(BIT 17) support: true
+11-03 17:46:39.805 W/MediaControlGattService( 1120): Feature MEDIA_STATE(BIT 17) support: true
+11-03 17:46:39.806 W/MediaControlGattService( 1120): Feature PLAYER_NAME(BIT 1) support: true
+11-03 17:46:39.810 W/MediaControlGattService( 1120): Feature PLAYER_NAME(BIT 1) support: true
+11-03 17:46:39.810 W/MediaControlGattService( 1120): Feature PLAYER_NAME(BIT 1) support: true
+11-03 17:46:39.810 W/MediaControlGattService( 1120): Feature PLAYER_NAME_NOTIFY support: true
+11-03 17:46:39.811 W/MediaControlGattService( 1120): Feature MEDIA_CONTROL_POINT_OPCODES_SUPPORTED(BIT 19) support: true
+11-03 17:46:39.812 W/MediaControlGattService( 1120): Feature PLAYING_ORDER_SUPPORTED(BIT 16) support: true
+11-03 17:46:39.812 W/MediaControlGattService( 1120): Feature PLAYING_ORDER(BIT 15) support: true
+11-03 17:46:39.812 W/MediaControlGattService( 1120): Feature PLAYER_ICON_OBJ_ID(BIT 2) support: false
+11-03 17:46:39.813 W/MediaControlGattService( 1120): Feature PLAYER_ICON_URL(BIT 3) support: false
+11-03 17:46:39.813 W/MediaControlGattService( 1120): Feature MEDIA_CONTROL_POINT_OPCODES_SUPPORTED(BIT 19) support: true
+11-03 17:46:39.813 W/MediaControlGattService( 1120): Feature MEDIA_CONTROL_POINT_OPCODES_SUPPORTED_NOTIFY support: true
+11-03 17:46:39.814 W/MediaControlGattService( 1120): Feature TRACK_TITLE(BIT 5) support: true
+11-03 17:46:39.814 W/MediaControlGattService( 1120): Feature TRACK_TITLE(BIT 5) support: true
+11-03 17:46:39.814 W/MediaControlGattService( 1120): Feature TRACK_TITLE_NOTIFY support: true
+11-03 17:46:39.819 W/MediaControlGattService( 1120): Feature TRACK_DURATION(BIT 6) support: true
+11-03 17:46:39.819 W/MediaControlGattService( 1120): Feature TRACK_DURATION(BIT 6) support: true
+11-03 17:46:39.819 W/MediaControlGattService( 1120): Feature TRACK_DURATION_NOTIFY support: true
+11-03 17:46:39.820 W/MediaControlGattService( 1120): Feature MEDIA_STATE(BIT 17) support: true
+11-03 17:46:39.820 D/MediaControlGattService( 1120): updateMediaStateChar
+11-03 17:46:39.820 W/MediaControlGattService( 1120): Feature MEDIA_STATE(BIT 17) support: true
+11-03 17:46:39.820 D/MediaControlGattService( 1120): updateMediaStateChar setting to state= 2
+11-03 17:46:39.821 W/MediaControlGattService( 1120): Feature MEDIA_STATE(BIT 17) support: true
+11-03 17:46:39.821 W/MediaControlGattService( 1120): Feature SEEKING_SPEED(BIT 9) support: true
+11-03 17:46:39.821 W/MediaControlGattService( 1120): Feature SEEKING_SPEED(BIT 9) support: true
+11-03 17:46:39.821 W/MediaControlGattService( 1120): Feature SEEKING_SPEED(BIT 9) support: true
+11-03 17:46:39.821 W/MediaControlGattService( 1120): Feature TRACK_CHANGED(BIT 4) support: true
+11-03 17:46:39.822 W/MediaControlGattService( 1120): Feature PLAYING_ORDER_SUPPORTED(BIT 16) support: true
+11-03 17:46:39.822 W/MediaControlGattService( 1120): Feature PLAYING_ORDER(BIT 15) support: true
+11-03 17:46:39.822 W/MediaControlGattService( 1120): Feature MEDIA_STATE(BIT 17) support: true
+11-03 17:46:39.822 V/MediaPlayerList( 1120): onActiveSessionsChanged: number of controllers: 2
+11-03 17:46:39.822 D/MediaPlayerList( 1120): onActiveSessionsChanged: controller: it.xonos.ma
+11-03 17:46:39.823 D/MediaPlayerList( 1120): sendMediaUpdate state=PlaybackState {state=BUFFERING(6), position=0, buffered position=0, speed=0.0, updated=209187, actions=3145651, custom actions=[], active item id=0, error=null}
+11-03 17:46:39.823 D/AvrcpTargetJni( 1120): sendMediaUpdateNative
+11-03 17:46:39.823 I/bt_stack( 1120): [INFO:avrcp_service.cc(515)] virtual void bluetooth::avrcp::AvrcpService::SendMediaUpdate(bool, bool, bool) track_changed=0 :  play_state=0 :  queue=0
+11-03 17:46:39.823 D/MediaPlayerList( 1120): onActiveSessionsChanged: controller: com.google.android.googlequicksearchbox
+11-03 17:46:39.823 V/MediaPlayerList( 1120): onActiveSessionsChanged: number of controllers: 2
+11-03 17:46:39.823 D/MediaPlayerList( 1120): onActiveSessionsChanged: controller: it.xonos.ma
+11-03 17:46:39.824 D/MediaPlayerList( 1120): sendMediaUpdate state=PlaybackState {state=BUFFERING(6), position=0, buffered position=0, speed=0.0, updated=209187, actions=3145651, custom actions=[], active item id=0, error=null}
+11-03 17:46:39.824 W/MediaControlGattService( 1120): Feature PLAYER_NAME(BIT 1) support: true
+11-03 17:46:39.825 W/MediaControlGattService( 1120): Feature PLAYER_NAME(BIT 1) support: true
+11-03 17:46:39.825 W/MediaControlGattService( 1120): Feature MEDIA_STATE(BIT 17) support: true
+11-03 17:46:39.825 D/MediaPlayerList( 1120): onActiveSessionsChanged: controller: com.google.android.googlequicksearchbox
+11-03 17:46:39.826 D/AvrcpTargetJni( 1120): sendPlayerSettingsNative
+11-03 17:46:39.826 I/bt_stack( 1120): [INFO:avrcp_service.cc(551)] virtual void bluetooth::avrcp::AvrcpService::SendPlayerSettingsChanged(std::vector<PlayerAttribute>, std::vector<uint8_t>)
+11-03 17:46:39.826 I/bt_stack( 1120): [INFO:avrcp_service.cc(565)] attribute=PlayerAttribute::REPEAT : value=PlayerRepeatValue::OFF
+11-03 17:46:39.826 I/bt_stack( 1120): attribute=PlayerAttribute::SHUFFLE : value=PlayerShuffleValue::OFF
+11-03 17:46:39.826 I/bt_stack( 1120): 
+11-03 17:46:39.837 D/AudioFlinger(  418): mixer(0x72965ed64930) throttle end: throttle time(33)
+11-03 17:46:39.888 W/NotificationHistory(  545): Attempted to add notif for locked/gone/disabled user 0
+11-03 17:46:39.890 V/AudioMediaPlayerWrapper( 1120): onPlaybackStateChanged(): it.xonos.ma : PlaybackState {state=PLAYING(3), position=3, buffered position=3, speed=1.0, updated=209388, actions=3145651, custom actions=[], active item id=0, error=null}
+11-03 17:46:39.890 D/AudioMediaPlayerWrapper( 1120): it.xonos.ma Only Title and Artist info sync for metadata
+11-03 17:46:39.890 V/AudioMediaPlayerWrapper( 1120): trySendMediaUpdate(): Metadata has been updated for it.xonos.ma
+11-03 17:46:39.890 D/MediaPlayerList( 1120): sendMediaUpdate state=PlaybackState {state=PLAYING(3), position=7, buffered position=3, speed=1.0, updated=209392, actions=3145651, custom actions=[], active item id=0, error=null}
+11-03 17:46:39.891 D/MediaControlGattService( 1120): updatePlayerState: playbackState= PLAYING
+11-03 17:46:39.891 W/MediaControlGattService( 1120): Feature PLAYBACK_SPEED(BIT 8) support: true
+11-03 17:46:39.891 W/MediaControlGattService( 1120): Feature PLAYBACK_SPEED(BIT 8) support: true
+11-03 17:46:39.891 W/MediaControlGattService( 1120): Feature PLAYBACK_SPEED(BIT 8) support: true
+11-03 17:46:39.891 W/MediaControlGattService( 1120): Feature PLAYBACK_SPEED_NOTIFY support: true
+11-03 17:46:39.891 W/MediaControlGattService( 1120): Feature TRACK_POSITION(BIT 7) support: true
+11-03 17:46:39.891 W/MediaControlGattService( 1120): Feature TRACK_POSITION_NOTIFY support: true
+11-03 17:46:39.891 W/MediaControlGattService( 1120): Feature MEDIA_STATE(BIT 17) support: true
+11-03 17:46:39.892 W/MediaControlGattService( 1120): Feature PLAYER_NAME(BIT 1) support: true
+11-03 17:46:39.892 W/MediaControlGattService( 1120): Feature PLAYER_NAME(BIT 1) support: true
+11-03 17:46:39.892 W/MediaControlGattService( 1120): Feature MEDIA_CONTROL_POINT_OPCODES_SUPPORTED(BIT 19) support: true
+11-03 17:46:39.892 W/MediaControlGattService( 1120): Feature MEDIA_STATE(BIT 17) support: true
+11-03 17:46:39.892 D/MediaControlGattService( 1120): updateMediaStateChar
+11-03 17:46:39.892 W/MediaControlGattService( 1120): Feature MEDIA_STATE(BIT 17) support: true
+11-03 17:46:39.892 D/MediaControlGattService( 1120): updateMediaStateChar setting to state= 1
+11-03 17:46:39.893 W/MediaControlGattService( 1120): Feature MEDIA_STATE(BIT 17) support: true
+11-03 17:46:39.893 W/MediaControlGattService( 1120): Feature SEEKING_SPEED(BIT 9) support: true
+11-03 17:46:39.893 W/AiAiEcho( 1775): LyftNotificationParser Ridesharing ETA not enabled
+11-03 17:46:39.893 W/MediaControlGattService( 1120): Feature SEEKING_SPEED(BIT 9) support: true
+11-03 17:46:39.893 W/AiAiEcho( 1775): SmartspaceNotificationPredictor no parser can handle this notification or notification is invalid
+11-03 17:46:39.893 W/MediaControlGattService( 1120): Feature SEEKING_SPEED(BIT 9) support: true
+11-03 17:46:39.894 V/AudioMediaPlayerWrapper( 1120): onPlaybackStateChanged(): it.xonos.ma : PlaybackState {state=PLAYING(3), position=3, buffered position=3, speed=1.0, updated=209388, actions=3145651, custom actions=[], active item id=0, error=null}
+11-03 17:46:39.894 W/AudioMediaPlayerWrapper( 1120): onPlaybackStateChanged(): it.xonos.ma tried to update with no new data
+11-03 17:46:39.895 V/AudioMediaPlayerWrapper( 1120): onPlaybackStateChanged(): it.xonos.ma : PlaybackState {state=PLAYING(3), position=3, buffered position=3, speed=1.0, updated=209388, actions=3145651, custom actions=[], active item id=0, error=null}
+11-03 17:46:39.895 D/AudioMediaPlayerWrapper( 1120): it.xonos.ma Only Title and Artist info sync for metadata
+11-03 17:46:39.896 V/AudioMediaPlayerWrapper( 1120): trySendMediaUpdate(): Metadata has been updated for it.xonos.ma
+11-03 17:46:39.896 D/MediaPlayerList( 1120): sendMediaUpdate state=PlaybackState {state=PLAYING(3), position=13, buffered position=3, speed=1.0, updated=209398, actions=3145651, custom actions=[], active item id=0, error=null}
+11-03 17:46:39.896 D/AvrcpTargetJni( 1120): sendMediaUpdateNative
+11-03 17:46:39.896 I/bt_stack( 1120): [INFO:avrcp_service.cc(515)] virtual void bluetooth::avrcp::AvrcpService::SendMediaUpdate(bool, bool, bool) track_changed=0 :  play_state=1 :  queue=1
+11-03 17:46:39.896 I/WifiService(  545): acquireWifiLock uid=10192 lockMode=3
+11-03 17:46:39.897 V/AudioMediaPlayerWrapper( 1120): onPlaybackStateChanged(): it.xonos.ma : PlaybackState {state=PLAYING(3), position=3, buffered position=3, speed=1.0, updated=209388, actions=3145651, custom actions=[], active item id=0, error=null}
+11-03 17:46:39.897 W/AudioMediaPlayerWrapper( 1120): onPlaybackStateChanged(): it.xonos.ma tried to update with no new data
+11-03 17:46:39.901 W/AiAiEcho( 1775): LyftNotificationParser Ridesharing ETA not enabled
+11-03 17:46:39.901 W/AiAiEcho( 1775): SmartspaceNotificationPredictor no parser can handle this notification or notification is invalid
+11-03 17:46:39.903 I/MediaFocusControl(  545): requestAudioFocus() from uid/pid 10192/7391 AA=USAGE_MEDIA/CONTENT_TYPE_MUSIC clientId=android.media.AudioManager@a8565c4it.xonos.ma.playback.AudioFocus$$ExternalSyntheticLambda0@9663cad callingPack=it.xonos.ma req=1 flags=0x0 sdk=34
+11-03 17:46:39.904 I/AudioService.FadeOutManager(  545): unfadeOutUid() uid:10192
+11-03 17:46:39.911 D/CompatibilityChangeReporter(  545): Compat change id reported: 203800354; UID 10192; state: ENABLED
+11-03 17:46:39.922 D/EGL_emulation(  912): app_time_stats: avg=39909.79ms min=39909.79ms max=39909.79ms count=1
+11-03 17:46:39.934 D/MediaResumeListener(  912): Checking for service component for it.xonos.ma
+11-03 17:46:39.935 D/MediaResumeListener(  912): Testing if we can connect to ComponentInfo{it.xonos.ma/it.xonos.ma.playback.PlaybackService}
+11-03 17:46:39.938 I/MR2ServiceImpl(  545): startScan | manager: 1
+11-03 17:46:39.944 W/LocalMediaManager(  912): BluetoothAdapter is null or muting expected device not exist
+11-03 17:46:39.952 D/MediaDeviceManager(  912): Can not get LocalBluetoothLeBroadcast
+11-03 17:46:39.960 D/ConnectivityService(  545): NetReassign [no changes] [c 0] [a 0] [i 1]
+11-03 17:46:39.961 D/MediaDeviceManager(  912): Can not get LocalBluetoothLeBroadcast
+11-03 17:46:39.962 I/CastDatabase( 5535): Opening the database
+11-03 17:46:39.972 I/CastSocket( 5535): Adding new CastClientAuthKeyManager. [CONTEXT service_id=161 ]
+11-03 17:46:39.981 W/DiscoveryManager( 5535): BroadcastReceiver not registered
+11-03 17:46:39.996 E/bwfc    ( 5535): Phenotype API error. Event # edax@71436956, EventCode: 5 [CONTEXT service_id=51 ]
+11-03 17:46:39.996 E/bwfc    ( 5535): bwdx: 29501: Stale snapshot for com.google.android.libraries.consentverifier#com.google.android.gms(change count changed - expected 4  but was 3)
+11-03 17:46:39.996 E/bwfc    ( 5535): 	at bwfg.b(:com.google.android.gms@231818047@23.18.18 (190800-535401451):16)
+11-03 17:46:39.996 E/bwfc    ( 5535): 	at bwff.g(:com.google.android.gms@231818047@23.18.18 (190800-535401451):0)
+11-03 17:46:39.996 E/bwfc    ( 5535): 	at bwfc.e(:com.google.android.gms@231818047@23.18.18 (190800-535401451):4)
+11-03 17:46:39.996 E/bwfc    ( 5535): 	at bwfc.f(:com.google.android.gms@231818047@23.18.18 (190800-535401451):2)
+11-03 17:46:39.996 E/bwfc    ( 5535): 	at avsy.eo(:com.google.android.gms@231818047@23.18.18 (190800-535401451):1)
+11-03 17:46:39.996 E/bwfc    ( 5535): 	at avtf.run(:com.google.android.gms@231818047@23.18.18 (190800-535401451):14)
+11-03 17:46:39.996 E/bwfc    ( 5535): 	at dfhf.run(:com.google.android.gms@231818047@23.18.18 (190800-535401451):2)
+11-03 17:46:39.996 E/bwfc    ( 5535): 	at aced.c(:com.google.android.gms@231818047@23.18.18 (190800-535401451):6)
+11-03 17:46:39.996 E/bwfc    ( 5535): 	at aced.run(:com.google.android.gms@231818047@23.18.18 (190800-535401451):7)
+11-03 17:46:39.996 E/bwfc    ( 5535): 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+11-03 17:46:39.996 E/bwfc    ( 5535): 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+11-03 17:46:39.996 E/bwfc    ( 5535): 	at acjn.run(:com.google.android.gms@231818047@23.18.18 (190800-535401451):0)
+11-03 17:46:39.996 E/bwfc    ( 5535): 	at java.lang.Thread.run(Thread.java:1012)
+11-03 17:46:39.996 W/AsyncOperation( 5535): operation=CommitToConfigurationOperationCall, opStatusCode=29501 [CONTEXT service_id=51 ]
+11-03 17:46:39.996 W/AsyncOperation( 5535): OperationException[Status{statusCode=Stale snapshot for com.google.android.libraries.consentverifier#com.google.android.gms(change count changed - expected 4  but was 3), resolution=null}]
+11-03 17:46:39.996 W/AsyncOperation( 5535): 	at bwfc.e(:com.google.android.gms@231818047@23.18.18 (190800-535401451):6)
+11-03 17:46:39.996 W/AsyncOperation( 5535): 	at bwfc.f(:com.google.android.gms@231818047@23.18.18 (190800-535401451):2)
+11-03 17:46:39.996 W/AsyncOperation( 5535): 	at avsy.eo(:com.google.android.gms@231818047@23.18.18 (190800-535401451):1)
+11-03 17:46:39.996 W/AsyncOperation( 5535): 	at avtf.run(:com.google.android.gms@231818047@23.18.18 (190800-535401451):14)
+11-03 17:46:39.996 W/AsyncOperation( 5535): 	at dfhf.run(:com.google.android.gms@231818047@23.18.18 (190800-535401451):2)
+11-03 17:46:39.996 W/AsyncOperation( 5535): 	at aced.c(:com.google.android.gms@231818047@23.18.18 (190800-535401451):6)
+11-03 17:46:39.996 W/AsyncOperation( 5535): 	at aced.run(:com.google.android.gms@231818047@23.18.18 (190800-535401451):7)
+11-03 17:46:39.996 W/AsyncOperation( 5535): 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+11-03 17:46:39.996 W/AsyncOperation( 5535): 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+11-03 17:46:39.996 W/AsyncOperation( 5535): 	at acjn.run(:com.google.android.gms@231818047@23.18.18 (190800-535401451):0)
+11-03 17:46:39.996 W/AsyncOperation( 5535): 	at java.lang.Thread.run(Thread.java:1012)
+11-03 17:46:39.996 W/MobStoreFlagStore( 5535): Failed to commit due to stale snapshot for com.google.android.libraries.consentverifier#com.google.android.gms, triggering flag update. Experiments may be delayed til next app start.
+11-03 17:46:40.011 W/ConstraintSet(  912): id unknown center_vertical_guideline
+11-03 17:46:40.012 W/ConstraintSet(  912): id unknown action_button_guideline
+11-03 17:46:40.012 W/ConstraintSet(  912): id unknown icon
+11-03 17:46:40.014 W/ConstraintSet(  912): id unknown media_seamless
+11-03 17:46:40.014 W/ConstraintSet(  912): id unknown media_action_barrier_start
+11-03 17:46:40.014 W/ConstraintSet(  912): id unknown media_action_barrier_end
+11-03 17:46:40.014 W/ConstraintSet(  912): id unknown media_action_barrier_top
+11-03 17:46:40.015 W/ConstraintSet(  912): id unknown remove_text
+11-03 17:46:40.015 W/ConstraintSet(  912): id unknown settings
+11-03 17:46:40.015 W/ConstraintSet(  912): id unknown dismiss
+11-03 17:46:40.015 W/ConstraintSet(  912): id unknown cancel
+11-03 17:46:40.019 W/ConstraintSet(  912): id unknown center_vertical_guideline
+11-03 17:46:40.020 W/ConstraintSet(  912): id unknown action_button_guideline
+11-03 17:46:40.021 W/ConstraintSet(  912): id unknown icon
+11-03 17:46:40.021 W/ConstraintSet(  912): id unknown media_seamless
+11-03 17:46:40.021 W/ConstraintSet(  912): id unknown media_action_barrier_start
+11-03 17:46:40.021 W/ConstraintSet(  912): id unknown media_action_barrier_end
+11-03 17:46:40.021 W/ConstraintSet(  912): id unknown media_action_barrier_top
+11-03 17:46:40.022 W/ConstraintSet(  912): id unknown remove_text
+11-03 17:46:40.022 W/ConstraintSet(  912): id unknown settings
+11-03 17:46:40.022 W/ConstraintSet(  912): id unknown dismiss
+11-03 17:46:40.022 W/ConstraintSet(  912): id unknown cancel
+11-03 17:46:40.027 W/ConstraintSet(  912): id unknown center_vertical_guideline
+11-03 17:46:40.027 W/ConstraintSet(  912): id unknown action_button_guideline
+11-03 17:46:40.028 W/ConstraintSet(  912): id unknown icon
+11-03 17:46:40.029 W/ConstraintSet(  912): id unknown media_seamless
+11-03 17:46:40.029 W/ConstraintSet(  912): id unknown media_action_barrier_start
+11-03 17:46:40.030 W/ConstraintSet(  912): id unknown media_action_barrier_end
+11-03 17:46:40.030 W/ConstraintSet(  912): id unknown media_action_barrier_top
+11-03 17:46:40.030 W/ConstraintSet(  912): id unknown remove_text
+11-03 17:46:40.030 W/ConstraintSet(  912): id unknown settings
+11-03 17:46:40.030 W/ConstraintSet(  912): id unknown dismiss
+11-03 17:46:40.030 W/ConstraintSet(  912): id unknown cancel
+11-03 17:46:40.036 W/ConstraintSet(  912): id unknown center_vertical_guideline
+11-03 17:46:40.036 W/ConstraintSet(  912): id unknown action_button_guideline
+11-03 17:46:40.037 W/ConstraintSet(  912): id unknown icon
+11-03 17:46:40.037 W/ConstraintSet(  912): id unknown media_seamless
+11-03 17:46:40.038 W/ConstraintSet(  912): id unknown media_action_barrier_start
+11-03 17:46:40.038 W/ConstraintSet(  912): id unknown media_action_barrier_end
+11-03 17:46:40.038 W/ConstraintSet(  912): id unknown media_action_barrier_top
+11-03 17:46:40.038 W/ConstraintSet(  912): id unknown remove_text
+11-03 17:46:40.039 W/ConstraintSet(  912): id unknown settings
+11-03 17:46:40.039 W/ConstraintSet(  912): id unknown dismiss
+11-03 17:46:40.039 W/ConstraintSet(  912): id unknown cancel
+11-03 17:46:40.047 I/SQLiteCastDBHelper( 5535): Creating cast database
+11-03 17:46:40.073 I/DiscoveryManager( 5535): Filter criteria(null) scannerFlags(2)
+11-03 17:46:40.074 W/DatabaseProcessor( 5535): processLocalDevices: failed to get the network info with non-null networkId.
+11-03 17:46:40.075 I/CastMediaRouteProvider( 5535): Published 0 routes
+11-03 17:46:40.078 D/LocalImageResolver(  912): Couldn't use ImageDecoder for drawable, falling back to non-resized load.
+11-03 17:46:40.081 I/MediaBrowserService( 7391): No root for client com.android.systemui from service android.service.media.MediaBrowserService$ServiceBinder$1
+11-03 17:46:40.085 E/MediaBrowser(  912): onConnectFailed for ComponentInfo{it.xonos.ma/it.xonos.ma.playback.PlaybackService}
+11-03 17:46:40.086 D/ResumeMediaBrowser(  912): Connection failed for ComponentInfo{it.xonos.ma/it.xonos.ma.playback.PlaybackService}
+11-03 17:46:40.086 E/MediaResumeListener(  912): Cannot resume with ComponentInfo{it.xonos.ma/it.xonos.ma.playback.PlaybackService}
+11-03 17:46:40.113 W/ConstraintSet(  912): id unknown center_vertical_guideline
+11-03 17:46:40.113 W/ConstraintSet(  912): id unknown action_button_guideline
+11-03 17:46:40.113 W/ConstraintSet(  912): id unknown icon
+11-03 17:46:40.113 W/ConstraintSet(  912): id unknown media_seamless
+11-03 17:46:40.114 W/ConstraintSet(  912): id unknown media_action_barrier_start
+11-03 17:46:40.115 W/ConstraintSet(  912): id unknown media_action_barrier_end
+11-03 17:46:40.115 W/ConstraintSet(  912): id unknown media_action_barrier_top
+11-03 17:46:40.115 W/ConstraintSet(  912): id unknown remove_text
+11-03 17:46:40.115 W/ConstraintSet(  912): id unknown settings
+11-03 17:46:40.115 W/ConstraintSet(  912): id unknown dismiss
+11-03 17:46:40.115 W/ConstraintSet(  912): id unknown cancel
+11-03 17:46:40.121 W/AiAiEcho( 1775): LyftNotificationParser Ridesharing ETA not enabled
+11-03 17:46:40.121 W/AiAiEcho( 1775): SmartspaceNotificationPredictor no parser can handle this notification or notification is invalid
+11-03 17:46:40.337 D/ActivityManager(  545): freezing 2036 com.google.process.gapps
+11-03 17:46:40.342 W/ConstraintSet(  912): id unknown center_vertical_guideline
+11-03 17:46:40.342 W/ConstraintSet(  912): id unknown action_button_guideline
+11-03 17:46:40.342 W/ConstraintSet(  912): id unknown icon
+11-03 17:46:40.342 W/ConstraintSet(  912): id unknown media_seamless
+11-03 17:46:40.342 W/ConstraintSet(  912): id unknown media_action_barrier_start
+11-03 17:46:40.342 W/ConstraintSet(  912): id unknown media_action_barrier_end
+11-03 17:46:40.342 W/ConstraintSet(  912): id unknown media_action_barrier_top
+11-03 17:46:40.342 W/ConstraintSet(  912): id unknown remove_text
+11-03 17:46:40.342 W/ConstraintSet(  912): id unknown settings
+11-03 17:46:40.342 W/ConstraintSet(  912): id unknown dismiss
+11-03 17:46:40.342 W/ConstraintSet(  912): id unknown cancel
+11-03 17:46:40.995 I/NetworkScheduler.Stats( 5535): Task com.google.android.gms/com.google.android.gms.tapandpay.gcmtask.TapAndPayGcmTaskService started execution. cause:4 exec_start_elapsed_seconds: 210 [CONTEXT service_id=218 ]
+11-03 17:46:40.996 V/NFC     ( 5535): this device does not have NFC support
+11-03 17:46:40.997 W/TapAndPay( 5535): NfcAdapter is null while obtaining CardEmulation instance. [CONTEXT service_id=79 ]
+11-03 17:46:40.997 W/TapAndPay( 5535): java.lang.NullPointerException: NfcAdapter is null
+11-03 17:46:40.997 W/TapAndPay( 5535): 	at android.nfc.cardemulation.CardEmulation.getInstance(CardEmulation.java:152)
+11-03 17:46:40.997 W/TapAndPay( 5535): 	at cdoy.<init>(:com.google.android.gms@231818047@23.18.18 (190800-535401451):0)
+11-03 17:46:40.997 W/TapAndPay( 5535): 	at com.google.android.gms.tapandpay.hce.task.TapAndPayAidRegistrationTaskOperation.a(:com.google.android.gms@231818047@23.18.18 (190800-535401451):5)
+11-03 17:46:40.997 W/TapAndPay( 5535): 	at com.google.android.gms.tapandpay.gcmtask.TapAndPayGcmTaskChimeraService.a(:com.google.android.gms@231818047@23.18.18 (190800-535401451):4)
+11-03 17:46:40.997 W/TapAndPay( 5535): 	at avzs.call(:com.google.android.gms@231818047@23.18.18 (190800-535401451):4)
+11-03 17:46:40.997 W/TapAndPay( 5535): 	at java.util.concurrent.FutureTask.run(FutureTask.java:264)
+11-03 17:46:40.997 W/TapAndPay( 5535): 	at aced.c(:com.google.android.gms@231818047@23.18.18 (190800-535401451):6)
+11-03 17:46:40.997 W/TapAndPay( 5535): 	at aced.run(:com.google.android.gms@231818047@23.18.18 (190800-535401451):7)
+11-03 17:46:40.997 W/TapAndPay( 5535): 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+11-03 17:46:40.997 W/TapAndPay( 5535): 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+11-03 17:46:40.997 W/TapAndPay( 5535): 	at acjn.run(:com.google.android.gms@231818047@23.18.18 (190800-535401451):0)
+11-03 17:46:40.997 W/TapAndPay( 5535): 	at java.lang.Thread.run(Thread.java:1012)
+11-03 17:46:41.000 I/NetworkScheduler.Stats( 5535): Task com.google.android.gms/com.google.android.gms.tapandpay.gcmtask.TapAndPayGcmTaskService finished executing. cause:4 result: 3 elapsed_millis: 11 uptime_millis: 11 exec_start_elapsed_seconds: 210 [CONTEXT service_id=218 ]
+11-03 17:46:41.018 I/NetworkScheduler.Stats( 5535): Task com.google.android.gms/com.google.android.gms.auth.account.be.legacy.AuthCronService started execution. cause:5 exec_start_elapsed_seconds: 210 [CONTEXT service_id=218 ]
+11-03 17:46:41.027 D/ActivityManager(  545): sync unfroze 3034 com.google.android.gms.unstable for 6
+11-03 17:46:41.027 W/ProcessStats(  545): Tracking association SourceState{1ceced6 com.google.android.gms.persistent/10127 BFgs #12926} whose proc state 4 is better than process ProcessState{b556a2c com.google.android.gms.unstable/10127 pkg=com.google.android.gms} proc state 14 (226 skipped)
+11-03 17:46:41.051 I/resolv  (  358): GetAddrInfoHandler::run: {101 786533 101 983141 10127 0}
+11-03 17:46:41.051 D/TrafficStats( 3034): tagSocket(113) with statsTag=0x1809, statsUid=-1
+11-03 17:46:41.060 W/libc    ( 3034): Access denied finding property "persist.adb.tls_server.enable"
+11-03 17:46:41.061 W/libc    ( 3034): Access denied finding property "service.adb.tls.port"
+11-03 17:46:41.057 W/binder:3034_9( 3034): type=1400 audit(0.0:3021): avc:  denied  { read } for  name="u:object_r:system_adbd_prop:s0" dev="tmpfs" ino=292 scontext=u:r:gmscore_app:s0:c512,c768 tcontext=u:object_r:system_adbd_prop:s0 tclass=file permissive=0 app=com.google.android.gms
+11-03 17:46:41.069 W/GmsUrlRequestImpl( 5535): Content-Type header is overwritten.
+11-03 17:46:41.061 W/binder:3034_9( 3034): type=1400 audit(0.0:3022): avc:  denied  { read } for  name="u:object_r:adbd_prop:s0" dev="tmpfs" ino=60 scontext=u:r:gmscore_app:s0:c512,c768 tcontext=u:object_r:adbd_prop:s0 tclass=file permissive=0 app=com.google.android.gms
+11-03 17:46:41.081 I/resolv  (  358): GetAddrInfoHandler::run: {101 786533 101 983141 10127 0}
+11-03 17:46:41.081 I/resolv  (  358): res_nmkquery: (QUERY, IN, A)
+11-03 17:46:41.081 I/resolv  (  358): res_nmkquery: (QUERY, IN, AAAA)
+11-03 17:46:41.081 I/resolv  (  358): resolv_cache_lookup: FOUND IN CACHE entry=0x7a2bccab8600
+11-03 17:46:41.081 I/resolv  (  358): doQuery: rcode=0, ancount=8, return value=440
+11-03 17:46:41.081 I/resolv  (  358): resolv_cache_lookup: FOUND IN CACHE entry=0x7a2bccab49e0
+11-03 17:46:41.081 I/resolv  (  358): doQuery: rcode=0, ancount=8, return value=344
+11-03 17:46:41.083 D/TrafficStats( 5535): tagSocket(201) with statsTag=0x401, statsUid=10127
+11-03 17:46:41.090 I/netd    (  358): tetherGetStats() -> {[]} <0.40ms>
+11-03 17:46:41.091 I/netd    (  358): bandwidthSetGlobalAlert(2097152) <0.09ms>
+11-03 17:46:41.136 W/GLSUser ( 5535): [AppCertManager] Exception while requesting key: 
+11-03 17:46:41.136 W/GLSUser ( 5535): java.util.concurrent.ExecutionException: avvw: Parse Proto Exception.
+11-03 17:46:41.136 W/GLSUser ( 5535): 	at dlnv.s(:com.google.android.gms@231818047@23.18.18 (190800-535401451):3)
+11-03 17:46:41.136 W/GLSUser ( 5535): 	at dlnv.get(:com.google.android.gms@231818047@23.18.18 (190800-535401451):7)
+11-03 17:46:41.136 W/GLSUser ( 5535): 	at oub.b(:com.google.android.gms@231818047@23.18.18 (190800-535401451):78)
+11-03 17:46:41.136 W/GLSUser ( 5535): 	at otz.b(:com.google.android.gms@231818047@23.18.18 (190800-535401451):4)
+11-03 17:46:41.136 W/GLSUser ( 5535): 	at otu.a(:com.google.android.gms@231818047@23.18.18 (190800-535401451):0)
+11-03 17:46:41.136 W/GLSUser ( 5535): 	at otx.a(:com.google.android.gms@231818047@23.18.18 (190800-535401451):6)
+11-03 17:46:41.136 W/GLSUser ( 5535): 	at lzq.call(:com.google.android.gms@231818047@23.18.18 (190800-535401451):14)
+11-03 17:46:41.136 W/GLSUser ( 5535): 	at java.util.concurrent.FutureTask.run(FutureTask.java:264)
+11-03 17:46:41.136 W/GLSUser ( 5535): 	at aced.c(:com.google.android.gms@231818047@23.18.18 (190800-535401451):6)
+11-03 17:46:41.136 W/GLSUser ( 5535): 	at aced.run(:com.google.android.gms@231818047@23.18.18 (190800-535401451):7)
+11-03 17:46:41.136 W/GLSUser ( 5535): 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+11-03 17:46:41.136 W/GLSUser ( 5535): 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+11-03 17:46:41.136 W/GLSUser ( 5535): 	at acjn.run(:com.google.android.gms@231818047@23.18.18 (190800-535401451):0)
+11-03 17:46:41.136 W/GLSUser ( 5535): 	at java.lang.Thread.run(Thread.java:1012)
+11-03 17:46:41.136 W/GLSUser ( 5535): Caused by: avvw: Parse Proto Exception.
+11-03 17:46:41.136 W/GLSUser ( 5535): 	at avwn.f(:com.google.android.gms@231818047@23.18.18 (190800-535401451):5)
+11-03 17:46:41.136 W/GLSUser ( 5535): 	at avxk.onSucceeded(:com.google.android.gms@231818047@23.18.18 (190800-535401451):0)
+11-03 17:46:41.136 W/GLSUser ( 5535): 	at jf.onSucceeded(:com.google.android.gms.dynamite_cronetdynamite@231818047@23.18.18 (190800-0):0)
+11-03 17:46:41.136 W/GLSUser ( 5535): 	at ie.run(:com.google.android.gms.dynamite_cronetdynamite@231818047@23.18.18 (190800-0):4)
+11-03 17:46:41.136 W/GLSUser ( 5535): 	... 6 more
+11-03 17:46:41.136 W/GLSUser ( 5535): Caused by: dzfz: Protocol message contained an invalid tag (zero).
+11-03 17:46:41.136 W/GLSUser ( 5535): 	at dzdb.k(:com.google.android.gms@231818047@23.18.18 (190800-535401451):13)
+11-03 17:46:41.136 W/GLSUser ( 5535): 	at dzha.c(:com.google.android.gms@231818047@23.18.18 (190800-535401451):47)
+11-03 17:46:41.136 W/GLSUser ( 5535): 	at dzha.h(:com.google.android.gms@231818047@23.18.18 (190800-535401451):45)
+11-03 17:46:41.136 W/GLSUser ( 5535): 	at dzfd.A(:com.google.android.gms@231818047@23.18.18 (190800-535401451):2)
+11-03 17:46:41.136 W/GLSUser ( 5535): 	at dzex.f(:com.google.android.gms@231818047@23.18.18 (190800-535401451):0)
+11-03 17:46:41.136 W/GLSUser ( 5535): 	at dzcx.d(:com.google.android.gms@231818047@23.18.18 (190800-535401451):0)
+11-03 17:46:41.136 W/GLSUser ( 5535): 	at dzcx.c(:com.google.android.gms@231818047@23.18.18 (190800-535401451):0)
+11-03 17:46:41.136 W/GLSUser ( 5535): 	at dzcx.n(:com.google.android.gms@231818047@23.18.18 (190800-535401451):0)
+11-03 17:46:41.136 W/GLSUser ( 5535): 	at avwn.h(:com.google.android.gms@231818047@23.18.18 (190800-535401451):7)
+11-03 17:46:41.136 W/GLSUser ( 5535): 	at avwn.f(:com.google.android.gms@231818047@23.18.18 (190800-535401451):1)
+11-03 17:46:41.136 W/GLSUser ( 5535): 	... 9 more
+11-03 17:46:41.141 I/NetworkScheduler.Stats( 5535): Task com.google.android.gms/com.google.android.gms.auth.account.be.legacy.AuthCronService finished executing. cause:5 result: 3 elapsed_millis: 127 uptime_millis: 127 exec_start_elapsed_seconds: 210 [CONTEXT service_id=218 ]
+11-03 17:46:41.412 D/ActivityManager(  545): freezing 4587 com.google.android.apps.messaging
+11-03 17:46:41.413 D/ActivityManager(  545): freezing 1623 android.process.acore
+11-03 17:46:41.705 D/StatusBarIconController(  912): ignoring old pipeline callbacks, because the new mobile icons are enabled
+11-03 17:46:42.706 D/StatusBarIconController(  912): ignoring old pipeline callbacks, because the new mobile icons are enabled
+11-03 17:46:42.709 W/linker64( 7442): type=1400 audit(0.0:3023): avc:  denied  { ioctl } for  path="/proc/7391/stat" dev="proc" ino=74532 ioctlcmd=0x5401 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tclass=file permissive=0 app=it.xonos.ma
+11-03 17:46:42.709 W/linker64( 7442): type=1400 audit(0.0:3024): avc:  denied  { ioctl } for  path="/proc/7391/cmdline" dev="proc" ino=74530 ioctlcmd=0x5401 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tclass=file permissive=0 app=it.xonos.ma
+11-03 17:46:42.709 W/linker64( 7442): type=1400 audit(0.0:3025): avc:  denied  { ioctl } for  path="/proc/7442/stat" dev="proc" ino=76351 ioctlcmd=0x5401 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tclass=file permissive=0 app=it.xonos.ma
+11-03 17:46:42.709 W/linker64( 7442): type=1400 audit(0.0:3026): avc:  denied  { ioctl } for  path="/proc/7442/cmdline" dev="proc" ino=76849 ioctlcmd=0x5401 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tclass=file permissive=0 app=it.xonos.ma
+11-03 17:46:42.890 V/AudioMediaPlayerWrapper( 1120): onPlaybackStateChanged(): it.xonos.ma : PlaybackState {state=PLAYING(3), position=3006, buffered position=3006, speed=1.0, updated=212391, actions=3145651, custom actions=[], active item id=0, error=null}
+11-03 17:46:42.890 D/AudioMediaPlayerWrapper( 1120): it.xonos.ma Only Title and Artist info sync for metadata
+11-03 17:46:42.891 V/AudioMediaPlayerWrapper( 1120): trySendMediaUpdate(): Metadata has been updated for it.xonos.ma
+11-03 17:46:42.891 D/MediaPlayerList( 1120): sendMediaUpdate state=PlaybackState {state=PLAYING(3), position=3008, buffered position=3006, speed=1.0, updated=212393, actions=3145651, custom actions=[], active item id=0, error=null}
+11-03 17:46:42.891 D/AvrcpTargetJni( 1120): sendMediaUpdateNative
+11-03 17:46:42.891 I/bt_stack( 1120): [INFO:avrcp_service.cc(515)] virtual void bluetooth::avrcp::AvrcpService::SendMediaUpdate(bool, bool, bool) track_changed=0 :  play_state=1 :  queue=0
+11-03 17:46:42.891 V/AudioMediaPlayerWrapper( 1120): onPlaybackStateChanged(): it.xonos.ma : PlaybackState {state=PLAYING(3), position=3006, buffered position=3006, speed=1.0, updated=212391, actions=3145651, custom actions=[], active item id=0, error=null}
+11-03 17:46:42.892 D/AudioMediaPlayerWrapper( 1120): it.xonos.ma Only Title and Artist info sync for metadata
+11-03 17:46:42.893 V/AudioMediaPlayerWrapper( 1120): trySendMediaUpdate(): Metadata has been updated for it.xonos.ma
+11-03 17:46:42.893 D/MediaPlayerList( 1120): sendMediaUpdate state=PlaybackState {state=PLAYING(3), position=3010, buffered position=3006, speed=1.0, updated=212395, actions=3145651, custom actions=[], active item id=0, error=null}
+11-03 17:46:42.893 D/MediaControlGattService( 1120): updatePlayerState: playbackState= PLAYING
+11-03 17:46:42.893 W/MediaControlGattService( 1120): Feature PLAYBACK_SPEED(BIT 8) support: true
+11-03 17:46:42.893 W/MediaControlGattService( 1120): Feature PLAYBACK_SPEED(BIT 8) support: true
+11-03 17:46:42.893 W/MediaControlGattService( 1120): Feature PLAYBACK_SPEED(BIT 8) support: true
+11-03 17:46:42.893 W/MediaControlGattService( 1120): Feature TRACK_POSITION(BIT 7) support: true
+11-03 17:46:42.893 W/MediaControlGattService( 1120): Feature TRACK_POSITION_NOTIFY support: true
+11-03 17:46:42.893 W/MediaControlGattService( 1120): Feature MEDIA_STATE(BIT 17) support: true
+11-03 17:46:42.893 W/MediaControlGattService( 1120): Feature MEDIA_STATE(BIT 17) support: true
+11-03 17:46:42.894 W/MediaControlGattService( 1120): Feature PLAYER_NAME(BIT 1) support: true
+11-03 17:46:42.894 W/MediaControlGattService( 1120): Feature PLAYER_NAME(BIT 1) support: true
+11-03 17:46:42.894 W/MediaControlGattService( 1120): Feature MEDIA_CONTROL_POINT_OPCODES_SUPPORTED(BIT 19) support: true
+11-03 17:46:42.894 W/MediaControlGattService( 1120): Feature MEDIA_STATE(BIT 17) support: true
+11-03 17:46:42.894 W/MediaControlGattService( 1120): Feature MEDIA_STATE(BIT 17) support: true
+11-03 17:46:42.894 W/MediaControlGattService( 1120): Feature SEEKING_SPEED(BIT 9) support: true
+11-03 17:46:42.894 W/MediaControlGattService( 1120): Feature SEEKING_SPEED(BIT 9) support: true
+11-03 17:46:42.894 W/MediaControlGattService( 1120): Feature SEEKING_SPEED(BIT 9) support: true
+11-03 17:46:44.183 D/OomAdjuster(  545): Not killing cached processes
+11-03 17:46:45.894 V/AudioMediaPlayerWrapper( 1120): onPlaybackStateChanged(): it.xonos.ma : PlaybackState {state=PLAYING(3), position=6010, buffered position=6010, speed=1.0, updated=215395, actions=3145651, custom actions=[], active item id=0, error=null}
+11-03 17:46:45.895 D/AudioMediaPlayerWrapper( 1120): it.xonos.ma Only Title and Artist info sync for metadata
+11-03 17:46:45.895 V/AudioMediaPlayerWrapper( 1120): trySendMediaUpdate(): Metadata has been updated for it.xonos.ma
+11-03 17:46:45.895 D/MediaPlayerList( 1120): sendMediaUpdate state=PlaybackState {state=PLAYING(3), position=6012, buffered position=6010, speed=1.0, updated=215397, actions=3145651, custom actions=[], active item id=0, error=null}
+11-03 17:46:45.895 D/AvrcpTargetJni( 1120): sendMediaUpdateNative
+11-03 17:46:45.895 I/bt_stack( 1120): [INFO:avrcp_service.cc(515)] virtual void bluetooth::avrcp::AvrcpService::SendMediaUpdate(bool, bool, bool) track_changed=0 :  play_state=1 :  queue=0
+11-03 17:46:45.896 V/AudioMediaPlayerWrapper( 1120): onPlaybackStateChanged(): it.xonos.ma : PlaybackState {state=PLAYING(3), position=6010, buffered position=6010, speed=1.0, updated=215395, actions=3145651, custom actions=[], active item id=0, error=null}
+11-03 17:46:45.896 D/AudioMediaPlayerWrapper( 1120): it.xonos.ma Only Title and Artist info sync for metadata
+11-03 17:46:45.897 V/AudioMediaPlayerWrapper( 1120): trySendMediaUpdate(): Metadata has been updated for it.xonos.ma
+11-03 17:46:45.897 D/MediaPlayerList( 1120): sendMediaUpdate state=PlaybackState {state=PLAYING(3), position=6014, buffered position=6010, speed=1.0, updated=215399, actions=3145651, custom actions=[], active item id=0, error=null}
+11-03 17:46:45.897 D/MediaControlGattService( 1120): updatePlayerState: playbackState= PLAYING
+11-03 17:46:45.897 W/MediaControlGattService( 1120): Feature PLAYBACK_SPEED(BIT 8) support: true
+11-03 17:46:45.897 W/MediaControlGattService( 1120): Feature PLAYBACK_SPEED(BIT 8) support: true
+11-03 17:46:45.897 W/MediaControlGattService( 1120): Feature PLAYBACK_SPEED(BIT 8) support: true
+11-03 17:46:45.897 W/MediaControlGattService( 1120): Feature TRACK_POSITION(BIT 7) support: true
+11-03 17:46:45.897 W/MediaControlGattService( 1120): Feature TRACK_POSITION_NOTIFY support: true
+11-03 17:46:45.897 W/MediaControlGattService( 1120): Feature MEDIA_STATE(BIT 17) support: true
+11-03 17:46:45.897 W/MediaControlGattService( 1120): Feature MEDIA_STATE(BIT 17) support: true
+11-03 17:46:45.898 W/MediaControlGattService( 1120): Feature PLAYER_NAME(BIT 1) support: true
+11-03 17:46:45.898 W/MediaControlGattService( 1120): Feature PLAYER_NAME(BIT 1) support: true
+11-03 17:46:45.898 W/MediaControlGattService( 1120): Feature MEDIA_CONTROL_POINT_OPCODES_SUPPORTED(BIT 19) support: true
+11-03 17:46:45.898 W/MediaControlGattService( 1120): Feature MEDIA_STATE(BIT 17) support: true
+11-03 17:46:45.898 W/MediaControlGattService( 1120): Feature MEDIA_STATE(BIT 17) support: true
+11-03 17:46:45.898 W/MediaControlGattService( 1120): Feature SEEKING_SPEED(BIT 9) support: true
+11-03 17:46:45.898 W/MediaControlGattService( 1120): Feature SEEKING_SPEED(BIT 9) support: true
+11-03 17:46:45.898 W/MediaControlGattService( 1120): Feature SEEKING_SPEED(BIT 9) support: true
+11-03 17:46:47.449 I/netd    (  358): tetherGetStats() -> {[]} <0.45ms>
+11-03 17:46:47.451 I/netd    (  358): bandwidthSetGlobalAlert(2097152) <0.09ms>
+11-03 17:46:47.454 I/netd    (  358): bandwidthRemoveInterfaceQuota(eth0) <0.54ms>
+11-03 17:46:47.455 I/netd    (  358): bandwidthSetInterfaceQuota(eth0, 9223372036854775807) <0.56ms>
+11-03 17:46:47.456 I/netd    (  358): bandwidthRemoveInterfaceQuota(eth0) <0.46ms>
+11-03 17:46:47.457 I/netd    (  358): bandwidthSetInterfaceQuota(eth0, 9223372036854775807) <0.63ms>
+11-03 17:46:47.709 W/linker64( 7442): type=1400 audit(0.0:3027): avc:  denied  { ioctl } for  path="/proc/7391/stat" dev="proc" ino=74532 ioctlcmd=0x5401 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tclass=file permissive=0 app=it.xonos.ma
+11-03 17:46:47.709 W/linker64( 7442): type=1400 audit(0.0:3028): avc:  denied  { ioctl } for  path="/proc/7391/cmdline" dev="proc" ino=74530 ioctlcmd=0x5401 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tclass=file permissive=0 app=it.xonos.ma
+11-03 17:46:47.709 W/linker64( 7442): type=1400 audit(0.0:3029): avc:  denied  { ioctl } for  path="/proc/7442/stat" dev="proc" ino=76351 ioctlcmd=0x5401 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tclass=file permissive=0 app=it.xonos.ma
+11-03 17:46:47.709 W/linker64( 7442): type=1400 audit(0.0:3030): avc:  denied  { ioctl } for  path="/proc/7442/cmdline" dev="proc" ino=76849 ioctlcmd=0x5401 scontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tcontext=u:r:untrusted_app:s0:c192,c256,c512,c768 tclass=file permissive=0 app=it.xonos.ma
+11-03 17:46:48.708 W/JobService( 3192): onNetworkChanged() not implemented in com.android.voicemail.impl.scheduling.TaskSchedulerJobService. Must override in a subclass.
+11-03 17:46:48.709 D/StatusBarIconController(  912): ignoring old pipeline callbacks, because the new mobile icons are enabled
+11-03 17:46:48.722 D/EGL_emulation(  912): app_time_stats: avg=2200.20ms min=43.42ms max=8355.24ms count=4
+11-03 17:46:48.899 V/AudioMediaPlayerWrapper( 1120): onPlaybackStateChanged(): it.xonos.ma : PlaybackState {state=PLAYING(3), position=9015, buffered position=9015, speed=1.0, updated=218400, actions=3145651, custom actions=[], active item id=0, error=null}
+11-03 17:46:48.900 D/AudioMediaPlayerWrapper( 1120): it.xonos.ma Only Title and Artist info sync for metadata
+11-03 17:46:48.901 V/AudioMediaPlayerWrapper( 1120): trySendMediaUpdate(): Metadata has been updated for it.xonos.ma
+11-03 17:46:48.901 D/MediaPlayerList( 1120): sendMediaUpdate state=PlaybackState {state=PLAYING(3), position=9018, buffered position=9015, speed=1.0, updated=218403, actions=3145651, custom actions=[], active item id=0, error=null}
+11-03 17:46:48.901 D/AvrcpTargetJni( 1120): sendMediaUpdateNative
+11-03 17:46:48.901 I/bt_stack( 1120): [INFO:avrcp_service.cc(515)] virtual void bluetooth::avrcp::AvrcpService::SendMediaUpdate(bool, bool, bool) track_changed=0 :  play_state=1 :  queue=0
+11-03 17:46:48.901 V/AudioMediaPlayerWrapper( 1120): onPlaybackStateChanged(): it.xonos.ma : PlaybackState {state=PLAYING(3), position=9015, buffered position=9015, speed=1.0, updated=218400, actions=3145651, custom actions=[], active item id=0, error=null}
+11-03 17:46:48.902 D/AudioMediaPlayerWrapper( 1120): it.xonos.ma Only Title and Artist info sync for metadata
+11-03 17:46:48.903 V/AudioMediaPlayerWrapper( 1120): trySendMediaUpdate(): Metadata has been updated for it.xonos.ma
+11-03 17:46:48.903 D/MediaPlayerList( 1120): sendMediaUpdate state=PlaybackState {state=PLAYING(3), position=9020, buffered position=9015, speed=1.0, updated=218405, actions=3145651, custom actions=[], active item id=0, error=null}
+11-03 17:46:48.903 D/MediaControlGattService( 1120): updatePlayerState: playbackState= PLAYING
+11-03 17:46:48.903 W/MediaControlGattService( 1120): Feature PLAYBACK_SPEED(BIT 8) support: true
+11-03 17:46:48.903 W/MediaControlGattService( 1120): Feature PLAYBACK_SPEED(BIT 8) support: true
+11-03 17:46:48.903 W/MediaControlGattService( 1120): Feature PLAYBACK_SPEED(BIT 8) support: true
+11-03 17:46:48.903 W/MediaControlGattService( 1120): Feature TRACK_POSITION(BIT 7) support: true
+11-03 17:46:48.903 W/MediaControlGattService( 1120): Feature TRACK_POSITION_NOTIFY support: true
+11-03 17:46:48.903 W/MediaControlGattService( 1120): Feature MEDIA_STATE(BIT 17) support: true
+11-03 17:46:48.903 W/MediaControlGattService( 1120): Feature MEDIA_STATE(BIT 17) support: true
+11-03 17:46:48.904 W/MediaControlGattService( 1120): Feature PLAYER_NAME(BIT 1) support: true
+11-03 17:46:48.904 W/MediaControlGattService( 1120): Feature PLAYER_NAME(BIT 1) support: true
+11-03 17:46:48.904 W/MediaControlGattService( 1120): Feature MEDIA_CONTROL_POINT_OPCODES_SUPPORTED(BIT 19) support: true
+11-03 17:46:48.904 W/MediaControlGattService( 1120): Feature MEDIA_STATE(BIT 17) support: true
+11-03 17:46:48.904 W/MediaControlGattService( 1120): Feature MEDIA_STATE(BIT 17) support: true
+11-03 17:46:48.904 W/MediaControlGattService( 1120): Feature SEEKING_SPEED(BIT 9) support: true
+11-03 17:46:48.904 W/MediaControlGattService( 1120): Feature SEEKING_SPEED(BIT 9) support: true
+11-03 17:46:48.905 W/MediaControlGattService( 1120): Feature SEEKING_SPEED(BIT 9) support: true
+11-03 17:46:49.786 D/OomAdjuster(  545): Not killing cached processes
+11-03 17:46:51.599 W/ProcessStats(  545): Tracking association SourceState{6a63a61 com.google.android.gms.persistent/10127 ImpBg #12943} whose proc state 6 is better than process ProcessState{2427cac com.google.android.gms/10127 pkg=com.google.android.gms} proc state 8 (9 skipped)
+11-03 17:46:51.601 I/NetworkScheduler.Stats( 5535): Task com.google.android.gms/com.google.android.gms.droidguard.DroidGuardGcmTaskService started execution. cause:7 exec_start_elapsed_seconds: 221 [CONTEXT service_id=218 ]
+11-03 17:46:51.605 I/NetworkScheduler.Stats( 5535): Task com.google.android.gms/com.google.android.gms.droidguard.DroidGuardGcmTaskService finished executing. cause:7 result: 1 elapsed_millis: 8 uptime_millis: 8 exec_start_elapsed_seconds: 221 [CONTEXT service_id=218 ]
+11-03 17:46:51.611 I/resolv  (  358): GetAddrInfoHandler::run: {101 786533 101 983141 10127 0}
+11-03 17:46:51.612 I/resolv  (  358): res_nmkquery: (QUERY, IN, AAAA)
+11-03 17:46:51.612 I/resolv  (  358): res_nmkquery: (QUERY, IN, A)
+11-03 17:46:51.612 I/resolv  (  358): resolv_cache_lookup: FOUND IN CACHE entry=0x7a2bccab4790
+11-03 17:46:51.612 I/resolv  (  358): doQuery: rcode=0, ancount=8, return value=404
+11-03 17:46:51.621 I/resolv  (  358): res_nsend: used send_dg 308 terrno: 0
+11-03 17:46:51.621 I/resolv  (  358): doQuery: rcode=0, ancount=8, return value=308
+11-03 17:46:51.622 D/TrafficStats( 3034): tagSocket(113) with statsTag=0x1803, statsUid=10127
+11-03 17:46:51.623 I/NetworkScheduler.Stats( 5535): Task com.google.android.gms/com.google.android.gms.tapandpay.gcmtask.TapAndPayGcmTaskService started execution. cause:5 exec_start_elapsed_seconds: 221 [CONTEXT service_id=218 ]
+11-03 17:46:51.627 I/NetworkScheduler.Stats( 5535): Task com.google.android.gms/com.google.android.gms.tapandpay.gcmtask.TapAndPayGcmTaskService finished executing. cause:5 result: 1 elapsed_millis: 11 uptime_millis: 11 exec_start_elapsed_seconds: 221 [CONTEXT service_id=218 ]
+11-03 17:46:51.692 I/XonosServer( 7391): Xonos: suona=true posizione=11.809 s brano=01 Tone 1
+11-03 17:46:51.694 I/MediaController( 7391): Release efda5b8 [AndroidXMedia3/1.11.1] [emu64xa, sdk_gphone64_x86_64, Google, 34] [media3.common, media3.session]
+11-03 17:46:51.699 I/RemoteProvisionSysSvc(  545): getRegistration(android.hardware.security.keymint.IRemotelyProvisionedComponent/default)
+11-03 17:46:51.714 D/EGL_emulation( 7391): app_time_stats: avg=6282.36ms min=412.80ms max=12151.93ms count=2
+11-03 17:46:51.723 D/TelephonyManager( 1136): requestModemActivityInfo: Sending result to app: ModemActivityInfo{ mTimestamp=221224 mSleepTimeMs=0 mIdleTimeMs=221196 mActivityStatsTechSpecificInfo=[{mRat=UNKNOWN,mFrequencyRange=UNKNOWN,mTxTimeMs[]=[0, 0, 0, 0, 0],mRxTimeMs=0}]}
+11-03 17:46:51.723 D/StatusBarIconController(  912): ignoring old pipeline callbacks, because the new mobile icons are enabled
+11-03 17:46:51.741 D/ActivityManager(  545): sync unfroze 3745 com.google.android.rkpdapp for 6
+11-03 17:46:51.746 I/RegistrationProxy(  545): onServiceConnected: com.android.rkpdapp.service.RemoteProvisioningService
+11-03 17:46:51.930 I/servicemanager(    0): Found android.hardware.security.keymint.IRemotelyProvisionedComponent/default in device VINTF manifest.
+11-03 17:46:51.755 I/RegistrationProxy(  545): IGetRegistrationCallback.onSuccess
+11-03 17:46:51.757 I/RemoteProvisionSysSvc(  545): Fetching key 10127 for client 82924382
+11-03 17:46:51.757 I/RegistrationProxy(  545): getKeyAsync operation started with callback 182145855
+11-03 17:46:51.757 I/RkpdRegistrationBinder( 3745): Key requested for : android.hardware.security.keymint.IRemotelyProvisionedComponent/default, clientUid: 1017, keyId: 10127, callback: 77368611
+11-03 17:46:51.758 I/RkpdRegistrationBinder( 3745): Key successfully assigned to client
+11-03 17:46:51.758 I/RemoteProvisionSysSvc(  545): Successfully fetched key for client 82924382
+11-03 17:46:51.765 D/BiometricService(  545): Sensor ID(4), oemStrength: 15, updatedStrength: 15, modality 8, state: 0, cookie: 0, sensorId 4, hasEnrollments: false cannot participate in Keystore operations
+11-03 17:46:51.765 D/BiometricService(  545): Sensor ID(0), oemStrength: 15, updatedStrength: 15, modality 2, state: 0, cookie: 0, sensorId 0, hasEnrollments: false cannot participate in Keystore operations
+11-03 17:46:51.887 W/libc    ( 3034): Access denied finding property "persist.adb.tls_server.enable"
+11-03 17:46:51.887 W/libc    ( 3034): Access denied finding property "service.adb.tls.port"
+11-03 17:46:51.891 W/SystemServiceRegistry( 3034): No service published for: persistent_data_block
+11-03 17:46:51.885 W/IntentService[D( 3034): type=1400 audit(0.0:3031): avc:  denied  { read } for  name="u:object_r:system_adbd_prop:s0" dev="tmpfs" ino=292 scontext=u:r:gmscore_app:s0:c512,c768 tcontext=u:object_r:system_adbd_prop:s0 tclass=file permissive=0 app=com.google.android.gms
+11-03 17:46:51.885 W/IntentService[D( 3034): type=1400 audit(0.0:3032): avc:  denied  { read } for  name="u:object_r:adbd_prop:s0" dev="tmpfs" ino=60 scontext=u:r:gmscore_app:s0:c512,c768 tcontext=u:object_r:adbd_prop:s0 tclass=file permissive=0 app=com.google.android.gms
+11-03 17:46:51.902 V/AudioMediaPlayerWrapper( 1120): onPlaybackStateChanged(): it.xonos.ma : PlaybackState {state=PLAYING(3), position=12018, buffered position=12018, speed=1.0, updated=221403, actions=3145651, custom actions=[], active item id=0, error=null}
+11-03 17:46:51.902 D/AudioMediaPlayerWrapper( 1120): it.xonos.ma Only Title and Artist info sync for metadata
+11-03 17:46:51.903 V/AudioMediaPlayerWrapper( 1120): trySendMediaUpdate(): Metadata has been updated for it.xonos.ma
+11-03 17:46:51.903 D/MediaPlayerList( 1120): sendMediaUpdate state=PlaybackState {state=PLAYING(3), position=12020, buffered position=12018, speed=1.0, updated=221405, actions=3145651, custom actions=[], active item id=0, error=null}
+11-03 17:46:51.903 D/MediaControlGattService( 1120): updatePlayerState: playbackState= PLAYING
+11-03 17:46:51.903 W/MediaControlGattService( 1120): Feature PLAYBACK_SPEED(BIT 8) support: true
+11-03 17:46:51.903 W/MediaControlGattService( 1120): Feature PLAYBACK_SPEED(BIT 8) support: true
+11-03 17:46:51.903 W/MediaControlGattService( 1120): Feature PLAYBACK_SPEED(BIT 8) support: true
+11-03 17:46:51.903 W/MediaControlGattService( 1120): Feature TRACK_POSITION(BIT 7) support: true
+11-03 17:46:51.903 W/MediaControlGattService( 1120): Feature TRACK_POSITION_NOTIFY support: true
+11-03 17:46:51.903 W/MediaControlGattService( 1120): Feature MEDIA_STATE(BIT 17) support: true
+11-03 17:46:51.903 W/MediaControlGattService( 1120): Feature MEDIA_STATE(BIT 17) support: true
+11-03 17:46:51.904 W/MediaControlGattService( 1120): Feature PLAYER_NAME(BIT 1) support: true
+11-03 17:46:51.904 W/MediaControlGattService( 1120): Feature PLAYER_NAME(BIT 1) support: true
+11-03 17:46:51.904 W/MediaControlGattService( 1120): Feature MEDIA_CONTROL_POINT_OPCODES_SUPPORTED(BIT 19) support: true
+11-03 17:46:51.904 W/MediaControlGattService( 1120): Feature MEDIA_STATE(BIT 17) support: true
+11-03 17:46:51.904 W/MediaControlGattService( 1120): Feature MEDIA_STATE(BIT 17) support: true
+11-03 17:46:51.904 W/MediaControlGattService( 1120): Feature SEEKING_SPEED(BIT 9) support: true
+11-03 17:46:51.904 W/MediaControlGattService( 1120): Feature SEEKING_SPEED(BIT 9) support: true
+11-03 17:46:51.904 W/MediaControlGattService( 1120): Feature SEEKING_SPEED(BIT 9) support: true
+11-03 17:46:51.905 V/AudioMediaPlayerWrapper( 1120): onPlaybackStateChanged(): it.xonos.ma : PlaybackState {state=PLAYING(3), position=12018, buffered position=12018, speed=1.0, updated=221403, actions=3145651, custom actions=[], active item id=0, error=null}
+11-03 17:46:51.907 D/AudioMediaPlayerWrapper( 1120): it.xonos.ma Only Title and Artist info sync for metadata
+11-03 17:46:51.907 V/AudioMediaPlayerWrapper( 1120): trySendMediaUpdate(): Metadata has been updated for it.xonos.ma
+11-03 17:46:51.907 D/MediaPlayerList( 1120): sendMediaUpdate state=PlaybackState {state=PLAYING(3), position=12024, buffered position=12018, speed=1.0, updated=221409, actions=3145651, custom actions=[], active item id=0, error=null}
+11-03 17:46:51.907 D/AvrcpTargetJni( 1120): sendMediaUpdateNative
+11-03 17:46:51.907 I/bt_stack( 1120): [INFO:avrcp_service.cc(515)] virtual void bluetooth::avrcp::AvrcpService::SendMediaUpdate(bool, bool, bool) track_changed=0 :  play_state=1 :  queue=0
+11-03 17:46:51.921 I/resolv  (  358): GetAddrInfoHandler::run: {101 786533 101 983141 10127 0}
+11-03 17:46:51.921 D/TrafficStats( 3034): tagSocket(119) with statsTag=0x1809, statsUid=-1
+11-03 17:46:51.922 D/TrafficStats( 3034): tagSocket(119) with statsTag=0x1809, statsUid=-1
+11-03 17:46:51.923 D/TrafficStats( 3034): tagSocket(119) with statsTag=0x1809, statsUid=-1

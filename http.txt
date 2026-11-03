@@ -1,0 +1,9 @@
+127.0.0.1 - - [03/Nov/2026 17:44:05] "HEAD /xonos-server-x86_64.zip HTTP/1.1" 200 -
+127.0.0.1 - - [03/Nov/2026 17:44:05] "GET /xonos-server-x86_64.zip.sig HTTP/1.1" 200 -
+127.0.0.1 - - [03/Nov/2026 17:44:05] "GET /xonos-server-x86_64.zip HTTP/1.1" 200 -
+127.0.0.1 - - [03/Nov/2026 17:46:25] "HEAD /xonos-server-x86_64.zip HTTP/1.1" 200 -
+127.0.0.1 - - [03/Nov/2026 17:46:25] "GET /xonos-server-x86_64.zip.sig HTTP/1.1" 200 -
+127.0.0.1 - - [03/Nov/2026 17:46:25] "GET /xonos-server-x86_64.zip HTTP/1.1" 200 -
+127.0.0.1 - - [03/Nov/2026 17:47:04] "HEAD /xonos-server-x86_64.zip HTTP/1.1" 200 -
+127.0.0.1 - - [03/Nov/2026 17:47:10] "GET /xonos-server-x86_64.zip.sig HTTP/1.1" 200 -
+127.0.0.1 - - [03/Nov/2026 17:47:10] "GET /xonos-server-x86_64.zip HTTP/1.1" 200 -

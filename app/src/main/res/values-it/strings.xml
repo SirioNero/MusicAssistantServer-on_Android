@@ -356,7 +356,7 @@
     <string name="journal_help">Xonos ricorda cosa ascolti su questo telefono per proporti musica nella Home. La cronologia resta su questo telefono per un anno, fuori dai backup di Android, e non viene mai condivisa.</string>
     <string name="journal_off">Spenta: Xonos non registra nuovi ascolti.</string>
     <string name="journal_empty">Ancora nessun ascolto.</string>
-    <string name="journal_since">Dal %1$s</string>
+    <string name="journal_since">Primo ascolto: %1$s</string>
     <string name="journal_clear">Cancella la cronologia</string>
     <string name="journal_clear_title">Cancellare la cronologia degli ascolti?</string>
     <string name="journal_clear_text">Xonos dimentica tutti gli ascolti salvati su questo telefono, e i consigli della Home ripartono da zero. Non si può annullare.</string>

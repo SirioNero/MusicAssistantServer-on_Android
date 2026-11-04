@@ -65,7 +65,9 @@ prima di cominciare: le cose scritte qui sono già state verificate, non vanno r
   pubblici: le password non si scrivono nei file e non passano da `GITHUB_ENV` (nei log un secret
   diventa `***`, una variabile no). Senza chiave la release resta non firmata (come la vuole F-Droid);
   con `XONOS_DEBUG_SIGNING=true` (le misure) si firma con la chiave di debug.
-- Licenza AGPL-3.0-or-later (`LICENSE`). Tutte le librerie sono Apache 2.0, compatibili. F-Droid: testi,
+- Licenza AGPL-3.0-or-later (`LICENSE`). Tutte le librerie sono Apache 2.0, compatibili; il carattere Manrope (dalla
+  0.1.58, `res/font`, istanze statiche 600 e 800 fatte da `tools/font/make_font.py`) è OFL 1.1, testo in
+  `app/src/main/assets/licenses/OFL-Manrope.txt`. F-Droid: testi,
   icona e schermate in `fastlane/metadata/android/` (inglese e italiano), ricetta da proporre a
   fdroiddata in `tools/fdroid/it.xonos.ma.yml` (toglie `tools/` prima di compilare: le prove usano un
   mirror di Maven Central che lo scanner di F-Droid non accetta), workflow "Come F-Droid" che compila
@@ -157,6 +159,10 @@ prima di cominciare: le cose scritte qui sono già state verificate, non vanno r
 | `phone/NsdFinder.kt` | Cerca Music Assistant nella rete con NsdManager (`_mass._tcp`) |
 | `phone/ui/` | Le schermate in Compose/Material 3. Tutto comune tranne `Platform.kt` (indietro, pixel della copertina, "schermata piena" per le misure, id per UiAutomator). `ServicesScreens.kt` disegna i moduli di MA dai campi; `Markdown.kt` i loro testi; `DevicesSheet.kt` "Suona su"; `PlaylistSheet.kt` "Aggiungi a una playlist" |
 | `baselineprofile/` | Le prove sull'emulatore: avvio, scorrimento di Home e Libreria, lettore, playlist lunga; genera il Baseline Profile |
+| `phone/model/HomeRows.kt` | Le righe di `music/recommendations` messe nelle sezioni della Home (Riprendi, scelte recenti, Per te, Riscopri, Dalla tua libreria, Altro), riconosciute dal servizio e dall'item_id; lo stesso ordine nel menu dell'auto (`forCar`) |
+| `data/LastListen.kt`, `phone/model/ResumePlan.kt` | Riprendi: la copia sul telefono dell'ultimo ascolto (`last-listen.json`) e la decisione fra play della coda, play_index, coda da rifare, primo brano (`ResumeCheckKt`) |
+| `data/taste/Journal.kt`, `playback/Listening.kt` | La cronologia degli ascolti (un file JSONL al mese per server in `noBackupFilesDir/per-te/`, un anno) e i viaggi in auto; `Listening` la scrive dallo stato del lettore (`JournalCheckKt`, `ListeningCheckKt`) |
+| `phone/ui/ArtPalette.kt`, `Motion.kt`, `Space.kt`, `HomeCards.kt` | Colori dalla copertina (OKLCH, contrasti controllati da `PaletteCheckKt`), movimenti, spazi, le schede della Home |
 | `Language.kt`, `Texts.kt` | Le lingue (senza Android); `wrap()` e `describe()`, che racconta un `Problem` nella lingua scelta |
 
 ## Music Assistant: cose verificate (2.10.8 e 2.11.0b7)
@@ -1127,6 +1133,48 @@ del workflow `indagine-0157` della sessione.
   modalità Spotify Connect), «Connect salto dopo un avvio a freddo» 0,27 s sulla stessa sessione, «Connect che non parte,
   ripiego» 8,69 s; il resto come nella 0.1.56.
 - Da portare in myCar: `SkipPlan` (Stay a fine coda), insieme al resto di 0.1.53-0.1.56.
+
+## Home «Per te» (0.1.58, ramo `claude/home-per-te`)
+
+L'utente: "Lavora su grafica app, playlist e home, deve suggerire delle playlist in base alle canzoni ascoltate, ai
+generi, e nuove scoperte, e anche un riprendi da dove hai lasciato … pensando in grande". Scelte dell'utente: fonti anche
+MusicBrainz/ListenBrainz e Last.fm con la sua chiave gratuita; cronologia degli ascolti di un anno (telefono, auto, myCar);
+scoperte sia novità dei suoi artisti sia artisti nuovi simili; aspetto scuro coi colori delle copertine. Il piano intero, in
+7 tappe, è in `docs/per-te-piano.md` (difetti trovati dai giudici in fondo). La 0.1.58 è la tappa 1 più il cuore visivo
+della 2; è solo app (pacchetto del server invariato, 2.10.8-12).
+- **Home**: testata col saluto e la data; «Riprendi» (`hero_resume`): dalla coda del telefono di Music Assistant
+  (`player_queues/get`, posizione e brano) o, se il server è fermo o la coda è sparita, dalla copia `last-listen.json`
+  scritta da `Listening` solo per una coda sentita suonare in questo processo (Music Assistant all'avvio può ridare una coda
+  vecchia); 14 giorni (30 per podcast e audiolibri); Nascondi con annulla. Poi le scelte recenti (`quick_pick`, solo
+  contesti: album, playlist, artisti, radio), Per te (i due Mix infiniti di MA, `music/playlists/library_items` con
+  provider builtin, e le righe di MA), i tuoi generi (`genreTiles`), In corso (podcast e audiobook: posizioni con
+  `item_by_uri` solo per le prime 5, mai per gli episodi di Spotify; «Segna come ascoltato» con `music/mark_played` e
+  annulla), Riscopri, Dalla tua libreria (3 righe), Altro (le altre righe di MA, caricate solo se si apre: possono chiamare
+  Spotify). Cache della Home v2 (`HomeSnapshot`, legge la v1). La Home si mostra subito dal disco (`showLocal`), poi si
+  aggiorna (`refreshHome`).
+- **Aspetto**: base scura neutra, ambra `#FFC27A` del marchio; `ArtTheme` sovrascrive primary/containers con la palette
+  della copertina (animata 600 ms); Manrope per titoli (800) e sottotitoli (600), il resto col carattere di sistema;
+  forme 6/10/14/20/28 e per tipo (artista tondo); `Motion`: pagine avanti 260 ms, indietro 180, schede 150, dissolvenze di
+  100 ms con le animazioni spente; mini-lettore a pillola con la barra di avanzamento; nel lettore «In riproduzione da»
+  (`MaPlayer.EXTRA_SOURCE_*`, tocco = apre album/playlist, non radio e audiolibri) e «Suona su» in basso. Il testo
+  del brano si chiede da un `LaunchedEffect` (prima la risposta poteva perdersi).
+- **Cronologia**: `Journal` (JSONL, un file al mese per server, potato dopo un anno, fuori dai backup), un ascolto finito
+  o saltato dopo 6 s, luogo «auto» dai bisogni CAR di `ServerKeeper` (`recordCars`, `car-sessions.json`). Impostazioni ›
+  Per te: interruttore (`Settings.journalEnabled`, acceso di serie), conteggi, mesi, Cancella (lascia `last-listen.json`).
+  Logcat: solo numeri («Per te: diario, ascolti scritti … N», «Per te: artisti N, con generi N, con MBID N», una volta).
+  `XonosApp.onCreate` apre `Listening` (nessuna lettura all'avvio).
+- **Auto**: le righe di «Per te» nell'ordine della Home, coi nomi di Xonos (`MenuLabels.row`, 16 righe note; le altre col
+  nome di MA).
+- Verificato: banco JVM con Docker MA 2.10.8 (HomeRowsCheck 73, ResumeCheck 65, JournalCheck, ListeningCheck 36,
+  PaletteCheck 34, PhoneCheck 91, MenuCheck, LongListCheck e le altre); 33 scene in it ed en, alcune in tutte le 9 lingue
+  (scene nuove `home-resume`, `home-first-run`, `home-starting`, `settings-per-te`, `settings-per-te-clear`,
+  `phone-server-outdated`). Non provato: sul telefono (Manrope, colori veri, movimenti, TalkBack, Gearslip coi nomi nuovi),
+  il Baseline Profile non rigenerato.
+- Da portare in myCar: `MaPlayer.EXTRA_SOURCE_*`, `MenuLabels.row` e `HomeRows` (Menu.kt lo importa).
+- Prossime tappe (piano): 2 playlist (pagina, collage, nuova, rinomina); 3 pacchetto 2.10.8-13 (cronologia sul server,
+  salvataggi della coda, Spotify protetto, Riprendi in auto); 4 i mix del motore; 5 ListenBrainz novità e scoperte; 6
+  Last.fm; 7 riordino e rifiniture. Scelte mie dette all'utente: mix come 6 playlist fisse di MA, Spotify me/top 6
+  richieste a settimana, finestra di Riprendi 14/30 giorni.
 
 ## Lingue
 

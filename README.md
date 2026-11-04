@@ -198,6 +198,8 @@ The same address is in the app, at the bottom of Settings, with buttons to copy 
 
 Xonos is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License, version 3 or (at your option) any later version. See [LICENSE](LICENSE).
 
+The app carries the Manrope typeface (SIL Open Font License 1.1, [text](app/src/main/assets/licenses/OFL-Manrope.txt)).
+
 The Music Assistant package for the phone holds other free software, each part under its own license (Apache 2.0, LGPL, MIT, PSF and more): `NOTICE.txt` inside it lists them, with where to find their source.
 
 Xonos is an independent project, not affiliated with Music Assistant, Gearslip or any music service.
@@ -328,6 +330,8 @@ La misma dirección está en la app, al final de Ajustes, con botones para copia
 ### Licencia
 
 Xonos es software libre: puedes redistribuirlo y modificarlo según los términos de la GNU Affero General Public License, versión 3 o (a tu elección) cualquier versión posterior. Consulta [LICENSE](LICENSE).
+
+La app incluye la tipografía Manrope (SIL Open Font License 1.1, [texto](app/src/main/assets/licenses/OFL-Manrope.txt)).
 
 El paquete de Music Assistant para el teléfono contiene otro software libre, cada parte con su licencia (Apache 2.0, LGPL, MIT, PSF y otras): `NOTICE.txt`, dentro del paquete, las enumera junto con dónde encontrar su código fuente.
 
@@ -460,6 +464,8 @@ La même adresse est dans l’app, en bas des Réglages, avec des boutons pour l
 
 Xonos est un logiciel libre : vous pouvez le redistribuer et le modifier selon les termes de la GNU Affero General Public License, version 3 ou (à votre choix) toute version ultérieure. Voir [LICENSE](LICENSE).
 
+L’application embarque la police Manrope (SIL Open Font License 1.1, [texte](app/src/main/assets/licenses/OFL-Manrope.txt)).
+
 Le paquet Music Assistant pour le téléphone contient d’autres logiciels libres, chacun sous sa licence (Apache 2.0, LGPL, MIT, PSF et d’autres) : `NOTICE.txt`, dans le paquet, les énumère avec l’endroit où trouver leur code source.
 
 Xonos est un projet indépendant, sans lien avec Music Assistant, Gearslip ni aucun service de musique.
@@ -590,6 +596,8 @@ Dieselbe Adresse steht in der App, unten in den Einstellungen, mit Knöpfen zum 
 ### Lizenz
 
 Xonos ist freie Software: Du kannst sie unter den Bedingungen der GNU Affero General Public License, Version 3 oder (nach deiner Wahl) jeder späteren Version, weitergeben und verändern. Siehe [LICENSE](LICENSE).
+
+Die App enthält die Schrift Manrope (SIL Open Font License 1.1, [Text](app/src/main/assets/licenses/OFL-Manrope.txt)).
 
 Das Music-Assistant-Paket für das Handy enthält weitere freie Software, jeder Teil unter seiner eigenen Lizenz (Apache 2.0, LGPL, MIT, PSF und andere): `NOTICE.txt` im Paket listet sie auf, mit dem Ort ihres Quellcodes.
 
@@ -722,6 +730,8 @@ Lo stesso indirizzo è nell’app, in fondo alle Impostazioni, con i pulsanti pe
 
 Xonos è software libero: puoi ridistribuirlo e modificarlo secondo i termini della GNU Affero General Public License, versione 3 o (a tua scelta) successiva. Vedi [LICENSE](LICENSE).
 
+L’app contiene il carattere Manrope (SIL Open Font License 1.1, [testo](app/src/main/assets/licenses/OFL-Manrope.txt)).
+
 Il pacchetto di Music Assistant per il telefono contiene altro software libero, ogni parte con la sua licenza (Apache 2.0, LGPL, MIT, PSF e altre): `NOTICE.txt`, dentro il pacchetto, le elenca con dove trovarne il sorgente.
 
 Xonos è un progetto indipendente, non legato a Music Assistant, a Gearslip né ad alcun servizio musicale.
@@ -852,6 +862,8 @@ O mesmo endereço está no app, no fim das Configurações, com botões para cop
 ### Licença
 
 O Xonos é software livre: você pode redistribuí-lo e modificá-lo nos termos da GNU Affero General Public License, versão 3 ou (a seu critério) qualquer versão posterior. Veja [LICENSE](LICENSE).
+
+O app inclui a fonte Manrope (SIL Open Font License 1.1, [texto](app/src/main/assets/licenses/OFL-Manrope.txt)).
 
 O pacote do Music Assistant para o telefone contém outros softwares livres, cada parte com a sua licença (Apache 2.0, LGPL, MIT, PSF e outras): o `NOTICE.txt`, dentro do pacote, lista todos, com onde encontrar o código-fonte.
 

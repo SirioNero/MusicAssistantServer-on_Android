@@ -806,7 +806,15 @@ async def _play_media_cases(kit: Any) -> tuple[bool, str]:  # noqa: PLR0915
         kit.load_s[0] = slow
 
     def key(err: BaseException | None) -> str:
-        return "nessun errore" if err is None else f"{type(err).__name__} {getattr(err, 'translation_key', None)}"
+        if err is None:
+            return "nessun errore"
+        if hasattr(err, "translation_key"):
+            return f"{type(err).__name__} {err.translation_key}"
+        # un errore che non è di Music Assistant è un guasto della coda finta: dove e cosa
+        import traceback  # noqa: PLC0415
+        frames = traceback.extract_tb(err.__traceback__)[-3:]
+        where = " < ".join(f"{Path(f.filename).name}:{f.lineno} {f.name}" for f in reversed(frames))
+        return f"{type(err).__name__} ({str(err)[:160]}) a {where}"
 
     if not isinstance(get_global_cache_value("available_providers"), set):
         return False, "play_media: available_providers non c'è nella cache globale (il server non ha servizi caricati?)"

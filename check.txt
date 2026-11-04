@@ -1,0 +1,14 @@
+server 0.0.0, schema 65, base http://127.0.0.1:8095
+primo account creato
+spotify: primo passo xonos_client_id (Your Spotify app's Client ID)
+spotify: poi authenticate, client_id ['0123456789abcdef0123456789abcdef'], ritorno ['https://music-assistant.io/callback']
+brani: 2; suono 01 Tone 1 (library://track/1)
+Sendspin: Music Assistant (localhost), ruoli ['player@v1']
+lettore Sendspin xonos-check-f202caa4 pronto
+stream/start: {'codec': 'pcm', 'sample_rate': 48000, 'channels': 2, 'bit_depth': 16}
+play_media → primo audio: 0.58 s
+stream/end
+niente da suonare: 2 There is nothing to play here: track not found in library: 999999
+formati annunciati dal server: [{'codec': 'pcm', 'sample_rate': 48000, 'channels': 2, 'bit_depth': 16}]
+audio arrivato: 21.8 s (4185600 byte), livello RMS 5016 su 32767
+suono

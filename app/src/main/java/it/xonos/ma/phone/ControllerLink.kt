@@ -51,7 +51,9 @@ class ControllerLink : PlayerLink, Player.Listener {
             return
         }
         val metadata = c.mediaMetadata
-        val extras = metadata.extras
+        // Gli extra dalla voce della coda, che cambia con lei: Media3 non confronta il contenuto degli extra, e con lo
+        // stesso brano ripartito da un'altra sorgente c.mediaMetadata resterebbe quello di prima ("In riproduzione da").
+        val extras = c.currentMediaItem?.mediaMetadata?.extras ?: metadata.extras
         val sourceUri = extras?.getString(MaPlayer.EXTRA_SOURCE_URI)
         val timeline = c.currentTimeline
         val queue = (0 until timeline.windowCount).map { i ->

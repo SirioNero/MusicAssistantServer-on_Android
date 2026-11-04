@@ -2,6 +2,8 @@ package it.xonos.ma.phone.model
 
 import it.xonos.ma.data.LastListen
 import it.xonos.ma.data.Library
+import it.xonos.ma.data.MaException
+import it.xonos.ma.data.Problem
 import it.xonos.ma.data.QueueState
 
 /**
@@ -19,7 +21,8 @@ sealed interface ResumeStep {
 
     /**
      * (c) La coda non c'è più o è un'altra: la si rifà da [media] (la sorgente, o il brano da solo) partendo da
-     * [startItem], poi si sposta a [seekSec] se serve. Casuale e ripeti come erano.
+     * [startItem], poi si sposta a [seekSec] se serve. Casuale e ripeti come erano. Con [fromStart] ("Ricomincia") un
+     * episodio o un audiolibro parte dall'inizio, non dal punto ricordato.
      */
     data class Rebuild(
         override val queueId: String,
@@ -28,6 +31,7 @@ sealed interface ResumeStep {
         val seekSec: Int,
         val shuffle: Boolean = false,
         val repeat: String = "off",
+        val fromStart: Boolean = false,
     ) : ResumeStep
 
     /** Il primo brano della coda, dall'inizio (una coda arrivata in fondo che Music Assistant non sa finita). */
@@ -47,7 +51,8 @@ sealed interface ResumeStep {
  * - (a) Coda con la stessa voce (queue_item_id) e al massimo [SAME_SPOT_S] di differenza: player_queues/play.
  * - (b) Stessa voce, ma la copia è più recente e più avanti di oltre [SAME_SPOT_S]: play_index con seek.
  * - (c) Coda assente o diversa (e la copia più recente): play_media della sorgente con start_item, poi seek oltre
- *   [SEEK_FROM_S]; senza sorgente il brano da solo.
+ *   [SEEK_FROM_S]; il brano da solo senza sorgente, e se la sorgente non sa partire da un brano ([START_ITEM_SOURCES]:
+ *   un artista, un genere, una coda dinamica come un'Infinite Mix) o non ha più quel brano.
  * - Coda finita: "Ascolta di nuovo". Una copia di un altro Music Assistant non conta.
  *
  * Senza Android: ResumeCheck lo prova da solo e contro il Music Assistant di prova.
@@ -70,6 +75,13 @@ object ResumePlan {
     const val SPOKEN_DAYS = 30
 
     private const val DAY_MS = 86_400_000L
+
+    /**
+     * Le sorgenti con cui start_item vale (Music Assistant 2.10.8, media_resolver): album, playlist e podcast partono da
+     * quel brano. Un artista e un genere lo ignorano e mescolano (suonerebbe un altro brano), una coda dinamica (Infinite
+     * Mix, vedi [LastListen.dynamic]) non risolve brani, e con un audiolibro start_item è un capitolo.
+     */
+    val START_ITEM_SOURCES = setOf("album", "playlist", "podcast")
 
     /** La copia, se è di questo Music Assistant ([serverId]); null se è di un altro o se il server non si sa. */
     fun usable(listen: LastListen?, serverId: String): LastListen? =
@@ -142,26 +154,32 @@ object ResumePlan {
         val live = queue?.takeIf { it.items > 0 && it.current != null }
         if (own == null) return live?.current?.let { ResumeStep.PlayIndex(queueId, it.id, 0) }
         if (live?.current?.id == own.queueItemId) return ResumeStep.PlayIndex(queueId, own.queueItemId, 0)
-        return rebuild(own.copy(positionSec = 0.0, ended = false), queueId)
+        return rebuild(own.copy(positionSec = 0.0, ended = false), queueId, fromStart = own.spoken)
     }
 
-    /** (c): dalla sorgente partendo dal brano, o il brano da solo; una coda finita riparte dall'inizio. */
-    private fun rebuild(listen: LastListen, queueId: String): ResumeStep {
+    /**
+     * (c): dalla sorgente partendo dal brano, o il brano da solo; una coda finita riparte dall'inizio della sorgente.
+     * [fromStart]: vedi [ResumeStep.Rebuild].
+     */
+    private fun rebuild(listen: LastListen, queueId: String, fromStart: Boolean = false): ResumeStep {
         val source = listen.source?.takeIf { it.uri != listen.track.uri }
         if (listen.ended) {
             return ResumeStep.ListenAgain(
                 ResumeStep.Rebuild(queueId, source?.uri ?: listen.track.uri, null, 0, listen.shuffle, listen.repeat),
             )
         }
+        // Solo una sorgente che sa partire da quel brano: le altre suonerebbero un brano diverso, e il punto finirebbe lì.
+        val from = source?.takeIf { it.mediaType in START_ITEM_SOURCES && !listen.dynamic }
         // Una radio non ha un punto: si riprende e basta.
         val seek = if (listen.track.mediaType != "radio" && listen.positionSec > SEEK_FROM_S) listen.positionSec.toInt() else 0
         return ResumeStep.Rebuild(
             queueId = queueId,
-            media = source?.uri ?: listen.track.uri,
-            startItem = if (source != null) listen.track.uri else null,
+            media = from?.uri ?: listen.track.uri,
+            startItem = if (from != null) listen.track.uri else null,
             seekSec = seek,
             shuffle = listen.shuffle,
             repeat = listen.repeat,
+            fromStart = fromStart,
         )
     }
 }
@@ -176,13 +194,35 @@ suspend fun ResumeStep.run(library: Library) {
         is ResumeStep.PlayIndex -> library.playIndex(queueId, queueItemId, seekSec)
         is ResumeStep.First -> library.playIndex(queueId, 0)
         is ResumeStep.Rebuild -> {
-            // Col casuale acceso start_item non mette il brano in testa: lo si spegne prima e lo si riaccende dopo.
-            library.setShuffle(queueId, false)
-            library.playMedia(queueId, listOf(media), startItem = startItem)
-            if (seekSec > 0) library.seek(queueId, seekSec)
-            if (shuffle) library.setShuffle(queueId, true)
-            library.setRepeat(queueId, repeat)
+            // Dalla 2.10 il casuale va a play_media, che tiene tutta la sorgente col brano per primo. Prima della 2.10
+            // (senza "shuffle") col casuale acceso start_item non metteva il brano in testa: spento prima, acceso dopo.
+            val shuffled = shuffle && library.shufflesOnPlay
+            // Una coda dinamica (Infinite Mix) non lascia cambiare casuale e ripeti: play_media li sistema da sé.
+            if (!shuffled) refusedIsFine { library.setShuffle(queueId, false) }
+            try {
+                library.playMedia(queueId, listOf(media), startItem = startItem, shuffle = shuffled, fromStart = fromStart)
+            } catch (e: MaException) {
+                // La sorgente non ha (più) il brano: arrivato con "Suona dopo" o "Aggiungi in coda", o tolto da una
+                // playlist. Allora il brano da solo.
+                if (startItem == null || e.problem != Problem.REFUSED) throw e
+                library.playMedia(queueId, listOf(startItem), fromStart = fromStart)
+            }
+            if (seekSec > 0) library.seek(queueId, seekSec) else if (fromStart) library.backToStart(queueId)
+            if (shuffle && !shuffled) library.setShuffle(queueId, true)
+            refusedIsFine { library.setRepeat(queueId, repeat) }
         }
         is ResumeStep.ListenAgain -> then.run(library)
+    }
+}
+
+/**
+ * Un comando che Music Assistant può rifiutare senza che sia un errore: su una coda dinamica casuale e ripeti non si
+ * cambiano. La rete che cade resta un errore.
+ */
+private suspend fun refusedIsFine(command: suspend () -> Unit) {
+    try {
+        command()
+    } catch (e: MaException) {
+        if (e.problem != Problem.REFUSED) throw e
     }
 }

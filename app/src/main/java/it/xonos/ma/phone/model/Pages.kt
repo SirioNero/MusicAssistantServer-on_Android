@@ -76,7 +76,10 @@ class HomePage : Page() {
     /** Episodi e audiolibri a metà; i primi [IN_PROGRESS_DETAILS] con la posizione. */
     var inProgress by mutableStateOf<Load<List<MaItem>>>(Load.Loading)
 
-    /** Gli episodi appena segnati come ascoltati: uri → secondi a cui erano arrivati, per "Annulla". */
+    /**
+     * Gli episodi appena segnati come ascoltati, che aspettano la fine di "Annulla" (uri → secondi a cui erano arrivati,
+     * se In corso lo dice): Music Assistant lo sa solo dopo.
+     */
     val marked = mutableStateMapOf<String, Int>()
 
     /** Le playlist Infinite Mix di Music Assistant, in testa al carosello Per te. */
@@ -104,6 +107,13 @@ class HomePage : Page() {
 
     /** Il Music Assistant di questa Home (server_id), se si sa: la copia di un altro server non vale. */
     internal var serverId: String? = null
+
+    /**
+     * La copia sul telefono può essere di un altro Music Assistant: la Home è di un server appena scelto (allora anche la
+     * Home salvata è del server di prima), o non ce n'è una salvata. Finché non si sa a quale server si è collegati
+     * ([serverId]), "Riprendi" non la mostra.
+     */
+    internal var otherServer = false
 
     /** "Riprendi" come lo dice la coda di Music Assistant (l'ultima volta che la si è letta). */
     internal var queueResume: LastListen? = null

@@ -107,6 +107,16 @@ class Settings(context: Context) {
             prefs.edit().putString(KEY_HIDDEN_RESUME, value).apply()
         }
 
+    /**
+     * I numeri della diagnosi di "Per te" (quanti artisti, con generi, con MBID) e per quale Music Assistant e versione
+     * di Xonos li si è contati (vedi playback/Listening.kt, savedDiagnosis): si contano una volta per versione.
+     */
+    var perTeDiagnosis: String?
+        get() = prefs.getString(KEY_PER_TE_DIAGNOSIS, null)
+        set(value) {
+            prefs.edit().putString(KEY_PER_TE_DIAGNOSIS, value).apply()
+        }
+
     /** La sezione "Altro" della Home aperta: si ricorda tra un'apertura e l'altra. */
     var homeMoreOpen: Boolean
         get() = prefs.getBoolean(KEY_HOME_MORE, false)
@@ -138,6 +148,7 @@ class Settings(context: Context) {
         private const val KEY_JOURNAL = "journal_enabled"
         private const val KEY_HIDDEN_RESUME = "hidden_resume"
         private const val KEY_HOME_MORE = "home_more_open"
+        private const val KEY_PER_TE_DIAGNOSIS = "per_te_diagnosis"
 
         const val DEFAULT_NAME = "Xonos"
 

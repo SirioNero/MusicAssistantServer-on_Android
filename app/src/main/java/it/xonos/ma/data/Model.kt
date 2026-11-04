@@ -399,6 +399,11 @@ data class QueueState(
     val ended: Boolean = false,
     /** Quando Music Assistant ha segnato [elapsedSec], in secondi dal 1970 (`elapsed_time_last_updated`); 0 se non si sa. */
     val elapsedUpdatedAt: Double = 0.0,
+    /**
+     * La coda è dinamica (`is_dynamic`): si riempie da sé da una sorgente come un'Infinite Mix. Allora casuale e ripeti
+     * non si cambiano, e i brani non vengono da una sorgente con un ordine. Falso prima della 2.10.8.
+     */
+    val dynamic: Boolean = false,
 ) {
     val playing: Boolean get() = state == "playing"
 
@@ -436,6 +441,7 @@ data class QueueState(
                     .objects().mapNotNull(QueueSource::from),
                 ended = o.optBoolean("ended"),
                 elapsedUpdatedAt = o.optDouble("elapsed_time_last_updated", 0.0).takeUnless { it.isNaN() } ?: 0.0,
+                dynamic = o.optBoolean("is_dynamic"),
             )
         }
     }

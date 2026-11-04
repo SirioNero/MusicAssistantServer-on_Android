@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -37,6 +38,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -93,11 +95,17 @@ import kotlin.math.ceil
 // le card del carosello Per te e delle righe, quelle di "In corso", le tessere dei generi e gli scheletri che le
 // sostituiscono mentre arrivano. La Home le mette in fila (HomeScreen.kt).
 
-/** L'altezza dell'eroe e della sua copertina. */
+/**
+ * L'altezza dell'eroe e della sua copertina. Sono minime: con il testo di sistema più grande l'eroe cresce, così il
+ * tasto Riprendi, il menu e la riga in basso restano interi.
+ */
 private val HERO_HEIGHT = 184.dp
 private val HERO_COVER = 120.dp
 
-/** Le Scelte rapide: tessere alte 56 dp con gli angoli da 10. */
+/**
+ * Le Scelte rapide: tessere alte 56 dp con gli angoli da 10. Restano così anche con il testo di sistema grande: il nome
+ * passa a una riga con i puntini (una tessera più alta spezzerebbe le parole a metà, "Emozio-ni").
+ */
 private val TILE_HEIGHT = 56.dp
 private val TILE_CORNER = 10.dp
 
@@ -145,7 +153,7 @@ internal fun HeroResume(listen: LastListen, page: HomePage, model: PhoneModel, m
             modifier.testTag("hero_resume")
                 .fillMaxWidth()
                 .padding(horizontal = Space.gutter)
-                .height(HERO_HEIGHT)
+                .heightIn(min = HERO_HEIGHT)
                 .onSizeChanged { width = it.width.coerceAtLeast(1) }
                 .graphicsLayer {
                     translationX = offset.value
@@ -172,8 +180,10 @@ internal fun HeroResume(listen: LastListen, page: HomePage, model: PhoneModel, m
                     )
                 },
         ) {
-            Column(Modifier.fillMaxSize().padding(start = Space.large, end = Space.large, top = Space.large, bottom = Space.medium)) {
-                Row(Modifier.height(HERO_COVER)) {
+            Column(Modifier.fillMaxWidth().padding(start = Space.large, end = Space.large, top = Space.large, bottom = Space.medium)) {
+                // Alta quanto la copertina, o quanto le scritte e i tasti se con il testo grande non ci stanno: la
+                // colonna di destra riempie l'altezza e i tasti restano in fondo.
+                Row(Modifier.height(IntrinsicSize.Min).heightIn(min = HERO_COVER)) {
                     Cover(url, listen.track.mediaType, Modifier.size(HERO_COVER), RoundedCornerShape(CoverCorners.hero - Space.small), 44.dp)
                     Spacer(Modifier.width(Space.medium))
                     Column(Modifier.weight(1f).fillMaxHeight()) {
@@ -223,35 +233,51 @@ internal fun HeroResume(listen: LastListen, page: HomePage, model: PhoneModel, m
     }
 }
 
-/** Riprendi (o Ascolta di nuovo), Apri (se c'è un posto da aprire e lo spazio) e il menu con Apri, Ricomincia e Nascondi. */
+/**
+ * Riprendi (o Ascolta di nuovo), Apri (se c'è un posto da aprire e lo spazio) e il menu con Apri, Ricomincia e Nascondi.
+ * Il menu si misura per primo e resta sempre intero: se lo spazio non basta, è la scritta di Riprendi a rimpicciolirsi.
+ */
 @Composable
 private fun HeroButtons(listen: LastListen, page: HomePage, model: PhoneModel) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        val label = stringResource(if (listen.ended) R.string.hero_listen_again else R.string.hero_resume)
-        val description = stringResource(R.string.hero_a11y, listen.track.name)
-        Button(
-            onClick = { model.resume(page) },
-            enabled = !model.starting,
-            modifier = Modifier.height(48.dp).testTag("hero_resume_play").semantics { contentDescription = description },
-            contentPadding = PaddingValues(start = Space.medium, end = Space.large),
-            colors = ButtonDefaults.buttonColors(
-                disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
-                disabledContentColor = MaterialTheme.colorScheme.onPrimary,
-            ),
-        ) {
-            if (model.starting) {
-                CircularProgressIndicator(Modifier.size(20.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
-            } else {
-                Icon(XIcons.Play, null, Modifier.size(22.dp))
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+            val label = stringResource(if (listen.ended) R.string.hero_listen_again else R.string.hero_resume)
+            val description = stringResource(R.string.hero_a11y, listen.track.name)
+            Button(
+                onClick = { model.resume(page) },
+                enabled = !model.starting,
+                modifier = Modifier.height(48.dp).testTag("hero_resume_play").semantics { contentDescription = description },
+                contentPadding = PaddingValues(start = Space.medium, end = Space.large),
+                colors = ButtonDefaults.buttonColors(
+                    disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                    disabledContentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
+            ) {
+                if (model.starting) {
+                    CircularProgressIndicator(Modifier.size(20.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
+                } else {
+                    Icon(XIcons.Play, null, Modifier.size(22.dp))
+                }
+                Spacer(Modifier.width(6.dp))
+                // Se non ci sta ("Ascolta di nuovo", "Послушать снова", il testo di sistema grande) rimpicciolisce fino a
+                // 11 sp, poi i puntini.
+                Text(
+                    label,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    autoSize = TextAutoSize.StepBased(
+                        minFontSize = 11.sp,
+                        maxFontSize = MaterialTheme.typography.labelLarge.fontSize,
+                        stepSize = 0.5.sp,
+                    ),
+                )
             }
-            Spacer(Modifier.width(6.dp))
-            Text(label, maxLines = 1)
-        }
-        // "Apri" prende lo spazio che resta e, se non basta (tedesco, greco, russo), si accorcia: il menu resta sempre.
-        Box(Modifier.weight(1f)) {
-            if (PhoneModel.resumeContext(listen) != null) {
-                TextButton(onClick = { model.openResume(page) }, colors = ButtonDefaults.textButtonColors(contentColor = Color.White)) {
-                    Text(stringResource(R.string.hero_open), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // "Apri" prende lo spazio che resta e, se non basta (tedesco, greco, russo), si accorcia: il menu resta sempre.
+            Box(Modifier.weight(1f)) {
+                if (PhoneModel.resumeContext(listen) != null) {
+                    TextButton(onClick = { model.openResume(page) }, colors = ButtonDefaults.textButtonColors(contentColor = Color.White)) {
+                        Text(stringResource(R.string.hero_open), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
                 }
             }
         }

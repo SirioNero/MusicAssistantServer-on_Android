@@ -296,8 +296,8 @@ class Journal(
 ) {
     private val journalDir = File(dir, "journal")
 
-    /** Gli intervalli in auto, che ServerKeeper scrive: dicono il luogo degli ascolti. */
-    val cars = CarSessions(File(dir, CarSessions.FILE), clock)
+    /** Gli intervalli in auto (li segna il servizio, vedi Listening.carTrip): dicono il luogo degli ascolti. */
+    val cars = CarSessions(File(dir, CarSessions.FILE), enabled, clock)
 
     @Volatile private var prunedAt = 0L
 
@@ -331,7 +331,12 @@ class Journal(
     fun read(serverId: String, sinceMs: Long = clock() - KEEP_DAYS * DAY_MS): List<Listen> {
         val from = max(sinceMs, clock() - KEEP_DAYS * DAY_MS)
         val firstMonth = YearMonth.from(Instant.ofEpochMilli(from).atZone(zone))
+        // Lo stesso ascolto può essere scritto più volte, con lo stesso inizio e lo stesso brano: chiuso in pausa quando
+        // l'app poteva essere fermata e poi ripreso, o la copia di un ascolto rimasto a metà in un processo morto (vedi
+        // ListenRecorder). Vale la riga con più secondi, cioè la più avanti. Dove sta nell'elenco ogni inizio: due brani
+        // diversi cominciati nello stesso millisecondo quasi non capitano, e così costa poco.
         val out = ArrayList<Listen>()
+        val starts = HashMap<Long, Int>()
         for ((month, file) in months(serverId)) {
             if (month < firstMonth) continue
             try {
@@ -339,7 +344,16 @@ class Journal(
                     for (line in lines) {
                         if (line.isBlank()) continue
                         val listen = Listen.parse(line) ?: continue
-                        if (listen.timeMs >= from) out += listen
+                        if (listen.timeMs < from) continue
+                        val index = starts[listen.timeMs]
+                        when {
+                            index == null -> {
+                                starts[listen.timeMs] = out.size
+                                out += listen
+                            }
+                            out[index].uri == listen.uri -> if (listen.seconds >= out[index].seconds) out[index] = listen
+                            else -> out += listen
+                        }
                     }
                 }
             } catch (e: Exception) {
@@ -372,7 +386,10 @@ class Journal(
         return JournalCounts(listens, tracks.size, artists.size, first, bytes)
     }
 
-    /** Toglie i mesi finiti da più di un anno. Lo fa da sé una volta al giorno, scrivendo. */
+    /**
+     * Toglie i mesi finiti da più di un anno. Lo fa da sé una volta al giorno, scrivendo; e Listening all'avvio del
+     * processo, anche con la cronologia spenta (allora non si scrive niente).
+     */
     @Synchronized
     fun prune(nowMs: Long = clock()) {
         prunedAt = nowMs
@@ -438,25 +455,33 @@ class Journal(
 }
 
 /**
- * Quando il telefono era in auto (Gearslip o un'altra app che comanda il lettore da fuori): coppie inizio-fine in
- * `per-te/car-sessions.json`. Le scrive ServerKeeper col bisogno CAR ([begin] e [end]); il diario le legge per dire
- * "auto" o "telefono". Una sessione rimasta aperta (l'app chiusa senza [end]) conta al massimo [MAX_OPEN_MS].
+ * Quando il telefono era in auto (Gearslip, Android Auto: un'app che sfoglia il menu da fuori): coppie inizio-fine in
+ * `per-te/car-sessions.json`. Le segna il servizio ([begin] e [end], vedi Listening.carTrip); il diario le legge per
+ * dire "auto" o "telefono". Con la cronologia spenta ([enabled]) non comincia nessun intervallo; la fine sì, per
+ * chiudere quello già cominciato.
+ *
+ * Un'istanza sola per processo (vedi Listening.open). Un intervallo rimasto aperto nel file è di un processo che non c'è
+ * più (chiuso senza [end]: telefono spento, aggiornamento): finisce quando è nato questo, al massimo dopo [MAX_OPEN_MS].
+ * Quello aperto da questo processo invece dura finché l'auto c'è, anche per un viaggio lungo.
  */
-class CarSessions(private val file: File, private val clock: () -> Long = System::currentTimeMillis) {
+class CarSessions(
+    private val file: File,
+    private val enabled: () -> Boolean = { true },
+    private val clock: () -> Long = System::currentTimeMillis,
+) {
     private var loaded = false
     private val sessions = ArrayList<LongArray>()
     private var open: Long? = null
 
+    /** Quando è nato questo processo: da qui in poi l'auto c'è solo se la segna lui. */
+    private val bornAt = clock()
+
     /** L'auto si è collegata: comincia un intervallo, se non ce n'è già uno aperto. */
     @Synchronized
     fun begin(nowMs: Long = clock()) {
+        if (!enabled()) return
         load()
-        val started = open
-        if (started != null) {
-            if (nowMs - started <= MAX_OPEN_MS) return
-            // Aperta da troppo: l'app era stata chiusa senza fine. Si chiude al massimo che può valere.
-            sessions += longArrayOf(started, started + MAX_OPEN_MS)
-        }
+        if (open != null) return
         open = nowMs
         save()
     }
@@ -466,7 +491,7 @@ class CarSessions(private val file: File, private val clock: () -> Long = System
     fun end(nowMs: Long = clock()) {
         load()
         val started = open ?: return
-        sessions += longArrayOf(started, max(started, min(nowMs, started + MAX_OPEN_MS)))
+        sessions += longArrayOf(started, max(started, nowMs))
         open = null
         save()
     }
@@ -477,7 +502,7 @@ class CarSessions(private val file: File, private val clock: () -> Long = System
         load()
         val closed = sessions.map { it[0]..it[1] }
         val started = open ?: return closed
-        return closed + listOf(started..min(nowMs, started + MAX_OPEN_MS))
+        return closed + listOf(started..max(started, nowMs))
     }
 
     /** Vero se [timeMs] cade in un intervallo in auto. */
@@ -517,6 +542,11 @@ class CarSessions(private val file: File, private val clock: () -> Long = System
         } catch (e: Exception) {
             Log.w(TAG, "Auto: intervalli illeggibili (${e.javaClass.simpleName})")
         }
+        // Aperto da un processo di prima, che non l'ha chiuso: questo processo, appena nato, l'auto non l'ha ancora vista.
+        val inherited = open ?: return
+        sessions += longArrayOf(inherited, max(inherited, min(bornAt, inherited + MAX_OPEN_MS)))
+        open = null
+        save()
     }
 
     private fun save() {
@@ -538,7 +568,7 @@ class CarSessions(private val file: File, private val clock: () -> Long = System
     companion object {
         const val FILE = "car-sessions.json"
 
-        /** Più di così un viaggio senza fine non conta. */
+        /** Più di così un viaggio rimasto aperto da un processo di prima non conta. */
         const val MAX_OPEN_MS = 4 * 3_600_000L
 
         private const val MAX_SESSIONS = 5000
@@ -618,9 +648,20 @@ class ListenRecorder(
 
     private var pending: Pending? = null
 
+    /**
+     * L'ascolto in pausa chiuso da [flush] (l'app poteva essere fermata: la sua riga è già nel diario). Se l'app è rimasta
+     * e la stessa voce riprende prima della fine della pausa ([PAUSE_ENDS_MS]), è sempre lui: continua, e alla chiusura
+     * si riscrive con lo stesso inizio e più secondi (il diario tiene quella, vedi [Journal.read]).
+     */
+    private var flushed: Pending? = null
+
     /** Lo stato di adesso ([now] null: niente in corso, per esempio la coda vuota). */
     @Synchronized
     fun update(now: NowListening?, nowMs: Long) {
+        flushed?.let { old ->
+            flushed = null
+            if (pending == null && now != null && nowMs - old.aliveMs <= PAUSE_ENDS_MS && sameItem(now, old.now)) pending = old
+        }
         // Una pausa lunga: l'ascolto è finito lì, e chi riprende dopo comincia un ascolto nuovo.
         pending?.let { paused ->
             if (!paused.playing && nowMs - paused.aliveMs > PAUSE_ENDS_MS) {
@@ -630,10 +671,17 @@ class ListenRecorder(
         }
         val current = pending
         if (current != null) {
-            val same = now != null && now.serverId == current.now.serverId && now.queueId == current.now.queueId &&
-                now.queueItemId == current.now.queueItemId
-            if (same) {
-                advance(current, now!!.positionSec, nowMs)
+            if (now != null && sameItem(now, current.now)) {
+                // Dopo una pausa riparte dall'inizio ("Ricomincia", o Music Assistant che ha perso il punto), lontano da
+                // dove era arrivato: è un ascolto nuovo.
+                if (!current.playing && now.playing && now.positionSec < RESTART_BACK_S &&
+                    current.reached - now.positionSec > SKIP_BEFORE_S
+                ) {
+                    close(current, nextOnSameQueueAt = null)
+                    pending = Pending(now, nowMs).also { start(it, now, nowMs) }
+                    return
+                }
+                advance(current, now.positionSec, nowMs)
                 // Ripeti un brano: la stessa voce torna all'inizio dopo essere arrivata in fondo.
                 if (current.playing && finished(current) && now.positionSec + RESTART_BACK_S < current.reached) {
                     close(current, nextOnSameQueueAt = null)
@@ -663,12 +711,26 @@ class ListenRecorder(
         advance(current, null, nowMs)
         close(current, nextOnSameQueueAt = null)
         pending = null
+        if (!current.playing) flushed = current
     }
 
     /** Dimentica l'ascolto in corso senza scriverlo ("Cancella la cronologia"). */
     @Synchronized
     fun drop() {
         pending = null
+        flushed = null
+    }
+
+    /**
+     * L'ascolto in corso come lo scriverebbe la chiusura adesso, mai saltato (non si sa ancora), col suo Music
+     * Assistant; null se non c'è o non si è ancora sentito. Serve a non perderlo se il processo muore senza chiuderlo
+     * (vedi Listening): la chiusura vera ha lo stesso inizio e lo stesso brano, e il diario tiene quella.
+     */
+    @Synchronized
+    fun snapshot(): Pair<String, Listen>? {
+        val p = pending ?: return null
+        if (p.listened < MIN_LISTEN_S) return null
+        return p.now.serverId to listenOf(p, finished(p), skipped = false)
     }
 
     private fun start(p: Pending, now: NowListening, nowMs: Long) {
@@ -694,6 +756,13 @@ class ListenRecorder(
         }
         if (p.playing) {
             val delta = pos - p.lastPos
+            // Tornato indietro (ripeti un brano, "Ricomincia"): fin dove era arrivato prima, se da lì è ripartito
+            // dall'inizio e ha suonato sempre. Gli aggiornamenti arrivano ogni 30 s: senza, la fine del giro di prima non si
+            // vedrebbe. Con uno spostamento a metà brano la stima resta indietro, mai avanti.
+            if (position != null && delta < -SLACK_S) {
+                val before = p.lastPos + max(0.0, wall - pos)
+                p.reached = max(p.reached, if (duration > 0) min(before, duration) else before)
+            }
             p.listened += when {
                 // La posizione va avanti col tempo: tanto si è ascoltato (ferma vuol dire che aspetta l'audio).
                 delta >= 0 && delta <= wall + SLACK_S -> delta
@@ -721,27 +790,31 @@ class ListenRecorder(
         if (p.listened < MIN_LISTEN_S) return
         val done = finished(p)
         val skipped = !done && p.listened < SKIP_BEFORE_S && nextOnSameQueueAt != null && nextOnSameQueueAt - p.aliveMs <= SKIP_GAP_MS
+        onListen(p.now.serverId, listenOf(p, done, skipped))
+    }
+
+    private fun listenOf(p: Pending, done: Boolean, skipped: Boolean): Listen {
         val started = p.startedMs ?: p.createdMs
         val n = p.now
-        onListen(
-            n.serverId,
-            Listen(
-                timeMs = started,
-                uri = n.uri,
-                libraryUri = n.libraryUri,
-                name = n.name,
-                mediaType = n.mediaType,
-                artists = n.artists,
-                album = n.album,
-                durationSec = n.durationSec,
-                seconds = p.listened,
-                finished = done,
-                skipped = skipped,
-                context = n.context,
-                place = place(started),
-            ),
+        return Listen(
+            timeMs = started,
+            uri = n.uri,
+            libraryUri = n.libraryUri,
+            name = n.name,
+            mediaType = n.mediaType,
+            artists = n.artists,
+            album = n.album,
+            durationSec = n.durationSec,
+            seconds = p.listened,
+            finished = done,
+            skipped = skipped,
+            context = n.context,
+            place = place(started),
         )
     }
+
+    private fun sameItem(a: NowListening, b: NowListening) =
+        a.serverId == b.serverId && a.queueId == b.queueId && a.queueItemId == b.queueItemId
 
     companion object {
         const val SKIP_BEFORE_S = 30.0

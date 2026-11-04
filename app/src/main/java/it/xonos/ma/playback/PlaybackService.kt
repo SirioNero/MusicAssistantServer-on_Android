@@ -113,9 +113,8 @@ class PlaybackService : MediaLibraryService() {
         connectivity = getSystemService(ConnectivityManager::class.java)
         val settings = app.settings
         val artwork = Artwork(this)
-        // Fuori dal backup di Android. Il keeper segna i viaggi in auto nello stesso diario (il luogo degli ascolti).
+        // Fuori dal backup di Android. I viaggi in auto (il luogo degli ascolti) li segna [tripsChanged].
         listening = Listening.open(noBackupFilesDir) { app.settings.journalEnabled }
-        app.keeper.recordCars(listening.cars, listening.io)
 
         engine = AudioEngine(AndroidAudio::output, AndroidAudio::decoder, TimeFilter()) {
             Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO)
@@ -217,6 +216,10 @@ class PlaybackService : MediaLibraryService() {
         listening.flush()
         listenTick?.cancel()
         outside.clear()
+        if (trips.isNotEmpty()) {
+            trips.clear()
+            listening.carTrip(false)
+        }
         engaged = false
         app.keeper.release(Need.PLAYING, 0)
         app.keeper.release(Need.CAR, 0)
@@ -255,6 +258,7 @@ class PlaybackService : MediaLibraryService() {
     override fun onUnbind(intent: Intent?): Boolean {
         if (intent?.action == LEGACY_BROWSER) {
             outsideChanged { outside.removeAll { it.controllerVersion == MediaSession.ControllerInfo.LEGACY_CONTROLLER_VERSION } }
+            tripsChanged { trips.removeAll { it.controllerVersion == MediaSession.ControllerInfo.LEGACY_CONTROLLER_VERSION } }
         }
         super.onUnbind(intent)
         return true
@@ -325,15 +329,25 @@ class PlaybackService : MediaLibraryService() {
 
     /**
      * Quanti artisti della libreria hanno generi e un id di MusicBrainz: nel registro di Xonos che la persona condivide,
-     * per sapere su cosa potranno contare i consigli. Una volta sola, poco dopo il primo collegamento (la Home intanto
-     * ha caricato); solo la libreria di Music Assistant, nessuna richiesta ai servizi.
+     * per sapere su cosa potranno contare i consigli. Si contano poco dopo il primo collegamento (la Home intanto ha
+     * caricato), una volta per Music Assistant ([server]) e versione di Xonos: scaricano tutti gli artisti della libreria,
+     * anche in rete mobile. Negli altri processi solo la riga coi numeri salvati, una volta. Solo la libreria di Music
+     * Assistant, nessuna richiesta ai servizi.
      */
-    private fun diagnose() {
+    private fun diagnose(server: String) {
         if (diagnosed || diagnosis?.isActive == true) return
+        val key = "$server/${BuildConfig.VERSION_CODE}"
+        Listening.savedDiagnosis(app.settings.perTeDiagnosis, key)?.let { counts ->
+            Log.i(TAG, Listening.diagnosis(counts))
+            diagnosed = true
+            return
+        }
         diagnosis = scope.launch(Dispatchers.Default) {
             delay(DIAGNOSIS_DELAY_MS)
             try {
-                Log.i(TAG, Listening.diagnosis(Listening.artistCounts(app.repo)))
+                val counts = Listening.artistCounts(app.repo)
+                Log.i(TAG, Listening.diagnosis(counts))
+                app.settings.perTeDiagnosis = Listening.saveDiagnosis(key, counts)
                 diagnosed = true
             } catch (e: CancellationException) {
                 throw e
@@ -356,6 +370,22 @@ class PlaybackService : MediaLibraryService() {
         val after = outside.isNotEmpty()
         if (before == after) return
         if (after) app.keeper.hold(Need.CAR) else app.keeper.release(Need.CAR)
+    }
+
+    /**
+     * Chi sfoglia il menu da fuori (Gearslip, Android Auto): finché c'è, è un viaggio in auto, il luogo degli ascolti nel
+     * diario (vedi [Listening.carTrip]). Non basta comandare: cuffie, orologi e app come KDE Connect arrivano coi tasti
+     * (per Media3 restano collegati fino a 5 minuti dopo l'ultimo comando), e non sono l'auto. Nemmeno il Bluetooth, che
+     * all'accensione sfoglia tutte le app: un'autoradio solo Bluetooth conta come telefono.
+     */
+    private val trips = mutableSetOf<MediaSession.ControllerInfo>()
+
+    private fun tripsChanged(change: () -> Unit) {
+        if (destroyed) return
+        val before = trips.isNotEmpty()
+        change()
+        val after = trips.isNotEmpty()
+        if (before != after) listening.carTrip(after)
     }
 
     /** Come ci presentiamo a Music Assistant, deciso a ogni connessione (la rete può essere cambiata). */
@@ -421,7 +451,7 @@ class PlaybackService : MediaLibraryService() {
                 networkChanged = false
                 announcedName = name
                 sendspin.start(connection.url, app.settings.load().token, force)
-                diagnose()
+                diagnose(connection.server.id)
             }
             Connection.NotConfigured -> sendspin.stop()
             // Mentre si ricollega, l'audio già ricevuto continua a suonare.
@@ -655,13 +685,20 @@ class PlaybackService : MediaLibraryService() {
 
         override fun onDisconnected(session: MediaSession, controller: MediaSession.ControllerInfo) {
             outsideChanged { outside.remove(controller) }
+            tripsChanged { trips.remove(controller) }
         }
 
         override fun onGetLibraryRoot(
             session: MediaLibrarySession,
             browser: MediaSession.ControllerInfo,
             params: LibraryParams?,
-        ): ListenableFuture<LibraryResult<MediaItem>> = Futures.immediateFuture(LibraryResult.ofItem(tree.root(), params))
+        ): ListenableFuture<LibraryResult<MediaItem>> {
+            val pkg = browser.packageName
+            if (pkg != this@PlaybackService.packageName && pkg != SYSTEM_UI && pkg !in BLUETOOTH) {
+                tripsChanged { trips.add(browser) }
+            }
+            return Futures.immediateFuture(LibraryResult.ofItem(tree.root(), params))
+        }
 
         override fun onGetItem(
             session: MediaLibrarySession,
@@ -809,6 +846,9 @@ class PlaybackService : MediaLibraryService() {
         /** La ripresa dei media del sistema: si lega anche lei, ma non è qualcuno che ascolta. */
         const val SYSTEM_UI = "com.android.systemui"
 
+        /** Il Bluetooth del sistema (AOSP e quello di Google): sfoglia le app per l'autoradio, non è un viaggio. */
+        val BLUETOOTH = setOf("com.android.bluetooth", "com.google.android.bluetooth")
+
         /** I problemi di connessione che non passano da soli: il menu dell'auto non li aspetta. */
         val LASTING = setOf(
             Problem.BAD_TOKEN,
@@ -827,6 +867,7 @@ class PlaybackService : MediaLibraryService() {
         /**
          * La riga di diagnosi dei consigli (solo numeri) è già nel registro: una volta per processo, anche se il servizio
          * si ferma e riparte. Se non riesce (il server sul telefono fermato nel frattempo) si riprova al collegamento dopo.
+         * I numeri si contano una volta per versione (vedi [diagnose]).
          */
         @Volatile
         var diagnosed = false

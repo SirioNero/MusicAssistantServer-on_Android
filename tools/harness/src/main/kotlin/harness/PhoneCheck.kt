@@ -348,7 +348,63 @@ fun main(): Unit = runBlocking {
     withTimeoutOrNull(3_000) { while (offlineAlbums.items.isEmpty()) delay(10) }
     check("Cache: prima pagina degli album", offlineAlbums.items.size == 100 && offlineAlbums.loading, "${offlineAlbums.items.size}")
     check("Cache: Riprendi dalla copia, col server fermo", offlineHome.resume == heroListen && offline.resumeVisible(offlineHome))
+
+    // Il collegamento arriva dopo i 20 s di attesa: la Home dal disco non è fresca, e collegati si aggiorna da sola.
+    // Prima risultava fresca (le sezioni salvate sono "pronte") e restava quella del disco.
+    withTimeoutOrNull(40_000) { while (offlineHome.job?.isActive == true) delay(100) }
+    check("Home dal disco, Music Assistant mai arrivato: non è fresca", !offlineHome.fresh && offlineHome.recent is Load.Ready)
+    val loadedBefore = offlineHome.loadedAt
+    offlineSettings.save(Settings.Config(url, "", token))
+    offlineRepo.reconnect()
+    val updated = withTimeoutOrNull(40_000) {
+        offlineRepo.connection.first { it is Connection.Connected }
+        while (!offlineHome.fresh || offlineHome.job?.isActive == true) delay(100)
+        true
+    } == true
+    check("Collegato dopo i 20 s: la Home si aggiorna da sola", updated && offlineHome.loadedAt > loadedBefore, "fresca ${offlineHome.fresh}")
+    offlineSettings.save(Settings.Config("http://127.0.0.1:1", "", "x"))
     offlineRepo.release()
+
+    // Cambiato server: finché il nuovo non risponde, "Riprendi" non mostra la copia del server di prima (toccandola
+    // suonava altro). Un'app con la Home salvata e la copia di questo Music Assistant.
+    val otherCache = ScreenCache(Files.createTempDirectory("xonos-cache-other").toFile())
+    cache.read(PhoneModel.HOME_CACHE)?.let { otherCache.write(PhoneModel.HOME_CACHE, it) }
+    val otherSettings = Settings().also { it.save(Settings.Config("http://127.0.0.1:1", "", "x")) }
+    val otherRepo = MaRepository(otherSettings)
+    otherRepo.acquire()
+    fun otherModel(cacheOf: ScreenCache) =
+        PhoneModel(otherRepo, Library(otherRepo), otherSettings, cacheOf, FixedFinder(), "Xonos (prova)", { playerId }, MutableStateFlow(false), CoroutineScope(SupervisorJob() + main))
+            .also { it.lastListen = { lastCopy } }
+    val other = otherModel(otherCache)
+    val otherHome = other.page as HomePage
+    other.start(otherHome)
+    withTimeoutOrNull(3_000) { while (otherHome.resume == null) delay(10) }
+    check("Prima del cambio di server: Riprendi dalla copia", otherHome.resume == heroListen)
+    other.openSettings()
+    val change = other.page as SettingsPage
+    change.home = "http://127.0.0.1:2"
+    other.save(change)
+    other.back()
+    val changedHome = other.page as HomePage
+    other.start(changedHome)
+    delay(1_000)
+    check(
+        "Cambiato server, non ancora collegato: niente Riprendi del server di prima",
+        changedHome !== otherHome && changedHome.resume == null && !other.resumeVisible(changedHome),
+        "${changedHome.resume?.track?.name}",
+    )
+    // Riaperta l'app prima di collegarsi: la Home salvata non c'è più (cancellata dal cambio), la copia sì.
+    val restarted = otherModel(ScreenCache(Files.createTempDirectory("xonos-cache-empty").toFile()))
+    val reopenedHome = restarted.page as HomePage
+    restarted.start(reopenedHome)
+    delay(1_000)
+    check("Riaperta dopo il cambio, senza Home salvata: niente Riprendi finché non si sa il server", reopenedHome.resume == null)
+    // Collegati a un Music Assistant (questo, che è quello della copia): Riprendi torna.
+    otherSettings.save(Settings.Config(url, "", token))
+    otherRepo.reconnect()
+    val back = withTimeoutOrNull(30_000) { while (changedHome.resume == null) delay(100); true } == true
+    check("Collegati al server della copia: Riprendi torna", back && changedHome.resume?.serverId == serverId)
+    otherRepo.release()
 
     bench.oldCacheChecks(model, home, rows, offlineSettings, library, emozioni, url, main)
 
@@ -631,19 +687,56 @@ private suspend fun Bench.resumeChecks(
     val started = home.inProgress.value.orEmpty().firstOrNull { it.resumeMs > 0 && it.providerDomain != "spotify" }
     check("In corso: c'è un episodio a metà", started != null, home.inProgress.value.orEmpty().joinToString { "${it.name} ${it.resumeMs}" })
     if (started != null) {
+        val point = library.item(started.uri)?.resumeMs ?: started.resumeMs
+        val ref = JSONObject().put("media_type", started.mediaType).put("item_id", started.itemId).put("provider", started.provider)
+            .put("name", started.name).put("uri", started.uri)
         model.markPlayed(home, started)
         check("In corso: segnato, con Annulla", started.uri in home.marked)
         delay(1_500)
-        check("In corso: Music Assistant lo sa ascoltato", library.inProgress().none { it.uri == started.uri })
+        // Music Assistant lo sa solo finito il tempo di "Annulla": mark_played cancella il punto.
+        check("In corso: durante Annulla Music Assistant non lo sa ancora", library.inProgress().any { it.uri == started.uri })
         model.undoMarkPlayed(home, started)
-        delay(1_500)
+        delay(PhoneModel.UNDO_MS + 1_000)
         val back = library.item(started.uri)
         check(
-            "In corso: \"Annulla\" lo rimette dov'era",
+            "In corso: \"Annulla\" lo lascia dov'era",
             started.uri !in home.marked && library.inProgress().any { it.uri == started.uri } && back?.fullyPlayed == false &&
-                kotlin.math.abs((back.resumeMs) - started.resumeMs) < 1_500,
-            "${back?.resumeMs} ms (era ${started.resumeMs})",
+                kotlin.math.abs(back.resumeMs - point) < 1_500 && home.inProgress.value.orEmpty().any { it.uri == started.uri },
+            "${back?.resumeMs} ms (era $point)",
         )
+        // Una card senza punto (dalla sesta, o un episodio di Spotify: In corso non lo dice). Prima "Annulla" mandava
+        // seconds_played 0: l'episodio usciva da In corso e il punto si perdeva.
+        val unknown = started.copy(resumeMs = 0)
+        model.markPlayed(home, unknown)
+        delay(1_000)
+        model.undoMarkPlayed(home, unknown)
+        delay(1_500)
+        val kept = library.item(started.uri)
+        check(
+            "In corso: \"Annulla\" di una card senza punto non lo perde",
+            library.inProgress().any { it.uri == started.uri } && kept != null && kotlin.math.abs(kept.resumeMs - point) < 1_500,
+            "${kept?.resumeMs} ms (era $point)",
+        )
+        // Passato il tempo di "Annulla": Music Assistant lo sa ascoltato, la card sparisce.
+        model.markPlayed(home, started)
+        delay(PhoneModel.UNDO_MS + 2_000)
+        check(
+            "In corso: finito Annulla, segnato in Music Assistant e la card sparita",
+            library.inProgress().none { it.uri == started.uri } && home.inProgress.value.orEmpty().none { it.uri == started.uri } &&
+                started.uri !in home.marked && library.item(started.uri)?.fullyPlayed == true,
+        )
+        // "Dall'inizio" (start_from_beginning): da capo.
+        model.playFromStart(started)
+        val again = settle { it?.playing == true && it.current?.title == started.name }
+        check("In corso: \"Dall'inizio\" da capo", again != null && again.elapsedSec < 5, "${again?.elapsedSec} s")
+        repo.command("player_queues/pause") { put("queue_id", playerId) }
+        settle { it?.playing == false }
+        // Rimesso a metà, com'era, per la prossima volta.
+        repo.command("music/mark_played") {
+            put("media_item", ref)
+            put("fully_played", false)
+            put("seconds_played", (point / 1000).toInt())
+        }
     }
 }
 

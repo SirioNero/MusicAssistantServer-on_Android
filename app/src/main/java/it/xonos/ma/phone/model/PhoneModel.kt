@@ -300,10 +300,12 @@ class PhoneModel(
         if (refresh) page.refreshing = true
         page.job = scope.launch {
             val keep = refresh || showLocal(page)
-            refreshHome(page, keep)
+            val reached = refreshHome(page, keep)
             page.refreshing = false
             page.shown = true
-            page.fresh = page.recent is Load.Ready && page.rows.value?.none { it.items is Load.Loading } == true
+            // Con la Home salvata recent e rows sono Ready anche se Music Assistant non ha risposto (collegamento arrivato
+            // dopo i 20 s): allora non è fresca, e al collegamento si ricarica da sola.
+            page.fresh = reached && page.recent is Load.Ready && page.rows.value?.none { it.items is Load.Loading } == true
             saveHome(page)
         }
     }
@@ -316,8 +318,15 @@ class PhoneModel(
     internal suspend fun showLocal(page: HomePage): Boolean {
         page.hiddenResume = settings.hiddenResume
         page.moreOpen = settings.homeMoreOpen
-        val (saved, listen) = withContext(Dispatchers.IO) { cache.read(HOME_CACHE)?.let(HomeSnapshot::from) to readLastListen() }
+        // Dopo un cambio di server la Home salvata è del server di prima (la si cancella in disparte: può esserci ancora).
+        val skip = page.otherServer
+        val (saved, listen) = withContext(Dispatchers.IO) {
+            (if (skip) null else cache.read(HOME_CACHE)?.let(HomeSnapshot::from)) to readLastListen()
+        }
         var lists = false
+        // Senza Home salvata (cancellata cambiando server, anche prima di riaprire l'app) la copia può essere del server di
+        // prima: "Riprendi" aspetta di sapere a quale Music Assistant si è collegati.
+        if (saved == null) page.otherServer = true
         if (saved != null) {
             savedBase = savedBase ?: saved.base
             page.serverId = page.serverId ?: saved.serverId
@@ -358,14 +367,15 @@ class PhoneModel(
     /**
      * "Riprendi": la copia sul telefono [local] o quella della coda di Music Assistant, la più recente delle due, se è
      * di questo server. Finché il server non si sa (la prima apertura dopo l'aggiornamento, col server fermo) si mostra la
-     * più recente: appena collegati si controlla.
+     * più recente: appena collegati si controlla. Dopo un cambio di server ([HomePage.otherServer]) invece niente: la copia
+     * sarebbe del server di prima, e toccandola suonerebbe altro.
      */
     private fun showResume(page: HomePage, local: LastListen?) {
         val serverId = connectedServerId() ?: page.serverId
-        page.resume = if (serverId == null) {
-            listOfNotNull(local, page.queueResume).maxByOrNull { it.timeMs }
-        } else {
-            ResumePlan.shown(local, page.queueResume, serverId)
+        page.resume = when {
+            serverId != null -> ResumePlan.shown(local, page.queueResume, serverId)
+            page.otherServer -> null
+            else -> listOfNotNull(local, page.queueResume).maxByOrNull { it.timeMs }
         }
     }
 
@@ -375,32 +385,37 @@ class PhoneModel(
     /**
      * Tutto quello che la Home chiede a Music Assistant, insieme: le Scelte rapide, le righe, In corso, le Infinite Mix,
      * i generi e la coda del telefono per "Riprendi". Nessuna di queste chiama Spotify (le righe di "Altro" sì, alcune:
-     * per questo si chiedono solo con "Altro" aperta). Con [keep] un errore lascia quello che si vedeva.
+     * per questo si chiedono solo con "Altro" aperta). Con [keep] un errore lascia quello che si vedeva. Vero se le
+     * Scelte rapide e le righe sono arrivate davvero da Music Assistant.
      */
-    private suspend fun refreshHome(page: HomePage, keep: Boolean) = coroutineScope {
+    private suspend fun refreshHome(page: HomePage, keep: Boolean): Boolean = coroutineScope {
         if (!keep) {
             page.recent = Load.Loading
             page.rows = Load.Loading
             page.inProgress = Load.Loading
         }
-        launch {
+        val recentReached = async {
             try {
                 awaitConnected()
                 page.recent = Load.Ready(library.recentContexts())
+                true
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 if (!keep || page.recent !is Load.Ready) page.recent = Load.Failed(e)
+                false
             }
         }
-        launch {
+        val rowsReached = async {
             try {
                 awaitConnected()
                 loadRows(page, keep)
+                true
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 if (!keep || page.rows !is Load.Ready) page.rows = Load.Failed(e)
+                false
             }
         }
         launch {
@@ -417,6 +432,7 @@ class PhoneModel(
         launch { quietly { page.mixes = infiniteMixes() } }
         launch { quietly { page.genres = library.genreTiles() } }
         launch { quietly { loadQueueResume(page) } }
+        recentReached.await() && rowsReached.await()
     }
 
     /** Collegati, [block]; un errore non ferma la Home (resta quello che c'era). */
@@ -563,6 +579,7 @@ class PhoneModel(
     private suspend fun loadQueueResume(page: HomePage) {
         val serverId = connectedServerId() ?: return
         page.serverId = serverId
+        page.otherServer = false
         val queueId = queueId()
         val queue = library.queue(queueId)
         val index = queue?.currentIndex
@@ -637,7 +654,8 @@ class PhoneModel(
                 }
                 // Un episodio o un audiolibro Music Assistant lo fa ripartire da dove era arrivato: play_index senza punto
                 // (0) vuol dire "dal punto ricordato", e la voce della coda tiene il punto di quando è entrata. Sulla stessa
-                // voce si chiede il secondo 1; rifacendo la coda, prima gli si fa dimenticare il punto (provato in Docker).
+                // voce si chiede il secondo 1; rifacendo la coda, prima gli si fa dimenticare il punto (provato in Docker),
+                // poi play_media "dall'inizio" (anche il punto del servizio, come Spotify: vedi ResumeStep.Rebuild).
                 val spokenRestart = restart && listen.spoken
                 when {
                     step == null -> Unit
@@ -695,14 +713,25 @@ class PhoneModel(
 
     // ---------- In corso ----------
 
-    /** I "segna come ascoltato" in viaggio, per uri: "Annulla" aspetta che il primo sia arrivato. */
+    /** I "segna come ascoltato" che aspettano la fine di "Annulla", per uri. */
     private val marking = mutableMapOf<String, Job>()
 
-    /** "Segna come ascoltato": subito; la card resta qualche secondo con "Annulla", poi sparisce. */
+    /**
+     * "Segna come ascoltato": la card resta qualche secondo con "Annulla", poi sparisce e lo si dice a Music Assistant.
+     * Non prima: mark_played cancella il punto (seconds_played), e "Annulla" non saprebbe rimetterlo per le card di cui
+     * In corso non lo dice (dalla sesta, e gli episodi di Spotify); con seconds_played 0 l'episodio uscirebbe da In corso
+     * e il punto di Audiobookshelf andrebbe a zero. Così "Annulla" non manda niente.
+     */
     fun markPlayed(page: HomePage, item: MaItem) {
         if (item.uri in page.marked) return
         page.marked[item.uri] = (item.resumeMs / 1000).toInt()
         marking[item.uri] = scope.launch {
+            delay(UNDO_MS)
+            // Da qui "Annulla" non c'è più (sul thread dello schermo, prima della prima attesa).
+            marking.remove(item.uri)
+            page.marked.remove(item.uri)
+            val before = page.inProgress.value
+            if (before != null) page.inProgress = Load.Ready(before.filter { it.uri != item.uri })
             try {
                 awaitConnected()
                 repo.command("music/mark_played") {
@@ -712,40 +741,27 @@ class PhoneModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                page.marked.remove(item.uri)
-                notice = Notice.Failed(e)
-            }
-        }
-        scope.launch {
-            delay(UNDO_MS)
-            if (page.marked.remove(item.uri) != null) {
-                page.inProgress.value?.let { list -> page.inProgress = Load.Ready(list.filter { it.uri != item.uri }) }
-            }
-        }
-    }
-
-    /** "Annulla": torna a metà, dove era arrivato. */
-    fun undoMarkPlayed(page: HomePage, item: MaItem) {
-        val seconds = page.marked.remove(item.uri) ?: return
-        scope.launch {
-            try {
-                // Due comandi insieme Music Assistant li fa in parallelo: prima deve finire il primo.
-                marking.remove(item.uri)?.join()
-                awaitConnected()
-                repo.command("music/mark_played") {
-                    put("media_item", itemRef(item))
-                    put("fully_played", false)
-                    put("seconds_played", seconds)
+                // Non segnato: la card torna al suo posto.
+                val now = page.inProgress.value
+                if (before != null && now != null && now.none { it.uri == item.uri }) {
+                    val at = before.indexOfFirst { it.uri == item.uri }.coerceIn(0, now.size)
+                    page.inProgress = Load.Ready(now.toMutableList().apply { add(at, item) })
                 }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
                 notice = Notice.Failed(e)
             }
         }
     }
 
-    /** "Dall'inizio": Music Assistant dimentica dove si era arrivati (mark_unplayed), poi suona da capo. */
+    /** "Annulla": Music Assistant non lo sa ancora, quindi l'episodio resta dov'era. */
+    fun undoMarkPlayed(page: HomePage, item: MaItem) {
+        if (page.marked.remove(item.uri) == null) return
+        marking.remove(item.uri)?.cancel()
+    }
+
+    /**
+     * "Dall'inizio": Music Assistant dimentica dove si era arrivati (mark_unplayed, per i Music Assistant più vecchi),
+     * poi suona da capo anche se il servizio ricorda un punto (Spotify: vedi [Library.playMedia] e [Library.backToStart]).
+     */
     fun playFromStart(item: MaItem) {
         scope.launch {
             try {
@@ -757,7 +773,7 @@ class PhoneModel(
                 notice = Notice.Failed(e)
                 return@launch
             }
-            play(item)
+            play(listOf(item.uri), fromStart = true)
         }
     }
 
@@ -1131,7 +1147,13 @@ class PhoneModel(
     fun addToQueue(item: MaItem) = play(listOf(item.uri), option = "add")
 
     /** Un "suona" (non "dopo" né "in coda") mandato a Music Assistant, che non ha ancora risposto. */
-    private data class PlayRequest(val target: String?, val media: List<String>, val start: String?, val shuffle: Boolean)
+    private data class PlayRequest(
+        val target: String?,
+        val media: List<String>,
+        val start: String?,
+        val shuffle: Boolean,
+        val fromStart: Boolean,
+    )
 
     private var pendingPlay: PlayRequest? = null
 
@@ -1142,10 +1164,17 @@ class PhoneModel(
     var starting by mutableStateOf(false)
         private set
 
-    private fun play(media: List<String>, start: String? = null, option: String = "replace", shuffle: Boolean = false) {
+    /** [fromStart]: un episodio o un audiolibro dall'inizio, non dal punto ricordato ("Dall'inizio"). */
+    private fun play(
+        media: List<String>,
+        start: String? = null,
+        option: String = "replace",
+        shuffle: Boolean = false,
+        fromStart: Boolean = false,
+    ) {
         // Suona dove si è scelto con "Suona su": il telefono, o un lettore di Music Assistant.
         val target = remote?.device?.id
-        val request = if (option == "replace") PlayRequest(target, media, start, shuffle) else null
+        val request = if (option == "replace") PlayRequest(target, media, start, shuffle, fromStart) else null
         // Lo stesso "suona" toccato di nuovo mentre Music Assistant prepara il primo: con Spotify (Soloist) farebbe
         // ripartire tutto da capo. Un "suona" diverso invece passa (Music Assistant li fa uno dopo l'altro).
         if (request != null && request == pendingPlay) return
@@ -1156,7 +1185,9 @@ class PhoneModel(
         scope.launch {
             try {
                 if (target == null) awaitReady()
-                library.playMedia(target ?: queueId(), media, start, option, shuffle)
+                val queue = target ?: queueId()
+                library.playMedia(queue, media, start, option, shuffle, fromStart)
+                if (fromStart) library.backToStart(queue)
                 when (option) {
                     "next" -> notice = Notice.PlayNext
                     "add" -> notice = Notice.Added
@@ -1914,6 +1945,9 @@ class PhoneModel(
     private fun forgetServer(settings: SettingsPage) {
         remote?.stop()
         remote = null
+        // I "segna come ascoltato" che aspettavano "Annulla" erano per il server di prima.
+        marking.values.forEach { it.cancel() }
+        marking.clear()
         // Anche i testi (per uri, che tra due server può essere lo stesso) e gli elenchi aperti di casse e playlist.
         lyrics.clear()
         picker = null
@@ -1923,7 +1957,7 @@ class PhoneModel(
             stack.clear()
             stack.add(
                 when (t) {
-                    Tab.HOME -> HomePage()
+                    Tab.HOME -> HomePage().apply { otherServer = true }
                     Tab.SEARCH -> SearchPage()
                     Tab.LIBRARY -> LibraryPage()
                 },

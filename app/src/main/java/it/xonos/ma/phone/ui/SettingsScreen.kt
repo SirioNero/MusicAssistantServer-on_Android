@@ -97,6 +97,8 @@ internal fun Onboarding(model: PhoneModel, host: Host, onDone: () -> Unit) {
  */
 @Composable
 internal fun SettingsScreen(page: SettingsPage, model: PhoneModel, host: Host, onboarding: Boolean, onDone: () -> Unit) {
+    // Prima di "Per te": resta nella composizione mentre "Per te" è aperta, e chiudendola le impostazioni tornano dov'erano.
+    val scroll = rememberScrollState()
     // "Per te" sta sopra le impostazioni da cui si è aperta: indietro la chiude.
     model.perTe?.takeIf { !onboarding && it.over == page.id }?.let { state ->
         PerTeScreen(state, model, host)
@@ -105,7 +107,7 @@ internal fun SettingsScreen(page: SettingsPage, model: PhoneModel, host: Host, o
     val focus = LocalFocusManager.current
     Column(
         Modifier.fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scroll)
             .statusBarsPadding()
             .navigationBarsPadding()
             .imePadding()

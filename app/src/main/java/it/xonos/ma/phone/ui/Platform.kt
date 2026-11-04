@@ -3,6 +3,7 @@ package it.xonos.ma.phone.ui
 import android.animation.ValueAnimator
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.view.View
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.ReportDrawnWhen
 import androidx.compose.runtime.Composable
@@ -28,6 +29,7 @@ import coil3.request.SuccessResult
 import coil3.request.allowHardware
 import coil3.toBitmap
 import it.xonos.ma.R
+import java.util.WeakHashMap
 
 // Le poche cose dello schermo che dipendono da Android. Il banco di prova (tools/screens) ha la
 // sua versione di questo file per Compose Desktop.
@@ -46,15 +48,27 @@ internal fun PlatformReportReady(ready: () -> Boolean) = ReportDrawnWhen(ready)
 /**
  * Lo schermo resta acceso finché [on]: a schermo spento Android congela l'app (e il server sul telefono, suo figlio), e
  * download, estrazione e primo avvio si fermavano senza dirlo.
+ *
+ * Si contano quelli che lo vogliono acceso: fra due pagine (la vecchia esce mentre la nuova entra) l'onDispose della
+ * vecchia arriva dopo la nuova, e non deve spegnerlo.
  */
 @Composable
 internal fun KeepScreenOn(on: Boolean) {
     val view = LocalView.current
     DisposableEffect(view, on) {
-        view.keepScreenOn = on
-        onDispose { view.keepScreenOn = false }
+        if (!on) return@DisposableEffect onDispose {}
+        screenOnUsers[view] = (screenOnUsers[view] ?: 0) + 1
+        view.keepScreenOn = true
+        onDispose {
+            val left = (screenOnUsers[view] ?: 1) - 1
+            if (left > 0) screenOnUsers[view] = left else screenOnUsers.remove(view)
+            view.keepScreenOn = left > 0
+        }
     }
 }
+
+/** Per ogni finestra, quante composable vogliono lo schermo acceso ([KeepScreenOn]). Solo dal thread principale. */
+private val screenOnUsers = WeakHashMap<View, Int>()
 
 /** Copia un testo negli appunti di Android. */
 @Composable

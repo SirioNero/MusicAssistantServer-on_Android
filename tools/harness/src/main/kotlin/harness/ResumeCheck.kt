@@ -64,10 +64,11 @@ fun main(): Unit = runBlocking {
         timeMs = time,
     )
 
-    fun queue(item: String? = "qi-4", pos: Double = 102.0, resume: Int = 102, updatedMs: Long = now, state: String = "idle", ended: Boolean = false, items: Int = 12): QueueState =
+    fun queue(item: String? = "qi-4", pos: Double = 102.0, resume: Int = 102, updatedMs: Long = now, state: String = "idle", ended: Boolean = false, items: Int = 12, dynamic: Boolean = false): QueueState =
         QueueState.from(
             JSONObject()
                 .put("queue_id", phone)
+                .put("is_dynamic", dynamic)
                 .put("state", state)
                 .put("items", items)
                 .put("current_index", 3)
@@ -97,6 +98,8 @@ fun main(): Unit = runBlocking {
     val legacy = QueueState.from(JSONObject().put("queue_id", "x").put("items", 1).put("radio_source", JSONArray().put(JSONObject().put("uri", "spotify://track/x").put("name", "Radio").put("media_type", "track"))))
     check("Prima della 2.10: radio_source", legacy?.source?.uri == "spotify://track/x")
     check("Posizione adesso mentre suona", abs(queue(pos = 10.0, state = "playing", updatedMs = now).elapsedAt(now / 1000.0 + 5) - 15.0) < 0.01)
+    check("QueueState: is_dynamic (Infinite Mix), falso se manca", queue(dynamic = true).dynamic && !queue().dynamic && old?.dynamic == false)
+    check("Copia dalla coda: dinamica come la coda", LastListen.of(server, queue(dynamic = true), emptyList(), 1.0, now)?.dynamic == true && LastListen.of(server, queue(), emptyList(), 1.0, now)?.dynamic == false)
 
     // ---------- La decisione ----------
     check("Niente copia né coda: niente", ResumePlan.decide(null, null, phone, server) == null)
@@ -111,6 +114,26 @@ fun main(): Unit = runBlocking {
     check("(c) un'altra coda più recente della copia: decide Music Assistant", ResumePlan.decide(copy(time = now - 3_600_000), queue(item = "qi-other"), phone, server) == ResumeStep.Play(phone))
     check("(c) senza sorgente: il brano da solo", ResumePlan.decide(copy(source = null, pos = 80.0), null, phone, server) == ResumeStep.Rebuild(phone, "library://track/729", null, 80))
     check("(c) una radio non ha un punto", (ResumePlan.decide(copy(source = null, pos = 800.0, type = "radio"), null, phone, server) as ResumeStep.Rebuild).seekSec == 0)
+    // Solo album, playlist e podcast partono dal brano chiesto: un artista e un genere mescolano, una mix non risolve brani.
+    fun from(type: String) = QueueSource("library://$type/7", "Sorgente", type, null)
+    for (type in listOf("album", "playlist", "podcast")) {
+        val step = ResumePlan.decide(copy(source = from(type)), null, phone, server)
+        check("(c) da $type: dalla sorgente col brano", step == ResumeStep.Rebuild(phone, "library://$type/7", "library://track/729", 102), step.toString())
+    }
+    for (type in listOf("artist", "genre", "audiobook", "radio")) {
+        val step = ResumePlan.decide(copy(source = from(type)), null, phone, server)
+        check("(c) da $type: il brano da solo (start_item lì non vale)", step == ResumeStep.Rebuild(phone, "library://track/729", null, 102), step.toString())
+    }
+    val mixStep = ResumePlan.decide(copy(source = from("playlist")).copy(dynamic = true), null, phone, server)
+    check("(c) da una coda dinamica (Infinite Mix): il brano da solo", mixStep == ResumeStep.Rebuild(phone, "library://track/729", null, 102), mixStep.toString())
+    check(
+        "(c) casuale e ripeti della copia",
+        ResumePlan.decide(copy().copy(shuffle = true, repeat = "all"), null, phone, server) == ResumeStep.Rebuild(phone, album.uri, "library://track/729", 102, true, "all"),
+    )
+    check(
+        "Coda finita da un artista: Ascolta di nuovo dall'artista",
+        ResumePlan.decide(copy(source = from("artist"), ended = true), null, phone, server) == ResumeStep.ListenAgain(ResumeStep.Rebuild(phone, "library://artist/7", null, 0)),
+    )
     check("Coda finita: Ascolta di nuovo (play rifà dal primo)", ResumePlan.decide(copy(), queue(ended = true), phone, server) == ResumeStep.ListenAgain(ResumeStep.Play(phone)))
     check("Coda finita senza copia: Ascolta di nuovo", ResumePlan.decide(null, queue(ended = true), phone, server) == ResumeStep.ListenAgain(ResumeStep.Play(phone)))
     check("Copia finita, coda che non lo sa: dal primo brano", ResumePlan.decide(copy(ended = true), queue(), phone, server) == ResumeStep.ListenAgain(ResumeStep.First(phone)))
@@ -121,6 +144,12 @@ fun main(): Unit = runBlocking {
     check("Senza server collegato la copia non vale", ResumePlan.decide(copy(), null, phone, "") == null)
     check("Ricomincia: lo stesso brano da 0", ResumePlan.restart(copy(), queue(), phone, server) == ResumeStep.PlayIndex(phone, "qi-4", 0))
     check("Ricomincia senza coda: dalla sorgente col brano, da 0", ResumePlan.restart(copy(), null, phone, server) == ResumeStep.Rebuild(phone, album.uri, "library://track/729", 0))
+    check("Ricomincia senza coda da un artista: il brano da solo, da 0", ResumePlan.restart(copy(source = from("artist")), null, phone, server) == ResumeStep.Rebuild(phone, "library://track/729", null, 0))
+    check(
+        "Ricomincia un episodio senza coda: dal podcast, dall'inizio anche per Music Assistant (start_from_beginning)",
+        ResumePlan.restart(copy(source = from("podcast"), type = "podcast_episode"), null, phone, server) ==
+            ResumeStep.Rebuild(phone, "library://podcast/7", "library://track/729", 0, fromStart = true),
+    )
 
     // ---------- Cosa mostra l'eroe ----------
     val fromQueue = LastListen.of(server, queue(resume = 90), emptyList(), 90.0, now - 120_000)
@@ -138,13 +167,15 @@ fun main(): Unit = runBlocking {
     check("Senza file: niente", store.read() == null)
     store.write(copy())
     check("Scritta e riletta uguale", store.read() == copy(), store.read().toString())
+    store.write(copy().copy(dynamic = true))
+    check("Scritta e riletta uguale, anche dinamica", store.read() == copy().copy(dynamic = true))
     check("Niente file temporanei lasciati", dir.list()!!.toList() == listOf("last-listen.json"))
     check("Meno di 4 KB", File(dir, "last-listen.json").length() < 4096, "${File(dir, "last-listen.json").length()} byte")
     File(dir, "last-listen.json").writeText("{\"server_id\": \"x\", \"track\": {\"uri\"")
     check("File rovinato: niente, senza errori", store.read() == null)
     File(dir, "last-listen.json").writeText("{\"server_id\":\"$server\",\"queue_item_id\":\"q\",\"track\":{\"uri\":\"library://track/1\"},\"futuro\":[1,2]}")
     val sparse = store.read()
-    check("Campi mancanti: valori vuoti", sparse != null && sparse.track.name == "" && sparse.positionSec == 0.0 && sparse.next.isEmpty() && sparse.source == null && sparse.repeat == "off")
+    check("Campi mancanti: valori vuoti", sparse != null && sparse.track.name == "" && sparse.positionSec == 0.0 && sparse.next.isEmpty() && sparse.source == null && sparse.repeat == "off" && !sparse.dynamic)
     store.clear()
     check("Tolta", store.read() == null)
     dir.deleteRecursively()
@@ -154,7 +185,8 @@ fun main(): Unit = runBlocking {
     if (token.isNullOrBlank()) {
         println("(senza MA_TOKEN: niente prove contro Music Assistant)")
     } else {
-        failures += live(token, ::check)
+        // Non "failures += live(...)": il valore di prima si leggerebbe prima, e i fallimenti contati dentro si perderebbero.
+        live(token, ::check)
     }
 
     println(if (failures == 0) "Tutto bene" else "$failures prove non passate")
@@ -320,10 +352,193 @@ private suspend fun live(token: String, check: (String, Boolean, String) -> Unit
             val e = until { it.playing }
             check("Ascolta di nuovo: dal primo brano, dall'inizio", e?.currentIndex == 0 && (e.elapsedAt(nowSec())) < 4.0, "brano ${e?.currentIndex}")
         }
+
+        // Le sorgenti con cui start_item non vale, e i casi che Music Assistant rifiuta (revisione della 0.1.58).
+        try {
+            sources(library, repo, serverId, playerId, albumItem, tracks, ::state, ::until, ::pause, ::nowSec, check)
+        } catch (e: Exception) {
+            check("Sorgenti: senza errori", false, "${e.javaClass.simpleName}: ${e.message}")
+        }
     } finally {
         runCatching { repo.command("player_queues/stop") { put("queue_id", playerId) } }
         client.stop()
         repo.release()
     }
     return 0
+}
+
+/**
+ * (c) con le sorgenti che start_item ignora o che non hanno il brano: si riprende sempre lo stesso brano. Un artista (Music
+ * Assistant mescola), un'Infinite Mix (coda dinamica: casuale e ripeti rifiutati), un brano arrivato con "Suona dopo"
+ * (non è nell'album della sorgente), l'album col casuale (tutto l'album, col brano per primo), e "dall'inizio" per un
+ * episodio con un punto ricordato.
+ */
+private suspend fun sources(
+    library: Library,
+    repo: MaRepository,
+    serverId: String,
+    playerId: String,
+    albumItem: MaItem,
+    tracks: List<MaItem>,
+    state: suspend () -> QueueState?,
+    until: suspend (Long, (QueueState) -> Boolean) -> QueueState?,
+    pause: suspend () -> QueueState?,
+    nowSec: () -> Double,
+    check: (String, Boolean, String) -> Unit,
+) {
+    suspend fun clear() {
+        repo.command("player_queues/clear") { put("queue_id", playerId) }
+        until(20_000) { it.items == 0 }
+    }
+
+    /** La copia della coda in pausa, la coda persa, la decisione e i comandi: suona lo stesso brano, allo stesso punto? */
+    suspend fun lostAndBack(label: String, copy: LastListen, expected: ResumeStep?): QueueState? {
+        clear()
+        val step = ResumePlan.decide(copy, state(), playerId, serverId)
+        check("$label: decisione", expected == null || step == expected, step.toString())
+        try {
+            step?.run(library)
+        } catch (e: Exception) {
+            check("$label: comandi senza errori", false, "${e.javaClass.simpleName}: ${e.message}")
+            return null
+        }
+        val back = until(20_000) { it.playing && it.current != null }
+        val pos = back?.elapsedAt(nowSec()) ?: -1.0
+        val wanted = if (copy.positionSec > ResumePlan.SEEK_FROM_S) copy.positionSec else 0.0
+        check(
+            "$label: stesso brano, stesso punto (±3 s)",
+            back?.current?.uri == copy.track.uri && abs(pos - wanted) <= 3.0,
+            "${back?.current?.uri} (copia ${copy.track.uri}) a %.1f s invece di %.1f".format(pos, wanted),
+        )
+        return back
+    }
+
+    suspend fun pausedCopy(): LastListen? {
+        val paused = pause() ?: return null
+        val next = library.queueItems(playerId, (paused.currentIndex ?: 0) + 1, LastListen.NEXT)
+        return LastListen.of(serverId, paused, next, paused.resumeSec, System.currentTimeMillis())
+    }
+
+    library.setShuffle(playerId, false)
+    library.setRepeat(playerId, "off")
+
+    // Un artista: Music Assistant mescola i suoi brani e ignora start_item. Prima ripartiva un altro brano.
+    val artist = library.libraryItems("artists").firstOrNull { library.artistTracks(it).size >= 3 }
+    check("Un artista con almeno 3 brani", artist != null, artist?.name.orEmpty())
+    if (artist != null) {
+        library.playMedia(playerId, listOf(artist.uri))
+        val playing = until(20_000) { it.playing && it.current != null }
+        if ((playing?.current?.durationSec ?: 0) > 40) library.seek(playerId, 20)
+        println("    artista: ${playing?.current?.title} di ${playing?.current?.durationSec} s")
+        delay(2_000)
+        val copy = pausedCopy()
+        check("Artista: la sorgente è l'artista", copy?.source?.mediaType == "artist", "${copy?.source?.mediaType}")
+        if (copy != null) lostAndBack("(c) da un artista", copy, ResumeStep.Rebuild(playerId, copy.track.uri, null, if (copy.positionSec > ResumePlan.SEEK_FROM_S) copy.positionSec.toInt() else 0))
+    }
+
+    // Un'Infinite Mix: la coda diventa dinamica (casuale acceso e bloccato).
+    // Quella della libreria: quella dei preferiti è vuota senza preferiti ("There is nothing to play here").
+    val mix = library.libraryItems("playlists").filter { it.name.contains("Infinite Mix") }.minByOrNull { if (it.name.contains("library")) 0 else 1 }
+    check("Un'Infinite Mix di Music Assistant", mix != null, mix?.uri.orEmpty())
+    if (mix != null) {
+        library.playMedia(playerId, listOf(mix.uri))
+        val mixing = until(20_000) { it.playing && it.current != null }
+        check("Infinite Mix: la coda dice is_dynamic", mixing?.dynamic == true && mixing.shuffle, "dinamica ${mixing?.dynamic}, casuale ${mixing?.shuffle}")
+        delay(2_000)
+        val mixCopy = pausedCopy()
+        check("Infinite Mix: la copia è dinamica", mixCopy?.dynamic == true, "")
+        // Una copia di un album (senza casuale, con ripeti) da rifare mentre Music Assistant ha la mix in coda: prima
+        // player_queues/shuffle false era rifiutato e non suonava niente.
+        val dynamicNow = state()
+        val albumCopy = LastListen(
+            serverId, playerId, "copia-album",
+            LastListen.Track(tracks[1].uri, tracks[1].name, "track", emptyList(), null, null, tracks[1].durationSec),
+            25.0, 1, tracks.size, it.xonos.ma.data.QueueSource(albumItem.uri, albumItem.name, "album", null), emptyList(), false, "all", false,
+            System.currentTimeMillis() + 120_000,
+        )
+        val step = ResumePlan.decide(albumCopy, dynamicNow, playerId, serverId)
+        check("Coda dinamica e copia di un album: si rifà l'album", step == ResumeStep.Rebuild(playerId, albumItem.uri, tracks[1].uri, 25, false, "all"), step.toString())
+        try {
+            step?.run(library)
+            val back = until(20_000) { it.playing && it.current != null }
+            val pos = back?.elapsedAt(nowSec()) ?: -1.0
+            check(
+                "Dalla coda dinamica: l'album, dal brano e dal punto, ripeti come la copia",
+                back?.current?.uri == tracks[1].uri && !back.dynamic && !back.shuffle && back.repeat == "all" && abs(pos - 25.0) <= 3.0,
+                "${back?.current?.uri}, dinamica ${back?.dynamic}, casuale ${back?.shuffle}, ripeti ${back?.repeat}, %.1f s".format(pos),
+            )
+        } catch (e: Exception) {
+            check("Dalla coda dinamica: comandi senza errori", false, "${e.javaClass.simpleName}: ${e.message}")
+        }
+        library.setRepeat(playerId, "off")
+        // La copia della mix stessa, con la coda persa: il brano da solo (prima ripartiva la mix da un altro brano).
+        if (mixCopy != null) lostAndBack("(c) da un'Infinite Mix", mixCopy, ResumeStep.Rebuild(playerId, mixCopy.track.uri, null, 0, mixCopy.shuffle, mixCopy.repeat))
+    }
+
+    // "Suona dopo": il brano entra in coda ma non nella sorgente (l'album). Music Assistant rifiuta l'album con start_item.
+    pause()
+    library.setShuffle(playerId, false)
+    val other = library.libraryItems("albums").firstOrNull { it.uri != albumItem.uri }?.let { library.albumTracks(it).firstOrNull() }
+    check("Un brano di un altro album", other != null, other?.name.orEmpty())
+    if (other != null) {
+        library.playMedia(playerId, listOf(albumItem.uri), startItem = tracks[0].uri)
+        until(20_000) { it.playing && it.current?.uri == tracks[0].uri }
+        library.playMedia(playerId, listOf(other.uri), option = "next")
+        delay(1_000)
+        repo.command("player_queues/next") { put("queue_id", playerId) }
+        until(20_000) { it.playing && it.current?.uri == other.uri }
+        delay(2_000)
+        val copy = pausedCopy()
+        check("Suona dopo: brano di un altro album, sorgente l'album", copy?.track?.uri == other.uri && copy.source?.uri == albumItem.uri, "${copy?.track?.uri} da ${copy?.source?.uri}")
+        if (copy != null) {
+            val back = lostAndBack("(c) brano arrivato con Suona dopo", copy, ResumeStep.Rebuild(playerId, albumItem.uri, other.uri, 0))
+            check("Suona dopo: il brano da solo", back?.items == 1, "voci ${back?.items}")
+        }
+    }
+
+    // Col casuale: tutto l'album, col brano per primo (prima restavano solo i brani dopo quello ripreso).
+    pause()
+    library.playMedia(playerId, listOf(albumItem.uri), startItem = tracks[2].uri, shuffle = true)
+    until(20_000) { it.playing && it.current?.uri == tracks[2].uri }
+    library.seek(playerId, 20)
+    delay(2_000)
+    val shuffled = pausedCopy()
+    check("Casuale: la copia lo sa", shuffled?.shuffle == true, "")
+    if (shuffled != null) {
+        val back = lostAndBack("(c) col casuale", shuffled, ResumeStep.Rebuild(playerId, albumItem.uri, tracks[2].uri, shuffled.positionSec.toInt(), true, "off"))
+        check("Col casuale: tutto l'album, casuale acceso", back?.items == tracks.size && back.shuffle && back.currentIndex == 0, "voci ${back?.items} su ${tracks.size}, casuale ${back?.shuffle}, posto ${back?.currentIndex}")
+    }
+    pause()
+    library.setShuffle(playerId, false)
+
+    // "Dall'inizio" di un episodio con un punto ricordato: start_from_beginning, e backToStart per chi non lo conosce.
+    val allEpisodes = library.libraryItems("podcasts").flatMap { library.podcastEpisodes(it) }
+    val episode = allEpisodes.filter { it.durationSec >= 30 }.maxByOrNull { it.durationSec }
+    check("Un episodio di almeno 30 s", episode != null, "${episode?.name} di ${episode?.durationSec} s")
+    if (episode != null) {
+        val point = minOf(200, episode.durationSec / 2)
+        suspend fun remember(seconds: Int) = repo.command("music/mark_played") {
+            put("media_item", JSONObject().put("media_type", episode.mediaType).put("item_id", episode.itemId).put("provider", episode.provider).put("name", episode.name).put("uri", episode.uri))
+            put("fully_played", false)
+            put("seconds_played", seconds)
+        }
+        remember(point)
+        library.playMedia(playerId, listOf(episode.uri))
+        val resumed = until(20_000) { it.playing && it.current?.uri == episode.uri }
+        check("Episodio: di suo Music Assistant riprende dal punto", abs((resumed?.elapsedAt(nowSec()) ?: 0.0) - point) < 5, "%.1f s invece di $point".format(resumed?.elapsedAt(nowSec())))
+        library.backToStart(playerId)
+        val back = until(20_000) { it.playing && it.elapsedAt(nowSec()) < point - 5 }
+        check("Episodio: backToStart lo riporta all'inizio", back != null && back.elapsedAt(nowSec()) < 5, "%.1f s".format(back?.elapsedAt(nowSec())))
+        pause()
+        remember(point)
+        library.playMedia(playerId, listOf(episode.uri), fromStart = true)
+        val fresh = until(20_000) { it.playing && it.current?.uri == episode.uri }
+        check("Episodio: play_media dall'inizio (start_from_beginning)", fresh != null && fresh.elapsedAt(nowSec()) < 5, "%.1f s".format(fresh?.elapsedAt(nowSec())))
+        pause()
+        runCatching {
+            repo.command("music/mark_unplayed") {
+                put("media_item", JSONObject().put("media_type", episode.mediaType).put("item_id", episode.itemId).put("provider", episode.provider).put("name", episode.name).put("uri", episode.uri))
+            }
+        }
+    }
 }

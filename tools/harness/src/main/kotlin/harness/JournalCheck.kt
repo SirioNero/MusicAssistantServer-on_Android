@@ -7,6 +7,7 @@ import it.xonos.ma.data.taste.Journal
 import it.xonos.ma.data.taste.Listen
 import it.xonos.ma.data.taste.ListenRecorder
 import it.xonos.ma.data.taste.NowListening
+import org.json.JSONObject
 import java.io.File
 import java.nio.file.Files
 import java.time.LocalDateTime
@@ -112,7 +113,39 @@ fun main() {
     check("In auto (intervallo chiuso)", reread.placeAt(at(2026, 11, 5, 8, 30)) == Journal.PLACE_CAR)
     check("Fuori dall'auto", reread.placeAt(at(2026, 11, 5, 12)) == Journal.PLACE_PHONE)
     check("In auto (intervallo ancora aperto)", reread.placeAt(at(2026, 11, 5, 18, 20)) == Journal.PLACE_CAR)
-    check("Un intervallo aperto conta al massimo 4 ore", reread.cars.intervals(at(2026, 11, 6, 12)).last().last == at(2026, 11, 5, 22))
+    // Rileggendo, il processo è nuovo: l'intervallo rimasto aperto da quello di prima finisce quando è nato questo.
+    check(
+        "Un intervallo aperto da un processo di prima finisce alla nascita del nuovo",
+        reread.cars.intervals(at(2026, 11, 6, 12)).last() == at(2026, 11, 5, 18)..at(2026, 11, 5, 18, 30),
+        reread.cars.intervals(at(2026, 11, 6, 12)).toString(),
+    )
+    check("…e lo si scrive chiuso", JSONObject(File(dir, CarSessions.FILE).readText()).isNull("open"))
+    check("Dopo la nascita, senza auto: telefono", reread.placeAt(at(2026, 11, 5, 19)) == Journal.PLACE_PHONE)
+    // Un processo che nasce molto dopo: l'intervallo di prima conta al massimo 4 ore.
+    val lateFile = File(Files.createTempDirectory("xonos-cars").toFile(), CarSessions.FILE)
+    CarSessions(lateFile) { at(2026, 11, 5, 18) }.begin(at(2026, 11, 5, 18))
+    val late = CarSessions(lateFile) { at(2026, 11, 6, 9) }
+    check("Rimasto aperto, il processo dopo nasce il giorno dopo: al massimo 4 ore", late.intervals() == listOf(at(2026, 11, 5, 18)..at(2026, 11, 5, 22)), late.intervals().toString())
+    late.begin(at(2026, 11, 6, 9, 5))
+    check("Il primo viaggio del processo nuovo è un intervallo nuovo", late.intervals().size == 2 && late.intervals().last().first == at(2026, 11, 6, 9, 5), late.intervals().toString())
+    // Un viaggio lungo nello stesso processo: dura finché l'auto c'è.
+    var tripNow = at(2026, 11, 7, 6)
+    val trip = CarSessions(File(Files.createTempDirectory("xonos-cars").toFile(), CarSessions.FILE)) { tripNow }
+    trip.begin(tripNow)
+    tripNow += 5 * 3_600_000L
+    check("Viaggio di 5 ore ancora in corso: in auto", trip.intervals().single().last == tripNow && at(2026, 11, 7, 10, 30) in trip.intervals().single())
+    trip.begin(tripNow)
+    trip.end(tripNow)
+    check("Viaggio di 5 ore chiuso: 5 ore", trip.intervals() == listOf(at(2026, 11, 7, 6)..at(2026, 11, 7, 11)), trip.intervals().toString())
+    // La cronologia spenta: nessun viaggio comincia, ma quello già cominciato si chiude.
+    var carsOn = true
+    val off = CarSessions(File(Files.createTempDirectory("xonos-cars").toFile(), CarSessions.FILE), { carsOn }) { at(2026, 11, 8, 8) }
+    off.begin(at(2026, 11, 8, 8))
+    carsOn = false
+    off.end(at(2026, 11, 8, 9))
+    off.begin(at(2026, 11, 8, 18))
+    off.end(at(2026, 11, 8, 19))
+    check("Cronologia spenta: niente viaggi nuovi, quello di prima chiuso", off.intervals() == listOf(at(2026, 11, 8, 8)..at(2026, 11, 8, 9)), off.intervals().toString())
 
     // ---------- Il registratore: finiti, saltati, pause ----------
     val written = mutableListOf<Listen>()
@@ -170,6 +203,108 @@ fun main() {
     recorder.update(np("R", 21.0, duration = 60), t)
     recorder.update(null, t)
     check("Ripeti uno: due ascolti, il primo finito", written.size == 2 && written[0].finished && !written[1].finished, written.joinToString { "${it.seconds}/${it.finished}" })
+
+    // Ripeti uno come lo vede il servizio: un aggiornamento ogni 30 s, in un punto qualsiasi del giro (30 fasi). Il giro
+    // di prima finisce fra due aggiornamenti: si vede solo la posizione tornata indietro.
+    var splitOk = 0
+    val splitBad = mutableListOf<String>()
+    for (phase in 0 until 30) {
+        written.clear()
+        t += 3_600_000
+        val begin = t
+        recorder.update(np("RR", 0.0, duration = 180), t)
+        t += phase * 1_000L
+        while (t - begin < 330_000) {
+            val pos = ((t - begin) / 1000.0) % 180.0
+            recorder.update(np("RR", pos, duration = 180), t)
+            t += 30_000
+        }
+        recorder.update(null, t)
+        if (written.size == 2 && written[0].finished) splitOk++ else splitBad += "fase $phase: " + written.joinToString { "${it.seconds}/${it.finished}" }
+    }
+    check("Ripeti uno, aggiornamenti ogni 30 s: due ascolti in tutte le 30 fasi", splitOk == 30, splitBad.take(3).joinToString(" | "))
+
+    // Pausa a 150 s, poi "Ricomincia" (la stessa voce da 0): due ascolti, il primo non finito.
+    written.clear()
+    t += 3_600_000
+    recorder.update(np("RC", 0.0, duration = 180), t)
+    for (s in 1..5) { t += 30_000; recorder.update(np("RC", s * 30.0, duration = 180), t) }
+    recorder.update(np("RC", 150.0, playing = false, duration = 180), t)
+    t += 60_000
+    recorder.update(np("RC", 0.0, duration = 180), t)
+    for (s in 1..6) { t += 30_000; recorder.update(np("RC", s * 30.0, duration = 180), t) }
+    recorder.update(null, t)
+    check(
+        "Ricomincia dopo una pausa: due ascolti, 150 s non finito e 180 s finito",
+        written.size == 2 && !written[0].finished && written[0].seconds in 149.0..151.0 && written[1].finished && written[1].seconds in 179.0..180.0,
+        written.joinToString { "${it.seconds}/${it.finished}" },
+    )
+    // Uno spostamento indietro a metà brano, mentre suona, resta lo stesso ascolto.
+    written.clear()
+    t += 3_600_000
+    recorder.update(np("SB", 0.0, duration = 180), t)
+    for (s in 1..4) { t += 30_000; recorder.update(np("SB", s * 30.0, duration = 180), t) }
+    t += 30_000
+    recorder.update(np("SB", 25.0, duration = 180), t)
+    t += 30_000
+    recorder.update(np("SB", 55.0, duration = 180), t)
+    recorder.update(null, t)
+    check("Spostamento indietro a metà brano: un ascolto, non finito", written.size == 1 && !written[0].finished, written.joinToString { "${it.seconds}/${it.finished}" })
+
+    // Pausa di 15 minuti: l'app lascia il primo piano e l'ascolto va nel diario (flush); poi riprende. Nel diario resta
+    // un ascolto solo, finito.
+    val pauseJournal = Journal(Journal.at(Files.createTempDirectory("xonos-journal-pause").toFile()), { true }, zone) { now }
+    val pauseRecorder = ListenRecorder({ Journal.PLACE_PHONE }) { serverId, l -> pauseJournal.add(serverId, l) }
+    t = at(2026, 11, 4, 9)
+    pauseRecorder.update(np("PP", 0.0, duration = 180), t)
+    t += 60_000
+    pauseRecorder.update(np("PP", 60.0, playing = false, duration = 180), t)
+    t += 10 * 60_000
+    pauseRecorder.flush(t)
+    val afterFlush = pauseJournal.read(server, 0)
+    t += 5 * 60_000
+    pauseRecorder.update(np("PP", 60.0, duration = 180), t)
+    t += 120_000
+    pauseRecorder.update(np("PP", 180.0, duration = 180), t)
+    pauseRecorder.update(np("PQ", 0.0, duration = 180), t + 500)
+    val afterPause = pauseJournal.read(server, 0)
+    check("Pausa con flush: subito una riga (l'app poteva essere chiusa)", afterFlush.size == 1 && afterFlush[0].seconds in 59.0..61.0, afterFlush.joinToString { "${it.seconds}/${it.finished}" })
+    check(
+        "Pausa di 15 minuti con flush, poi ripreso: un ascolto solo, 180 s, finito",
+        afterPause.size == 1 && afterPause[0].finished && afterPause[0].seconds in 179.0..180.0,
+        afterPause.joinToString { "${it.seconds}/${it.finished}" },
+    )
+    // Dopo più di 30 minuti di pausa invece è un ascolto nuovo, anche dopo un flush.
+    t += 1_000
+    pauseRecorder.update(np("PR", 0.0, duration = 180), t)
+    t += 60_000
+    pauseRecorder.update(np("PR", 60.0, playing = false, duration = 180), t)
+    pauseRecorder.flush(t + 1_000)
+    t += 40 * 60_000
+    pauseRecorder.update(np("PR", 60.0, duration = 180), t)
+    t += 30_000
+    pauseRecorder.update(np("PR", 90.0, duration = 180), t)
+    pauseRecorder.flush(t)
+    check("Pausa di 40 minuti con flush: due ascolti", pauseJournal.read(server, 0).count { it.name == "Brano PR" } == 2, pauseJournal.read(server, 0).joinToString { "${it.name} ${it.seconds}" })
+
+    // L'ascolto in corso così com'è (per non perderlo se il processo muore).
+    val snaps = ListenRecorder({ Journal.PLACE_CAR }) { _, _ -> }
+    t += 3_600_000
+    snaps.update(np("SN", 0.0), t)
+    val none = snaps.snapshot()
+    t += 40_000
+    snaps.update(np("SN", 40.0), t)
+    val snap = snaps.snapshot()
+    check("Ascolto in corso: niente prima di sentirlo, poi lui", none == null && snap?.first == server && snap.second.seconds in 39.0..41.0 && !snap.second.skipped && snap.second.place == Journal.PLACE_CAR, snap.toString())
+
+    // Lo stesso ascolto scritto due volte (stesso inizio, stesso brano): se ne legge uno, quello con più secondi.
+    val twice = Journal(Journal.at(Files.createTempDirectory("xonos-journal-twice").toFile()), { true }, zone) { now }
+    twice.add(server, listen(at(2026, 11, 4, 8), 1, seconds = 60.0, finished = false))
+    twice.add(server, listen(at(2026, 11, 4, 9), 2))
+    twice.add(server, listen(at(2026, 11, 4, 8), 1, seconds = 200.0, finished = true))
+    twice.add(server, listen(at(2026, 11, 4, 8), 1, seconds = 120.0, finished = false))
+    val deduped = twice.read(server)
+    check("Doppioni: un ascolto per inizio e brano, quello più avanti", deduped.size == 2 && deduped[0].seconds == 200.0 && deduped[0].finished && twice.counts(server).listens == 2, deduped.joinToString { "${it.uri} ${it.seconds}" })
 
     // Un brano mai suonato (la coda caricata in pausa) non si scrive.
     written.clear()

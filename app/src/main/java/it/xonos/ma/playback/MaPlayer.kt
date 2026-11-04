@@ -129,6 +129,12 @@ class MaPlayer(
     var serverId: String? = null
         private set
 
+    /**
+     * Il Music Assistant ([serverId]) che ha mandato [queue]. Passati a un altro server, la coda di prima resta qui finché
+     * non arriva quella nuova: non è sua (vedi [queueState]).
+     */
+    private var queueServer: String? = null
+
     private class Expectation(val test: (QueueState?) -> Boolean, val future: SettableFuture<Void?>)
     private val expectations = mutableListOf<Expectation>()
 
@@ -343,6 +349,7 @@ class MaPlayer(
     private fun apply(q: QueueState, itemsChanged: Boolean = false) {
         val old = queue
         queue = q
+        queueServer = serverId
         if (q.playing) lastPlayingAt = SystemClock.elapsedRealtime()
         val jumped = old == null || old.currentIndex != q.currentIndex || old.current?.id != q.current?.id
         setElapsed(q.elapsedSec, fromServer = !jumped)
@@ -804,8 +811,12 @@ class MaPlayer(
 
     val isPlayingOnServer: Boolean get() = queue?.playing == true
 
-    /** Lo stato della coda come l'ha detto Music Assistant l'ultima volta (per la copia dell'ultimo ascolto e il diario). */
-    val queueState: QueueState? get() = queue
+    /**
+     * Lo stato della coda come l'ha detto Music Assistant l'ultima volta (per la copia dell'ultimo ascolto e il diario).
+     * Null se è del server di prima: passati a un altro Music Assistant, la sua coda non c'è ancora, e quella vecchia
+     * finirebbe nella copia e nel diario del nuovo.
+     */
+    val queueState: QueueState? get() = queue?.takeIf { queueServer != null && queueServer == serverId }
 
     /** Dove è arrivato ciò che si sente, in secondi (la posizione mostrata, un po' indietro dopo un avvio lento). */
     val heardPositionSec: Double

@@ -25,7 +25,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
@@ -134,14 +137,20 @@ internal fun Modifier.pressScale(interaction: InteractionSource): Modifier = com
  * L'entrata a cascata di una sezione: sale di 16 dp e compare, [index] × 30 ms dopo la prima (dalla sesta in poi
  * insieme). Solo se [play]: chi chiama lo accende al primo caricamento del processo (vedi [CascadeOnce]), sennò le
  * sezioni comparirebbero di nuovo a ogni scorrimento. Con le animazioni spente niente cascata.
+ *
+ * Finita, non si rifà: una sezione che esce dallo schermo e torna (la LazyColumn la toglie e la ricompone) ritrova il
+ * suo "fatto" con rememberSaveable, che la LazyColumn tiene per ogni voce anche fuori dallo schermo.
  */
 internal fun Modifier.cascadeIn(index: Int, play: Boolean): Modifier = composed {
     if (!play || reducedMotion()) return@composed Modifier
+    var done by rememberSaveable { mutableStateOf(false) }
+    if (done) return@composed Modifier
     val progress = remember { Animatable(0f) }
     val rise = with(LocalDensity.current) { 16.dp.toPx() }
     LaunchedEffect(Unit) {
         delay(Motion.CASCADE_STEP_MS * min(index, Motion.CASCADE_STEPS - 1))
         progress.animateTo(1f, tween(Motion.CASCADE_MS, easing = Motion.emphasizedDecelerate))
+        done = true
     }
     graphicsLayer {
         alpha = progress.value

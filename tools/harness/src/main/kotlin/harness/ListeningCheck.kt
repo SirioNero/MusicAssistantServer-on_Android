@@ -8,11 +8,8 @@ import it.xonos.ma.data.QueueState
 import it.xonos.ma.data.Settings
 import it.xonos.ma.data.objects
 import it.xonos.ma.data.taste.Journal
-import it.xonos.ma.phone.model.ServerKeeper
-import it.xonos.ma.phone.model.ServerKeeper.Need
+import it.xonos.ma.data.taste.Listen
 import it.xonos.ma.playback.Listening
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
@@ -26,9 +23,11 @@ import java.util.concurrent.Executor
 
 /**
  * Dal lettore ai file (playback/Listening.kt), come fa il servizio: la copia dell'ultimo ascolto scritta solo per un
- * brano sentito suonare (a ogni brano nuovo, alla pausa, ogni 30 s, alla chiusura), il diario con finiti, saltati e il
- * luogo "auto" dagli intervalli che segna ServerKeeper col bisogno CAR, l'interruttore, i numeri e "Cancella". Nel
- * registro solo numeri. Con MA_TOKEN anche la riga di diagnosi degli artisti e una coda vera di Music Assistant.
+ * brano sentito suonare (a ogni brano nuovo, alla pausa, ogni 30 s, alla chiusura se ha suonato dopo l'ultima copia,
+ * alla fine della coda), mai indietro senza suonare (la coda ripristinata dopo un distacco), il diario con finiti,
+ * saltati e il luogo "auto" dai viaggi in auto ([Listening.carTrip]), l'ascolto in corso ritrovato da un processo nuovo,
+ * la potatura all'avvio, l'interruttore, i numeri e "Cancella". Nel registro solo numeri. Con MA_TOKEN anche la riga di
+ * diagnosi degli artisti e una coda vera di Music Assistant.
  */
 fun main(): Unit = runBlocking {
     var failures = 0
@@ -55,11 +54,12 @@ fun main(): Unit = runBlocking {
     val queueId = "telefono-prova"
     val lastFile = File(root, Listening.LAST_LISTEN_FILE)
 
-    fun queue(i: Int, playing: Boolean, elapsed: Double, duration: Int = 200, index: Int = i, items: Int = 12): QueueState =
+    fun queue(i: Int, playing: Boolean, elapsed: Double, duration: Int = 200, index: Int = i, items: Int = 12, state: String? = null, ended: Boolean = false): QueueState =
         QueueState.from(
             JSONObject()
                 .put("queue_id", queueId)
-                .put("state", if (playing) "playing" else "paused")
+                .put("state", state ?: if (playing) "playing" else "paused")
+                .put("ended", ended)
                 .put("items", items)
                 .put("current_index", index)
                 .put("elapsed_time", elapsed)
@@ -122,16 +122,27 @@ fun main(): Unit = runBlocking {
     now += 4_000
     feed(queue(1, playing = false, elapsed = 46.0), 46.0)
     check("Seconda pausa a pochi secondi dalla prima: di nuovo", copy()?.positionSec == 46.0, "${copy()?.positionSec}")
+    val pausedKey = copy()?.key
     now += 2_000
-    feed(queue(1, playing = false, elapsed = 46.0), 51.0, force = true)
-    check("Alla chiusura (force) per la voce sentita: sì", copy()?.positionSec == 51.0)
+    feed(queue(1, playing = false, elapsed = 46.0), 46.0, force = true)
+    check("Alla chiusura (force) senza aver suonato dopo la pausa: la copia resta com'era (chiave e ora)", copy()?.key == pausedKey && copy()?.positionSec == 46.0, "${copy()?.key} ${copy()?.positionSec}")
+    now += 600_000
+    feed(queue(1, playing = false, elapsed = 46.0), 46.0, force = true)
+    check("…anche 10 minuti dopo (la fine del primo piano): «Nascondi» regge", copy()?.key == pausedKey)
+    now += 1_000
+    feed(queue(1, playing = true, elapsed = 46.0), 46.0)
+    now += 3_000
+    feed(queue(1, playing = true, elapsed = 49.0), 49.0, force = true)
+    check("Alla chiusura dopo aver suonato: sì", copy()?.positionSec == 49.0 && copy()?.key != pausedKey)
+    now += 2_000
+    feed(queue(1, playing = false, elapsed = 51.0), 51.0)
     check("Nel diario ancora niente (il brano è in pausa, non finito)", lines().isEmpty())
 
     // ---------- Il diario ----------
     // Riprende e arriva in fondo; poi il 2.
     now += 1_000
-    feed(queue(1, playing = true, elapsed = 46.0), 46.0)
-    now += 154_000
+    feed(queue(1, playing = true, elapsed = 51.0), 51.0)
+    now += 149_000
     feed(queue(1, playing = true, elapsed = 200.0), 200.0)
     now += 500
     feed(queue(2, playing = true, elapsed = 0.0), 0.0)
@@ -144,30 +155,23 @@ fun main(): Unit = runBlocking {
     check("Luogo: telefono", all.firstOrNull()?.place == Journal.PLACE_PHONE)
     check("Il brano nuovo è la copia", copy()?.queueItemId == "voce-2")
 
-    // Il 2 saltato dopo 6 s; intanto arriva l'auto. Il keeper segna il viaggio col bisogno CAR (inizio e fine), e il
-    // diario lo usa per il luogo.
-    val keeper = ServerKeeper(CoroutineScope(Dispatchers.Unconfined), used = { false }, start = {}, stop = {}, wallClock = { now })
-    keeper.recordCars(listening.cars, inline)
-    keeper.hold(Need.SCREEN)
-    keeper.touch(Need.CAR)
-    check("Un tocco dell'auto (il menu) non apre un viaggio", listening.cars.intervals(now).isEmpty())
+    // Il 2 saltato dopo 6 s; intanto arriva l'auto. Il servizio segna il viaggio quando un'app sfoglia il menu da fuori
+    // e quando l'ultima se ne va (inizio e fine), e il diario lo usa per il luogo.
     now += 6_000
     feed(queue(2, playing = true, elapsed = 6.0), 6.0)
     now += 300
-    keeper.hold(Need.CAR)
+    listening.carTrip(true)
     val carStart = now
-    keeper.hold(Need.CAR)
     feed(queue(3, playing = true, elapsed = 0.0), 0.0)
     all = lines()
     check("Saltato dopo 6 s: saltato", all.size == 2 && all[1].skipped && !all[1].finished, "${all.getOrNull(1)?.seconds} s")
     now += 100_000
     feed(queue(3, playing = true, elapsed = 100.0), 100.0)
     now += 1_000
-    keeper.release(Need.CAR)
-    check("Due prese del bisogno CAR: il viaggio resta aperto finché non si lasciano tutte e due", listening.cars.intervals(now).singleOrNull()?.last == now)
-    keeper.release(Need.CAR)
+    check("Viaggio in corso: aperto fino ad adesso", listening.cars.intervals(now).singleOrNull()?.last == now)
+    listening.carTrip(false)
     now += 60_000
-    keeper.release(Need.CAR)
+    listening.carTrip(false)
     val trips = listening.cars.intervals(now)
     check("Un viaggio, chiuso quando l'auto se n'è andata", trips.size == 1 && trips[0].first == carStart && trips[0].last == carStart + 101_000, trips.toString())
     val saved = JSONObject(File(Journal.at(root), "car-sessions.json").readText())
@@ -185,9 +189,12 @@ fun main(): Unit = runBlocking {
     all = lines()
     check("Alla chiusura l'ascolto in corso va nel diario (né finito né saltato)", all.size == 4 && !all[3].finished && !all[3].skipped && all[3].seconds in 49.0..52.0, "${all.getOrNull(3)?.seconds} s")
 
-    // Spenta: niente di nuovo; riaccesa: di nuovo.
+    // Spenta: niente di nuovo, nemmeno viaggi; riaccesa: di nuovo.
     enabled = false
+    listening.carTrip(true)
     now += 1_000
+    listening.carTrip(false)
+    check("Cronologia spenta: nessun viaggio nuovo", listening.cars.intervals(now).size == 1)
     feed(queue(5, playing = true, elapsed = 0.0), 0.0)
     now += 199_000
     feed(queue(5, playing = true, elapsed = 199.0), 199.0)
@@ -231,6 +238,123 @@ fun main(): Unit = runBlocking {
     val tCounts = threaded.counts()
     val tLines = threaded.journal.read(server, 0)
     check("Thread delle scritture: 40 ascolti in ordine, 39 saltati", tCounts.listens == 40 && tLines.map { it.libraryUri } == (1..40).map { "library://track/$it" } && tLines.count { it.skipped } == 39, "${tCounts.listens}")
+
+    // ---------- La copia dopo un distacco, alla fine della coda ----------
+    val other = Listening(Files.createTempDirectory("xonos-listening-copy").toFile(), { true }, inline) { now }
+    fun feedOther(q: QueueState?, position: Double, force: Boolean = false) =
+        other.update(server, q, { upcoming(q?.currentIndex ?: 0) }, position, force)
+    feedOther(queue(1, playing = true, elapsed = 150.0, duration = 300), 150.0)
+    now += 30_000
+    feedOther(queue(1, playing = true, elapsed = 180.0, duration = 300), 180.0)
+    // La rete cade: l'audio ricevuto suona ancora un po', poi si ferma; lo stato resta l'ultimo "playing".
+    now += 15_000
+    feedOther(queue(1, playing = true, elapsed = 180.0, duration = 300), 195.0)
+    // Al ritorno Music Assistant ripristina la stessa voce col punto del suo ultimo salvataggio.
+    now += 60_000
+    feedOther(queue(1, playing = false, elapsed = 4.5, duration = 300, state = "idle"), 4.5)
+    check("Coda ripristinata dopo un distacco (stessa voce a 4,5 s): la copia tiene il punto sentito", other.lastListen.read()?.positionSec == 195.0, "${other.lastListen.read()?.positionSec}")
+    now += 600_000
+    feedOther(queue(1, playing = false, elapsed = 4.5, duration = 300, state = "idle"), 4.5, force = true)
+    check("…anche alla chiusura dell'app", other.lastListen.read()?.positionSec == 195.0, "${other.lastListen.read()?.positionSec}")
+    // Riparte da lì: la posizione vale di nuovo quella che si sente, anche indietro.
+    now += 1_000
+    feedOther(queue(1, playing = true, elapsed = 195.0, duration = 300), 195.0)
+    now += 2_000
+    feedOther(queue(1, playing = true, elapsed = 10.0, duration = 300), 10.0)
+    feedOther(queue(1, playing = false, elapsed = 10.0, duration = 300), 10.0)
+    check("Spostato indietro mentre suona, poi pausa: la copia segue", other.lastListen.read()?.positionSec == 10.0, "${other.lastListen.read()?.positionSec}")
+    // L'ultimo brano della coda finisce: prima lo stato fermo, qualche secondo dopo "ended" (con la posizione a 0).
+    now += 1_000
+    feedOther(queue(11, playing = true, elapsed = 190.0, duration = 200, index = 11), 190.0)
+    now += 9_900
+    feedOther(queue(11, playing = false, elapsed = 199.9, duration = 200, index = 11, state = "idle"), 199.9)
+    check("Fine dell'ultimo brano: copia ferma, non ancora finita", other.lastListen.read()?.let { !it.ended && it.queueItemId == "voce-11" } == true)
+    now += 5_000
+    feedOther(queue(11, playing = false, elapsed = 0.0, duration = 200, index = 11, state = "idle", ended = true), 0.0)
+    val ended = other.lastListen.read()
+    check("Music Assistant segna la fine della coda: la copia dice finita (Ascolta di nuovo)", ended?.ended == true && ended.positionSec == 199.9, "${ended?.ended} ${ended?.positionSec}")
+    val endedKey = ended?.key
+    now += 600_000
+    feedOther(queue(11, playing = false, elapsed = 0.0, duration = 200, index = 11, state = "idle", ended = true), 0.0, force = true)
+    check("…e alla chiusura non si riscrive", other.lastListen.read()?.key == endedKey)
+
+    // ---------- L'ascolto in corso, se il processo muore ----------
+    val crashDir = Files.createTempDirectory("xonos-listening-crash").toFile()
+    val pendingFile = File(Journal.at(crashDir), Listening.PENDING_FILE)
+    val dying = Listening(crashDir, { true }, inline) { now }
+    dying.update(server, queue(1, playing = true, elapsed = 0.0), { emptyList() }, 0.0)
+    now += 5_000
+    dying.update(server, queue(1, playing = true, elapsed = 5.0), { emptyList() }, 5.0)
+    check("Copia dell'ascolto in corso: subito appena si sente", pendingFile.exists())
+    now += 30_000
+    dying.update(server, queue(1, playing = true, elapsed = 35.0), { emptyList() }, 35.0)
+    now += 30_000
+    dying.update(server, queue(1, playing = true, elapsed = 65.0), { emptyList() }, 65.0)
+    now += 20_000
+    // Il processo muore qui (aggiornamento, Android): nessuna chiusura. Il processo dopo la trova.
+    val reborn = Listening(crashDir, { true }, inline) { now }
+    val recovered = reborn.journal.read(server, 0)
+    check("Processo morto mentre suonava: l'ascolto c'è nel processo dopo (65 s)", recovered.size == 1 && recovered[0].seconds in 64.0..66.0 && !recovered[0].finished && !recovered[0].skipped, recovered.joinToString { "${it.seconds}/${it.finished}" })
+    check("…e la copia dell'ascolto in corso non c'è più", !pendingFile.exists())
+    val reborn2 = Listening(crashDir, { true }, inline) { now }
+    check("…una volta sola", reborn2.journal.read(server, 0).size == 1)
+    // Chiuso per bene: niente copia, e niente doppioni.
+    reborn2.update(server, queue(2, playing = true, elapsed = 0.0), { emptyList() }, 0.0)
+    now += 40_000
+    reborn2.update(server, queue(2, playing = true, elapsed = 40.0), { emptyList() }, 40.0)
+    reborn2.update(server, queue(3, playing = true, elapsed = 0.0), { emptyList() }, 0.0)
+    check("Ascolto chiuso: nel diario, e la sua copia via", reborn2.journal.read(server, 0).size == 2 && !pendingFile.exists())
+    // La copia scritta e la chiusura vera entrambe nel diario (il processo muore fra le due): se ne legge una, la più avanti.
+    Journal.at(crashDir).mkdirs()
+    val partial = Listen(now - 50_000, "spotify--Ab12://track/sp9", "library://track/9", "Brano segreto 9", "track", emptyList(), null, 200, 20.0, false, false, null, Journal.PLACE_PHONE)
+    reborn2.journal.add(server, partial.copy(seconds = 45.0))
+    pendingFile.writeText(JSONObject().put("server_id", server).put("listen", partial.toJson()).toString())
+    val reborn3 = Listening(crashDir, { true }, inline) { now }
+    val nine = reborn3.journal.read(server, 0).filter { it.libraryUri == "library://track/9" }
+    check("Copia e chiusura dello stesso ascolto: uno solo, quello più avanti", nine.size == 1 && nine[0].seconds == 45.0, nine.joinToString { "${it.seconds}" })
+    pendingFile.writeText("{\"server_id\": \"x\", \"listen\": {\"name\": \"Brano segreto")
+    Listening(crashDir, { true }, inline) { now }
+    check("Copia rovinata: via, senza errori", !pendingFile.exists())
+    // Cronologia spenta: la copia non si usa.
+    pendingFile.writeText(JSONObject().put("server_id", server).put("listen", partial.copy(timeMs = now - 10_000).toJson()).toString())
+    val offAfter = Listening(crashDir, { false }, inline) { now }
+    check("Cronologia spenta: la copia dell'ascolto in corso si butta", !pendingFile.exists() && offAfter.journal.read(server, 0).size == reborn3.journal.read(server, 0).size)
+
+    // ---------- Pausa lunga: l'app lascia il primo piano, poi si riprende ----------
+    val pauseDir = Files.createTempDirectory("xonos-listening-pause").toFile()
+    val paused = Listening(pauseDir, { true }, inline) { now }
+    paused.update(server, queue(1, playing = true, elapsed = 0.0), { emptyList() }, 0.0)
+    now += 60_000
+    paused.update(server, queue(1, playing = false, elapsed = 60.0), { emptyList() }, 60.0)
+    now += 600_000
+    // Come onUpdateNotification alla fine del primo piano.
+    paused.update(server, queue(1, playing = false, elapsed = 60.0), { emptyList() }, 60.0, force = true)
+    paused.flush()
+    now += 300_000
+    paused.update(server, queue(1, playing = true, elapsed = 60.0), { emptyList() }, 60.0)
+    now += 140_000
+    paused.update(server, queue(1, playing = true, elapsed = 200.0), { emptyList() }, 200.0)
+    paused.update(server, queue(2, playing = true, elapsed = 0.0), { emptyList() }, 0.0)
+    val one = paused.journal.read(server, 0)
+    check("Pausa di 15 minuti con la fine del primo piano: un ascolto solo, finito", one.size == 1 && one[0].finished && one[0].seconds in 199.0..200.0, one.joinToString { "${it.seconds}/${it.finished}" })
+
+    // ---------- La potatura all'avvio, anche con la cronologia spenta ----------
+    val pruneDir = Files.createTempDirectory("xonos-listening-prune").toFile()
+    val oldMonth = File(Journal.at(pruneDir), "journal/$server/2024-01.jsonl").also { it.parentFile.mkdirs(); it.writeText("{}\n") }
+    val keptMonth = File(Journal.at(pruneDir), "journal/$server/2026-10.jsonl").also { it.writeText("{}\n") }
+    Listening(pruneDir, { false }, inline) { now }
+    check("All'avvio i mesi di più di un anno si tolgono (cronologia spenta)", !oldMonth.exists() && keptMonth.exists())
+
+    // ---------- La diagnosi una volta per versione ----------
+    val counted = Listening.ArtistCounts(1200, 800, 950)
+    val savedLine = Listening.saveDiagnosis("$server/58", counted)
+    check(
+        "Diagnosi salvata: la stessa versione e lo stesso server la ritrovano, gli altri no",
+        Listening.savedDiagnosis(savedLine, "$server/58") == counted && Listening.savedDiagnosis(savedLine, "$server/59") == null &&
+            Listening.savedDiagnosis(savedLine, "altro/58") == null && Listening.savedDiagnosis(null, "$server/58") == null &&
+            Listening.savedDiagnosis("$server/58 1 x 3", "$server/58") == null,
+        savedLine,
+    )
 
     // ---------- Con un Music Assistant vero ----------
     if (System.getenv("MA_TOKEN") != null) {
@@ -278,6 +402,7 @@ fun main(): Unit = runBlocking {
     val templates = setOf(
         "I/Xonos: Per te: diario, ascolti scritti da quando Xonos è partito N (finiti N, saltati N)",
         "I/Xonos: Per te: artisti N, con generi N, con MBID N",
+        "W/Xonos: Per te: ascolto in corso illeggibile (JSONException)",
     )
     val perTe = log.filter { it.contains("Per te:") }
     check("Nel registro le righe di Per te sono solo numeri", perTe.isNotEmpty() && perTe.all { it.replace(Regex("\\d+"), "N") in templates }, perTe.joinToString(" | "))

@@ -50,8 +50,23 @@ cmake --build "$WORK/mbedtls-build" -j "$JOBS" >/dev/null
 cmake --install "$WORK/mbedtls-build" >/dev/null
 
 echo "ffmpeg $FFMPEG_VERSION per $ABI"
-curl -fsSL "https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.xz" | tar xJ -C "$WORK"
-cd "$WORK/ffmpeg-$FFMPEG_VERSION"
+# ffmpeg.org a volte non risponde ai runner di GitHub (4 novembre 2026: «Could not connect to server»):
+# si riprova, poi si prende lo stesso tag dal mirror di FFmpeg su GitHub. Lì manca il file VERSION delle
+# release, che si scrive: Music Assistant legge la versione da «ffmpeg -version» e vuole la 7.
+SRC="$WORK/ffmpeg-$FFMPEG_VERSION"
+mkdir -p "$SRC"
+if curl -fsSL --retry 3 --retry-all-errors --retry-delay 10 --connect-timeout 30 \
+        "https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.xz" -o "$WORK/ffmpeg.tar.xz"; then
+    tar xJf "$WORK/ffmpeg.tar.xz" --strip-components=1 -C "$SRC"
+else
+    echo "ffmpeg.org non risponde: prendo n$FFMPEG_VERSION da github.com/FFmpeg/FFmpeg"
+    curl -fsSL --retry 3 --retry-all-errors --retry-delay 10 --connect-timeout 30 \
+        "https://github.com/FFmpeg/FFmpeg/archive/refs/tags/n$FFMPEG_VERSION.tar.gz" \
+        | tar xz --strip-components=1 -C "$SRC"
+    echo "$FFMPEG_VERSION" > "$SRC/VERSION"
+fi
+rm -f "$WORK/ffmpeg.tar.xz"
+cd "$SRC"
 # Le decodifiche: tutto l'audio, più le immagini delle copertine.
 DECODERS='aac*,ac3*,eac3*,alac,als,ape,atrac*,cook,dca,dsd_*,flac,mlp,truehd,mp1*,mp2*,mp3*,mpc7,mpc8'
 DECODERS+=',opus,vorbis,wavpack,wma*,tta,tak,speex,gsm*,amr*,qdm2,qdmc,ra_*,ralf,sipr,twinvq,adpcm_*'

@@ -31,6 +31,8 @@ class Settings {
 
     var hiddenResume: String? = null
 
+    var perTeDiagnosis: String? = null
+
     var homeMoreOpen: Boolean = false
 
     var playerName: String = DEFAULT_NAME

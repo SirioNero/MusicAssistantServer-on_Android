@@ -35,6 +35,8 @@ data class LastListen(
     val ended: Boolean,
     /** Quando è stata fatta la copia, in ms dal 1970. */
     val timeMs: Long,
+    /** La coda era dinamica (un'Infinite Mix): la sorgente non dice da dove riprendere (vedi [QueueState.dynamic]). */
+    val dynamic: Boolean = false,
 ) {
     /** Il brano. [durationSec] 0 se non si sa (le radio). */
     data class Track(
@@ -88,6 +90,7 @@ data class LastListen(
         .put("repeat", repeat)
         .put("ended", ended)
         .put("time", timeMs)
+        .put("dynamic", dynamic)
 
     companion object {
         const val VERSION = 1
@@ -132,6 +135,7 @@ data class LastListen(
                 repeat = queue.repeat,
                 ended = queue.ended,
                 timeMs = timeMs,
+                dynamic = queue.dynamic,
             )
         }
 
@@ -172,6 +176,8 @@ data class LastListen(
                 repeat = o.str("repeat") ?: "off",
                 ended = o.optBoolean("ended"),
                 timeMs = o.optLong("time"),
+                // Le copie di prima non l'hanno: false.
+                dynamic = o.optBoolean("dynamic"),
             )
         }
 

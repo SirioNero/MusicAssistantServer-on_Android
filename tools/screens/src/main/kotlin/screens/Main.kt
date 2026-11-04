@@ -77,7 +77,8 @@ import kotlin.system.exitProcess
  * composable dell'app, lo stesso PhoneModel, un Music Assistant finto ([FakeServer]).
  *
  * -Dxonos.out=cartella (predefinita out/), -Dxonos.lang=it|en|... (predefinita it),
- * -Dxonos.only=home,player (solo alcune scene).
+ * -Dxonos.only=home,player (solo alcune scene), -Dxonos.fontScale=1.3 (il testo di sistema più grande, come
+ * Impostazioni > Display > Dimensione carattere; predefinita 1).
  */
 fun main() {
     // Un errore non deve lasciare il processo appeso ai thread del server finto e di OkHttp.
@@ -143,6 +144,8 @@ private const val WIDTH = 1080
 // Più alta con -Dxonos.height, per vedere intere le pagine lunghe (le impostazioni).
 private val HEIGHT = System.getProperty("xonos.height")?.toIntOrNull() ?: 2340
 private const val DENSITY = 2.625f
+// La dimensione del testo scelta nel sistema (-Dxonos.fontScale): le card con altezze fisse si provano con 1,3 e 2.
+private val FONT_SCALE = System.getProperty("xonos.fontScale")?.toFloatOrNull() ?: 1f
 
 /**
  * Una scena: prepara il modello (schede, pagine, lettore) e dice cosa sta suonando. [server] è Music Assistant sul
@@ -188,7 +191,7 @@ private fun shoot(file: File, lang: String, scene: Scene) {
     model.lastListen = { store }
     scene.setUp(model)
     val host = FakeHost(Language.of(if (lang == "zh") "zh-CN" else lang))
-    val composeScene = ImageComposeScene(WIDTH, HEIGHT, Density(DENSITY)) { XonosScreen(model, FakeLink(scene.now), host) }
+    val composeScene = ImageComposeScene(WIDTH, HEIGHT, Density(DENSITY, FONT_SCALE)) { XonosScreen(model, FakeLink(scene.now), host) }
     // Il tempo di caricare le copertine e di finire le animazioni.
     val start = System.nanoTime()
     while (System.nanoTime() - start < SETTLE_NS) {

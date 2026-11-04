@@ -73,7 +73,7 @@ prima di cominciare: le cose scritte qui sono già state verificate, non vanno r
   (F-Droid rifiuta quel blocco). Build riproducibili: il workflow "Riproducibile" compila la release
   come F-Droid (la loro immagine `fdroidserver:buildserver-trixie`, OpenJDK 21, Gradle del wrapper,
   senza `tools/`) e la confronta byte per byte con l'APK della release tolta la firma: per la 0.1.38, la
-  0.1.42, la 0.1.49, la 0.1.50, la 0.1.52, la 0.1.53 e la 0.1.56 identici. Così la ricetta ha `Binaries` e `AllowedAPKSigningKeys` (SHA-256 del certificato
+  0.1.42, la 0.1.49, la 0.1.50, la 0.1.52, la 0.1.53, la 0.1.56 e la 0.1.57 identici. Così la ricetta ha `Binaries` e `AllowedAPKSigningKeys` (SHA-256 del certificato
   `18ef3fc3…2c836`): F-Droid pubblica l'APK con la nostra firma e si passa da GitHub/Obtainium a F-Droid
   senza disinstallare. Dopo ogni release va lanciato a mano "Riproducibile": una versione non identica
   F-Droid non la pubblica. Il modello delle richieste di fdroiddata vuole in `commit` l'hash completo e

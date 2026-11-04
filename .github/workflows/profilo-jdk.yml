@@ -1,9 +1,10 @@
 name: Profilo e JDK
 
 # Prova di un giorno (4 novembre 2026): la 0.1.58 compilata come F-Droid (OpenJDK 21) ha nel profilo ART una regola in
-# meno della release (Temurin 17): il costruttore che R8 crea fondendo classi. Qui la stessa versione si compila come la
-# release (setup-java, setup-gradle, gradle :app:assembleRelease, senza chiave) con JDK 17 e con JDK 21, e si confronta il
-# profilo con quello della release e con quello di F-Droid (contenuto 6d5244dce4d8a8fc). Da togliere dopo.
+# meno della release (Temurin 17): il costruttore che R8 crea fondendo classi. Primo giro: compilata da capo come la
+# release, senza la cache di Gradle, con JDK 17 e 21 dà il profilo di F-Droid (contenuto 6d5244dce4d8a8fc): non è il JDK.
+# Secondo giro: tre build uguali a quella della release (Temurin 17, la cache di Gradle di setup-gradle accesa), per
+# vedere se il profilo della release (e09c2f47c06caf25) esce a volte. Da togliere dopo.
 on:
   push:
     branches: ["claude/**"]
@@ -15,7 +16,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        jdk: [17, 21]
+        jdk: [17]
+        giro: [1, 2, 3]
     env:
       VERSION: "0.1.58"
     steps:
@@ -33,9 +35,9 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.14.3"
-          cache-disabled: true
+          cache-read-only: true
       - name: Compila come la release
-        run: gradle :app:assembleRelease --no-daemon -q
+        run: gradle :app:assembleRelease --no-daemon --stacktrace -q
       - name: Confronta il profilo
         run: |
           curl -sSfL -o signed.apk "https://github.com/${{ github.repository }}/releases/download/v$VERSION/Xonos.apk"

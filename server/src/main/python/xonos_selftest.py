@@ -26,7 +26,7 @@ import signal
 import sys
 import threading
 import time
-from contextlib import suppress
+from contextlib import nullcontext, suppress
 from pathlib import Path
 from typing import Any
 
@@ -757,7 +757,11 @@ async def _play_media_cases(kit: Any) -> tuple[bool, str]:  # noqa: PLR0915
             self.mass = test
             self.logger = logging.getLogger("music_assistant.xonos_prova")
             self.queue = SimpleNamespace(
-                queue_id="coda", is_dynamic=False, shuffle_enabled=False, smart_shuffle_active=False
+                queue_id="coda",
+                is_dynamic=False,
+                shuffle_enabled=False,
+                smart_shuffle_active=False,
+                extra_attributes={},
             )
             self.data = SimpleNamespace(
                 queue=self.queue,
@@ -765,6 +769,7 @@ async def _play_media_cases(kit: Any) -> tuple[bool, str]:  # noqa: PLR0915
                 enqueued_media_items=[],
                 credited_albums=set(),
                 userid=None,
+                play_action_refcount=0,
             )
             self._queue_data = {"coda": self.data}
             self._media_resolver = SimpleNamespace(_resolve_media_items=resolve)
@@ -774,6 +779,13 @@ async def _play_media_cases(kit: Any) -> tuple[bool, str]:  # noqa: PLR0915
             return self.queue
 
         def _set_transitioning(self, queue_id: str, value: bool) -> None:
+            pass
+
+        # per handle_play_action, che avvolge _handle_play_media (il lucchetto del lettore e lo stato della coda)
+        def signal_update(self, queue_id: str) -> None:
+            pass
+
+        def on_player_update(self, player: Any, changed: dict[str, Any]) -> None:
             pass
 
         async def _apply_shuffle(self, queue_id: str, option: Any, shuffle: Any) -> None:
@@ -821,7 +833,11 @@ async def _play_media_cases(kit: Any) -> tuple[bool, str]:  # noqa: PLR0915
     problems: list[str] = []
     seen: list[str] = []
     saved = (getattr(test, "players", None), getattr(test, "music", None))
-    test.players = SimpleNamespace(get_player=lambda queue_id, raise_unavailable=False: SimpleNamespace(extra_data={}))
+    test.players = SimpleNamespace(
+        get_player=lambda queue_id, raise_unavailable=False: SimpleNamespace(extra_data={}),
+        # il lucchetto del lettore (e del gruppo) di handle_play_action: qui c'è una coda sola
+        get_group_and_player_lock=lambda player_id: nullcontext(),
+    )
     test.music = SimpleNamespace(get_item_by_uri=by_uri)
     test._providers[kit.other] = SimpleNamespace(
         instance_id=kit.other, domain="xonos_altro", name="altro", available=True, manifest=SimpleNamespace(depends_on=None)

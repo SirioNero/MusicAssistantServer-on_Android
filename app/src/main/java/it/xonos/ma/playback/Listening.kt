@@ -14,7 +14,6 @@ import it.xonos.ma.data.taste.JournalCounts
 import it.xonos.ma.data.taste.Listen
 import it.xonos.ma.data.taste.ListenRecorder
 import it.xonos.ma.data.taste.NowListening
-import it.xonos.ma.phone.model.ResumePlan
 import kotlinx.coroutines.suspendCancellableCoroutine
 import org.json.JSONArray
 import org.json.JSONObject
@@ -148,7 +147,7 @@ class Listening(
         // Senza suonare la posizione non torna indietro: dopo un distacco Music Assistant ripristina la coda col punto del
         // suo ultimo salvataggio (pochi secondi dopo l'inizio del brano), e alla fine della coda dà 0. Si tiene quello
         // sentito.
-        val position = if (!q.playing && positionSec < heardPos - ResumePlan.SAME_SPOT_S) heardPos else positionSec
+        val position = if (!q.playing && positionSec < heardPos - LastListen.SAME_SPOT_S) heardPos else positionSec
         val copy = LastListen.of(server, q, next(), position, now) ?: return
         savedKey = key
         savedAt = now

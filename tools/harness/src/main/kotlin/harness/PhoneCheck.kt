@@ -404,6 +404,27 @@ fun main(): Unit = runBlocking {
     otherRepo.reconnect()
     val back = withTimeoutOrNull(30_000) { while (changedHome.resume == null) delay(100); true } == true
     check("Collegati al server della copia: Riprendi torna", back && changedHome.resume?.serverId == serverId)
+    check("Collegati: l'ultimo server collegato è salvato", otherSettings.lastServerId == serverId, "${otherSettings.lastServerId}")
+    // Android ha svuotato la cache (la Home salvata non c'è più) e il server è fermo: la copia è dell'ultimo server
+    // collegato, quindi Riprendi c'è subito. Cambiando server invece no, nemmeno riaprendo l'app.
+    otherSettings.save(Settings.Config("http://127.0.0.1:1", "", "x"))
+    otherRepo.reconnect()
+    withTimeoutOrNull(10_000) { otherRepo.connection.first { it !is Connection.Connected } }
+    val cleared = otherModel(ScreenCache(Files.createTempDirectory("xonos-cache-cleared").toFile()))
+    val clearedHome = cleared.page as HomePage
+    cleared.start(clearedHome)
+    withTimeoutOrNull(3_000) { while (clearedHome.resume == null) delay(10) }
+    check("Cache svuotata, server fermo: Riprendi dalla copia dell'ultimo server collegato", clearedHome.resume == heroListen && cleared.resumeVisible(clearedHome))
+    cleared.openSettings()
+    val away = cleared.page as SettingsPage
+    away.home = "http://127.0.0.1:3"
+    cleared.save(away)
+    check("Cambiato server: l'ultimo server collegato si dimentica", otherSettings.lastServerId == null)
+    val afterSwitch = otherModel(ScreenCache(Files.createTempDirectory("xonos-cache-empty2").toFile()))
+    val reopenedAgain = afterSwitch.page as HomePage
+    afterSwitch.start(reopenedAgain)
+    delay(1_000)
+    check("Cache svuotata dopo un cambio di server: niente Riprendi del server di prima", reopenedAgain.resume == null)
     otherRepo.release()
 
     bench.oldCacheChecks(model, home, rows, offlineSettings, library, emozioni, url, main)

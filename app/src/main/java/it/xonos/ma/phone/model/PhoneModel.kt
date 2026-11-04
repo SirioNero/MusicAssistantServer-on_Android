@@ -325,8 +325,12 @@ class PhoneModel(
         }
         var lists = false
         // Senza Home salvata (cancellata cambiando server, anche prima di riaprire l'app) la copia può essere del server di
-        // prima: "Riprendi" aspetta di sapere a quale Music Assistant si è collegati.
-        if (saved == null) page.otherServer = true
+        // prima: "Riprendi" aspetta di sapere a quale Music Assistant si è collegati. Se invece l'ha tolta Android (la
+        // cache) vale l'ultimo server collegato, che si dimentica cambiando server: la copia si vede anche col server fermo.
+        if (saved == null) {
+            val last = if (skip) null else settings.lastServerId
+            if (last != null) page.serverId = page.serverId ?: last else page.otherServer = true
+        }
         if (saved != null) {
             savedBase = savedBase ?: saved.base
             page.serverId = page.serverId ?: saved.serverId
@@ -580,6 +584,7 @@ class PhoneModel(
         val serverId = connectedServerId() ?: return
         page.serverId = serverId
         page.otherServer = false
+        if (settings.lastServerId != serverId) settings.lastServerId = serverId
         val queueId = queueId()
         val queue = library.queue(queueId)
         val index = queue?.currentIndex
@@ -1948,6 +1953,8 @@ class PhoneModel(
         // I "segna come ascoltato" che aspettavano "Annulla" erano per il server di prima.
         marking.values.forEach { it.cancel() }
         marking.clear()
+        // La copia di "Riprendi" sul telefono è del server di prima: senza Home salvata non la si mostra (vedi showLocal).
+        this.settings.lastServerId = null
         // Anche i testi (per uri, che tra due server può essere lo stesso) e gli elenchi aperti di casse e playlist.
         lyrics.clear()
         picker = null

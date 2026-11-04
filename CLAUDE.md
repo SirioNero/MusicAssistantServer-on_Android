@@ -1152,6 +1152,17 @@ della 2; è solo app (pacchetto del server invariato, 2.10.8-12).
   annulla), Riscopri, Dalla tua libreria (3 righe), Altro (le altre righe di MA, caricate solo se si apre: possono chiamare
   Spotify). Cache della Home v2 (`HomeSnapshot`, legge la v1). La Home si mostra subito dal disco (`showLocal`), poi si
   aggiorna (`refreshHome`).
+- **Riprendi, dalla revisione avversaria** (5 aree, un verificatore per area, poi correzioni riviste): se la coda va
+  rifatta, la sorgente con `start_item` solo per album, playlist e podcast non dinamici (artista, genere e Infinite Mix
+  ignorano `start_item` in MA 2.10.8: si rifà il brano da solo; un brano arrivato con «Suona dopo» non è nella sorgente:
+  rifiuto, poi il brano da solo); casuale e ripeti che una coda dinamica rifiuta non fermano la ripresa; il casuale va
+  a `play_media` (dalla 2.10, `Library.shufflesOnPlay`). La copia non torna indietro senza suonare (dopo un distacco MA
+  ripristina la coda con la posizione di circa 5 s dall'inizio del brano) e si riscrive quando MA segna la fine della
+  coda. La coda di `MaPlayer` è legata al server che l'ha mandata (`queueState` null dopo un cambio). «Segna come
+  ascoltato» si manda solo finiti i 6 s di «Annulla» (prima «Annulla» rimandava 0 e l'episodio spariva da In corso).
+  «Dall'inizio» con `start_from_beginning` (episodi) o `Library.backToStart` (audiolibri). Dopo un cambio di server
+  niente eroe finché non ci si collega (`HomePage.otherServer`, `Settings.lastServerId` per una cache svuotata).
+  L'eroe cresce col testo di sistema grande (`-Dxonos.fontScale` in tools/screens).
 - **Aspetto**: base scura neutra, ambra `#FFC27A` del marchio; `ArtTheme` sovrascrive primary/containers con la palette
   della copertina (animata 600 ms); Manrope per titoli (800) e sottotitoli (600), il resto col carattere di sistema;
   forme 6/10/14/20/28 e per tipo (artista tondo); `Motion`: pagine avanti 260 ms, indietro 180, schede 150, dissolvenze di
@@ -1159,9 +1170,14 @@ della 2; è solo app (pacchetto del server invariato, 2.10.8-12).
   (`MaPlayer.EXTRA_SOURCE_*`, tocco = apre album/playlist, non radio e audiolibri) e «Suona su» in basso. Il testo
   del brano si chiede da un `LaunchedEffect` (prima la risposta poteva perdersi).
 - **Cronologia**: `Journal` (JSONL, un file al mese per server, potato dopo un anno, fuori dai backup), un ascolto finito
-  o saltato dopo 6 s, luogo «auto» dai bisogni CAR di `ServerKeeper` (`recordCars`, `car-sessions.json`). Impostazioni ›
-  Per te: interruttore (`Settings.journalEnabled`, acceso di serie), conteggi, mesi, Cancella (lascia `last-listen.json`).
-  Logcat: solo numeri («Per te: diario, ascolti scritti … N», «Per te: artisti N, con generi N, con MBID N», una volta).
+  o saltato dopo 6 s, luogo «auto» finché un'app esterna sfoglia il menu (`PlaybackService.tripsChanged` →
+  `Listening.carTrip`, `car-sessions.json`; non basta comandare: cuffie, orologi e KDE Connect arrivano coi tasti;
+  a cronologia spenta niente viaggi; un viaggio lasciato aperto da un processo morto si chiude alla nascita del
+  successivo). L'ascolto in corso si copia in `pending-listen.json` (ripreso se il processo muore); ripeti uno e
+  pause lunghe contati giusti; potatura a ogni avvio. Impostazioni › Per te: interruttore (`Settings.journalEnabled`,
+  acceso di serie), conteggi, mesi, Cancella (lascia `last-listen.json`).
+  Logcat: solo numeri («Per te: diario, ascolti scritti … N», «Per te: artisti N, con generi N, con MBID N», una volta
+  per server e versione, `Settings.perTeDiagnosis`).
   `XonosApp.onCreate` apre `Listening` (nessuna lettura all'avvio).
 - **Auto**: le righe di «Per te» nell'ordine della Home, coi nomi di Xonos (`MenuLabels.row`, 16 righe note; le altre col
   nome di MA).

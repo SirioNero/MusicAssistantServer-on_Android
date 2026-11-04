@@ -33,6 +33,8 @@ class Settings {
 
     var perTeDiagnosis: String? = null
 
+    var lastServerId: String? = null
+
     var homeMoreOpen: Boolean = false
 
     var playerName: String = DEFAULT_NAME

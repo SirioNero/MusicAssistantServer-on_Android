@@ -59,7 +59,7 @@ sealed interface ResumeStep {
  */
 object ResumePlan {
     /** Fin qui la posizione della coda e quella della copia sono "lo stesso punto". */
-    const val SAME_SPOT_S = 10.0
+    const val SAME_SPOT_S = LastListen.SAME_SPOT_S
 
     /** Dopo una ricostruzione si va al punto solo oltre questo: sotto si riparte dall'inizio del brano. */
     const val SEEK_FROM_S = 15.0

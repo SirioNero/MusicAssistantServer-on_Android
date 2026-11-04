@@ -99,6 +99,12 @@ data class LastListen(
         const val NEXT = 3
 
         /**
+         * Fin qui due posizioni dello stesso brano sono "lo stesso punto" (ResumePlan.SAME_SPOT_S). Sta qui, in data/,
+         * perché lo usa anche playback/Listening.kt, che myCar copia senza le parti del telefono.
+         */
+        const val SAME_SPOT_S = 10.0
+
+        /**
          * La copia dallo stato della coda [queue] e dai brani dopo [next] (quelli da `current_index + 1`). [positionSec]
          * è la posizione che si sente (quella del lettore, più fresca di quella di Music Assistant). Null senza brano.
          */

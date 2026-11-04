@@ -108,6 +108,17 @@ class Settings(context: Context) {
         }
 
     /**
+     * Il Music Assistant (server_id) dell'ultima Home collegata; null dopo un cambio di server, finché il nuovo non
+     * risponde. Senza la Home salvata (è nella cache, che Android può svuotare) dice se la copia di "Riprendi" è di questo
+     * server anche col server fermo.
+     */
+    var lastServerId: String?
+        get() = prefs.getString(KEY_LAST_SERVER, null)
+        set(value) {
+            prefs.edit().putString(KEY_LAST_SERVER, value).apply()
+        }
+
+    /**
      * I numeri della diagnosi di "Per te" (quanti artisti, con generi, con MBID) e per quale Music Assistant e versione
      * di Xonos li si è contati (vedi playback/Listening.kt, savedDiagnosis): si contano una volta per versione.
      */
@@ -149,6 +160,7 @@ class Settings(context: Context) {
         private const val KEY_HIDDEN_RESUME = "hidden_resume"
         private const val KEY_HOME_MORE = "home_more_open"
         private const val KEY_PER_TE_DIAGNOSIS = "per_te_diagnosis"
+        private const val KEY_LAST_SERVER = "last_server_id"
 
         const val DEFAULT_NAME = "Xonos"
 

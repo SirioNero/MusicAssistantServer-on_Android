@@ -1,5 +1,6 @@
 package it.xonos.ma.phone.ui
 
+import android.animation.ValueAnimator
 import android.content.ClipData
 import android.content.ClipboardManager
 import androidx.activity.compose.BackHandler
@@ -17,12 +18,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import coil3.SingletonImageLoader
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
 import coil3.request.allowHardware
 import coil3.toBitmap
+import it.xonos.ma.R
 
 // Le poche cose dello schermo che dipendono da Android. Il banco di prova (tools/screens) ha la
 // sua versione di questo file per Compose Desktop.
@@ -64,7 +69,23 @@ internal fun rememberCopy(): (String) -> Unit {
 @OptIn(ExperimentalComposeUiApi::class)
 internal fun Modifier.automationIds(): Modifier = semantics { testTagsAsResourceId = true }
 
-/** I pixel di una copertina rimpicciolita, per prenderne il colore; null finché non ci sono. */
+/**
+ * Manrope (SIL OFL 1.1, licenza in assets/licenses/OFL-Manrope.txt), solo 600 e 800: i file di res/font li fa
+ * tools/font/make_font.py. Nel banco di prova (tools/screens) gli stessi file.
+ */
+internal val Manrope = FontFamily(
+    Font(R.font.manrope_semibold, FontWeight.SemiBold),
+    Font(R.font.manrope_extrabold, FontWeight.ExtraBold),
+)
+
+/**
+ * Vero se nel sistema le animazioni sono spente (opzioni sviluppatore, o "Rimuovi animazioni" in Accessibilità):
+ * niente cascata, scheletri fermi, pagine in dissolvenza breve.
+ */
+@Composable
+internal fun reducedMotion(): Boolean = remember { !ValueAnimator.areAnimatorsEnabled() }
+
+/** I pixel di una copertina rimpicciolita (48×48), per prenderne i colori; null finché non ci sono. */
 @Composable
 internal fun rememberArtworkPixels(url: String?): IntArray? {
     val context = LocalPlatformContext.current
@@ -82,4 +103,4 @@ internal fun rememberArtworkPixels(url: String?): IntArray? {
     return pixels
 }
 
-private const val SAMPLE_SIZE = 32
+private const val SAMPLE_SIZE = 48

@@ -2,8 +2,10 @@ package it.xonos.ma.phone.ui
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -56,17 +58,34 @@ import it.xonos.ma.R
 import it.xonos.ma.data.MaItem
 import it.xonos.ma.phone.model.Load
 import it.xonos.ma.phone.model.PhoneModel
-import kotlin.math.abs
-import kotlin.math.max
-import kotlin.math.min
 
 /** Le misure delle immagini chieste a Music Assistant: le versioni recenti accettano solo alcune misure. */
 internal const val SMALL_ART = 256
 internal const val LARGE_ART = 512
 
-/** La forma della copertina: tonda per gli artisti, arrotondata per il resto. */
-internal fun coverShape(mediaType: String?, corner: Dp = 8.dp): Shape =
-    if (mediaType == "artist") CircleShape else RoundedCornerShape(corner)
+/**
+ * La forma della copertina: tonda per gli artisti, per il resto con gli angoli del suo tipo (brano 8, album 12,
+ * playlist e mix 20, genere 16). Le copertine piccole delle righe danno il loro [corner].
+ */
+internal fun coverShape(mediaType: String?, corner: Dp? = null): Shape = when {
+    mediaType == "artist" -> CircleShape
+    corner != null -> RoundedCornerShape(corner)
+    else -> RoundedCornerShape(coverCorner(mediaType))
+}
+
+/** Gli angoli della copertina di un tipo, a misura di card. */
+internal fun coverCorner(mediaType: String?): Dp = when (mediaType) {
+    "track", "podcast_episode" -> 8.dp
+    "playlist", "mix" -> 20.dp
+    "genre" -> 16.dp
+    else -> 12.dp
+}
+
+/** Gli angoli delle copertine di posti speciali: l'eroe della Home e il mini-lettore. */
+internal object CoverCorners {
+    val hero = 28.dp
+    val miniPlayer = 20.dp
+}
 
 /** La copertina di un elemento; finché non arriva (o se non c'è), l'icona del suo tipo su un riquadro. */
 @Composable
@@ -83,16 +102,21 @@ internal fun Cover(
     }
 }
 
-/** Una scheda con copertina, nome e sottotitolo: nelle righe orizzontali e nelle griglie. */
+/** Una scheda con copertina, nome e sottotitolo: nelle righe orizzontali e nelle griglie. Premuta si rimpicciolisce. */
 @Composable
 internal fun ItemCard(item: MaItem, model: PhoneModel, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val artist = item.mediaType == "artist"
+    val interaction = remember { MutableInteractionSource() }
     Column(
-        modifier.testTag("card").clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(6.dp),
+        modifier.testTag("card")
+            .pressScale(interaction)
+            .clip(MaterialTheme.shapes.medium)
+            .clickable(interactionSource = interaction, indication = LocalIndication.current, onClick = onClick)
+            .padding(6.dp),
         horizontalAlignment = if (artist) Alignment.CenterHorizontally else Alignment.Start,
     ) {
-        Cover(model.image(item.image, SMALL_ART), item.mediaType, Modifier.fillMaxWidth().aspectRatio(1f), coverShape(item.mediaType, 10.dp), 40.dp)
-        Spacer(Modifier.height(8.dp))
+        Cover(model.image(item.image, SMALL_ART), item.mediaType, Modifier.fillMaxWidth().aspectRatio(1f), coverShape(item.mediaType), 40.dp)
+        Spacer(Modifier.height(Space.small))
         Text(
             item.name,
             style = MaterialTheme.typography.titleSmall,
@@ -138,9 +162,10 @@ internal fun CardRow(
     }
 }
 
+/** Il titolo di una sezione nelle pagine (album, artista, ricerca), allineato alle righe a 16 dp. */
 @Composable
 internal fun SectionTitle(title: String, subtitle: String? = null, onSeeAll: (() -> Unit)? = null) {
-    Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 20.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().padding(start = Space.large, end = Space.tiny, top = Space.gutter, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (subtitle != null) {
@@ -150,6 +175,52 @@ internal fun SectionTitle(title: String, subtitle: String? = null, onSeeAll: (()
         if (onSeeAll != null) TextButton(onClick = onSeeAll) { Text(stringResource(R.string.see_all)) }
     }
 }
+
+/**
+ * Il titolo di una sezione della Home: l'occhiello sopra ("RIPRENDI", "PER TE"), il titolo in Manrope 800 e, se c'è,
+ * "Mostra tutto". [horizontal] è il margine laterale (di base quello delle pagine, 20 dp).
+ */
+@Composable
+internal fun SectionHeader(
+    title: String,
+    modifier: Modifier = Modifier,
+    eyebrow: String? = null,
+    onSeeAll: (() -> Unit)? = null,
+    horizontal: Dp = Space.gutter,
+) {
+    Row(
+        modifier.fillMaxWidth().padding(start = horizontal, end = if (onSeeAll != null) Space.tiny else horizontal, bottom = Space.small),
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        Column(Modifier.weight(1f)) {
+            if (eyebrow != null) Eyebrow(eyebrow)
+            Text(title, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+        if (onSeeAll != null) {
+            TextButton(onClick = onSeeAll) {
+                Text(stringResource(R.string.see_all))
+                Icon(XIcons.Chevron, null, Modifier.size(18.dp))
+            }
+        }
+    }
+}
+
+/** L'occhiello: 11 sp, Manrope 600, maiuscolo e un po' spaziato, sopra un titolo. */
+@Composable
+internal fun Eyebrow(text: String, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.onSurfaceVariant) {
+    Text(eyebrowCase(text), modifier, style = XonosStyles.eyebrow, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
+}
+
+/** Il testo dell'occhiello in maiuscolo; il greco in maiuscolo perde gli accenti, come si scrive. */
+internal fun eyebrowCase(text: String): String {
+    val upper = text.uppercase()
+    if (upper.none { it in GREEK_TONOS }) return upper
+    return buildString(upper.length) { upper.forEach { append(GREEK_TONOS[it] ?: it) } }
+}
+
+private val GREEK_TONOS = mapOf(
+    'Ά' to 'Α', 'Έ' to 'Ε', 'Ή' to 'Η', 'Ί' to 'Ι', 'Ό' to 'Ο', 'Ύ' to 'Υ', 'Ώ' to 'Ω', 'ΐ' to 'Ϊ', 'ΰ' to 'Ϋ',
+)
 
 /**
  * Una riga di elenco: copertina (o numero del brano), nome, sottotitolo, durata e menu.
@@ -201,7 +272,7 @@ internal fun ItemRow(
         if (item.durationSec > 0 && item.mediaType == "track") {
             Text(
                 clock(item.durationSec * 1000L),
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelMedium.tabular(),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = 8.dp),
             )
@@ -421,56 +492,13 @@ internal fun tracksSummary(tracks: List<MaItem>): String {
     return if (total > 0) "$count · ${length(total)}" else count
 }
 
-/** Il colore che una copertina dà allo sfondo (si muove piano quando cambia). */
+/**
+ * Il colore che una copertina dà allo sfondo di una testata: il suo «profondo» (vedi [ArtPalette]), che si muove piano
+ * quando cambia. Senza copertina il grigio del tema.
+ */
 @Composable
 internal fun backdropOf(url: String?): Color {
-    val pixels = rememberArtworkPixels(url)
-    val fallback = MaterialTheme.colorScheme.surfaceContainerHigh
-    val target = remember(pixels) { pixels?.let(::backdropColor) } ?: fallback
+    val palette = rememberArtPalette(url)
+    val target = palette?.let { Color(it.profondo) } ?: MaterialTheme.colorScheme.surfaceContainerHigh
     return animateColorAsState(target, tween(600), label = "backdrop").value
-}
-
-/**
- * Il colore di fondo preso da una copertina: tra i colori più frequenti vince quello più vivo,
- * poi lo si scurisce perché il testo bianco resti leggibile.
- */
-internal fun backdropColor(pixels: IntArray): Color {
-    // Si contano i colori a 4 bit per canale; i grigi pesano poco, quelli vivi di più.
-    val weights = HashMap<Int, FloatArray>()
-    for (pixel in pixels) {
-        if ((pixel ushr 24) < 128) continue
-        val r = (pixel shr 16) and 0xFF
-        val g = (pixel shr 8) and 0xFF
-        val b = pixel and 0xFF
-        val high = max(r, max(g, b))
-        val low = min(r, min(g, b))
-        val saturation = if (high == 0) 0f else (high - low) / high.toFloat()
-        val light = (high + low) / 510f
-        val weight = 0.1f + saturation * (1f - abs(light - 0.5f) * 1.4f).coerceAtLeast(0f)
-        val key = ((r shr 4) shl 8) or ((g shr 4) shl 4) or (b shr 4)
-        val sum = weights.getOrPut(key) { FloatArray(4) }
-        sum[0] += weight
-        sum[1] += r * weight
-        sum[2] += g * weight
-        sum[3] += b * weight
-    }
-    val best = weights.values.maxByOrNull { it[0] } ?: return Color(0xFF1A2333)
-    val (hue, saturation) = hueAndSaturation(best[1] / best[0] / 255f, best[2] / best[0] / 255f, best[3] / best[0] / 255f)
-    return Color.hsl(hue, saturation.coerceIn(0.12f, 0.55f), 0.24f)
-}
-
-/** Tinta (0-360) e saturazione (0-1) di un colore, come in HSL. */
-private fun hueAndSaturation(r: Float, g: Float, b: Float): Pair<Float, Float> {
-    val high = max(r, max(g, b))
-    val low = min(r, min(g, b))
-    val delta = high - low
-    if (delta < 1e-4f) return 220f to 0f
-    val light = (high + low) / 2
-    val saturation = delta / (1 - abs(2 * light - 1))
-    val hue = when (high) {
-        r -> 60 * (((g - b) / delta) % 6)
-        g -> 60 * ((b - r) / delta + 2)
-        else -> 60 * ((r - g) / delta + 4)
-    }
-    return (if (hue < 0) hue + 360 else hue) to saturation.coerceIn(0f, 1f)
 }

@@ -61,4 +61,5 @@ class XmlLabels(private val lang: String) : MenuLabels {
     override fun count(type: String, count: Int) = plural("count_$type", count)
     override val topTracks get() = strings.getValue("top_tracks")
     override val allTracks get() = strings.getValue("all_tracks")
+    override fun row(itemId: String): String? = strings["row_$itemId"]
 }

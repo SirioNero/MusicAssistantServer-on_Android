@@ -9,7 +9,14 @@ import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.svg.SvgDecoder
 import it.xonos.ma.Language
 import it.xonos.ma.R
+import it.xonos.ma.data.ArtistRef
 import it.xonos.ma.data.Connection
+import it.xonos.ma.data.HomeSnapshot
+import it.xonos.ma.data.LastListen
+import it.xonos.ma.data.LastListenStore
+import it.xonos.ma.data.MaImage
+import it.xonos.ma.data.QueueSource
+import it.xonos.ma.data.Ref
 import it.xonos.ma.data.Library
 import it.xonos.ma.data.MaException
 import it.xonos.ma.data.MaRepository
@@ -20,6 +27,8 @@ import it.xonos.ma.data.Device
 import it.xonos.ma.data.FlowStep
 import it.xonos.ma.data.ServiceConfig
 import it.xonos.ma.data.ServiceKind
+import it.xonos.ma.data.taste.JournalCounts
+import it.xonos.ma.data.taste.Listen
 import it.xonos.ma.phone.model.AddServicePage
 import it.xonos.ma.phone.model.ArtistPage
 import it.xonos.ma.phone.model.FlowPage
@@ -34,6 +43,7 @@ import it.xonos.ma.phone.model.NowPlaying
 import it.xonos.ma.phone.model.PhoneModel
 import it.xonos.ma.phone.model.PhoneServerControl
 import it.xonos.ma.phone.model.PlayerLink
+import it.xonos.ma.phone.model.PlayContext
 import it.xonos.ma.phone.model.PlayerPanel
 import it.xonos.ma.phone.model.QueueEntry
 import it.xonos.ma.phone.model.Repeat
@@ -45,8 +55,10 @@ import it.xonos.ma.phone.model.ServicesPage
 import it.xonos.ma.phone.model.Shelf
 import it.xonos.ma.phone.model.initialValues
 import it.xonos.ma.phone.model.Tab
+import it.xonos.ma.phone.model.value
 import it.xonos.ma.phone.ui.Host
 import it.xonos.ma.phone.ui.XonosScreen
+import it.xonos.ma.playback.Listening
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -142,6 +154,10 @@ private class Scene(
     val server: PhoneServerControl? = ScreenServer(),
     /** Indirizzi e token salvati, se non quelli del server finto. */
     val config: Settings.Config? = null,
+    /** Le schermate salvate (la Home dell'ultima volta); di base nessuna. */
+    val cache: (() -> ScreenCache)? = null,
+    /** La copia dell'ultimo ascolto, per "Riprendi" col server fermo; di base nessuna. */
+    val listen: (() -> LastListenStore)? = null,
     val setUp: PhoneModel.() -> Unit,
 )
 
@@ -160,7 +176,7 @@ private fun shoot(file: File, lang: String, scene: Scene) {
         repo,
         Library(repo),
         settings,
-        ScreenCache(null),
+        scene.cache?.invoke() ?: ScreenCache(null),
         FixedFinder(FOUND),
         "Xonos (schermate)",
         { "xonos-screens" },
@@ -168,6 +184,8 @@ private fun shoot(file: File, lang: String, scene: Scene) {
         CoroutineScope(SupervisorJob() + Dispatchers.Default),
         scene.server,
     )
+    val store = scene.listen?.invoke()
+    model.lastListen = { store }
     scene.setUp(model)
     val host = FakeHost(Language.of(if (lang == "zh") "zh-CN" else lang))
     val composeScene = ImageComposeScene(WIDTH, HEIGHT, Density(DENSITY)) { XonosScreen(model, FakeLink(scene.now), host) }
@@ -202,6 +220,12 @@ private class ServerFailed : PhoneServerControl by ScreenServer() {
     companion object {
         const val URL = "http://127.0.0.1:9"
     }
+}
+
+/** Music Assistant sul telefono in uso, ma il pacchetto è di una versione vecchia (Xonos aggiornato): non parte. */
+private class ServerOutdated : PhoneServerControl by ScreenServer() {
+    override val url = ServerFailed.URL
+    override val outdated = true
 }
 
 /** Music Assistant sul telefono, non ancora scaricato: le schermate mostrano solo la scheda e la domanda. */
@@ -286,6 +310,7 @@ private val PLAYING = NowPlaying(
     favorite = true,
     queue = EMOZIONI.map { QueueEntry(it.name, "Lucio Battisti", null) },
     queueIndex = 1,
+    context = PlayContext("library://album/emozioni", "Emozioni", "album", null),
 )
 
 /** Il lettore finto: fermo a 25 secondi; i comandi non fanno niente. */
@@ -332,30 +357,168 @@ private class FakeHost(override val language: Language) : Host {
 
 private fun <T> ready(value: T) = Load.Ready(value)
 
+/** Le due Infinite Mix di Music Assistant. */
+private val MIXES = listOf(
+    Catalog.infiniteMix(HomePage.MIX_LIBRARY, "Infinite Mix (library)"),
+    Catalog.infiniteMix(HomePage.MIX_FAVORITES, "Infinite Mix (favorites)"),
+)
+
+/** Le ultime cose scelte: le Scelte rapide. */
+private val CONTEXTS = listOf(
+    Catalog.album("emozioni"),
+    Catalog.playlist("viaggio", "Viaggio in auto", "Xonos"),
+    Catalog.artist("battiato"),
+    Catalog.podcast("morning", "Morning", "Il Post"),
+    Catalog.album("bollicine"),
+    Catalog.radio("deejay", "Radio Deejay"),
+)
+
+/** Le righe di Music Assistant: le 16 della libreria si riconoscono da servizio e item_id, come quelle vere. */
+private fun homeRows(): List<HomePage.Row> = listOf(
+    HomePage.Row(Catalog.folder("recent_artists", "Recent artists", null), ready(listOf("battisti", "vasco", "mina", "dalla").map { Catalog.artist(it) })),
+    HomePage.Row(Catalog.folder("forgotten_tracks", "Forgotten Tracks", null), ready(listOf(Catalog.track("canto", 1), Catalog.track("anima", 3), Catalog.track("studiouno", 1), Catalog.track("west", 2)))),
+    HomePage.Row(Catalog.folder("forgotten_albums", "Forgotten Albums", null), ready(listOf("west", "studiouno", "anima").map(Catalog::album))),
+    HomePage.Row(Catalog.folder("recently_added_albums", "Recently added albums", null), ready(listOf("padrone", "creuza", "nero", "mare").map(Catalog::album))),
+    HomePage.Row(
+        Catalog.folder("favorite_playlists", "Favorite playlists", null),
+        ready(listOf(Catalog.playlist("domenica", "Domenica mattina", "Spotify"), Catalog.playlist("ottanta", "Anni Ottanta", "Spotify"), Catalog.playlist("viaggio", "Viaggio in auto", "Xonos"))),
+    ),
+    HomePage.Row(Catalog.folder("most_played_tracks", "Most Played Tracks", null), ready(listOf(EMOZIONI[2], EMOZIONI[0], Catalog.track("bollicine", 2), Catalog.track("padrone", 3)))),
+)
+
+/** "Altro", chiusa: le righe a caso e quella di un servizio che Xonos non conosce. */
+private fun moreRows(): List<HomePage.Row> = listOf(
+    HomePage.Row(Catalog.folder("random_albums", "Random albums", null), ready(listOf("mare", "nero", "canto").map(Catalog::album))),
+    HomePage.Row(Catalog.serviceRow("itunes_podcasts", "itunes-top-podcasts", "Trending Podcasts"), ready(listOf(Catalog.podcast("morning", "Morning", "Il Post"), Catalog.podcast("bordone", "Tienimi Bordone", "Il Post")))),
+)
+
+private val IN_PROGRESS = listOf(
+    Catalog.episode("morning", 4, "Morning – 24 ottobre", 31, resumeMinutes = 12),
+    Catalog.episode("morning", 3, "Morning – 23 ottobre", 27, resumeMinutes = 20),
+)
+
+private val GENRES = listOf(
+    Catalog.genre("cantautori", "Cantautori", "battiato"),
+    Catalog.genre("rock", "rock", "vasco"),
+    Catalog.genre("pop", "pop"),
+    Catalog.genre("jazz", "Jazz", "studiouno"),
+    Catalog.genre("colonne", "Colonne sonore", "west"),
+    Catalog.genre("elettronica", "Elettronica"),
+)
+
+/** La Home piena, già caricata. */
+private fun richHome(home: HomePage) {
+    home.recent = ready(CONTEXTS)
+    home.mixes = MIXES
+    home.inProgress = ready(IN_PROGRESS)
+    home.genres = GENRES
+    home.rows = ready(homeRows())
+    home.more = moreRows()
+    home.serverId = SERVER_ID
+    home.started = true
+    home.shown = true
+}
+
+/** Il server_id del Music Assistant finto (vedi FakeServer). */
+private const val SERVER_ID = "screens"
+
+private fun image(id: String) = MaImage(id, "library", id, false)
+
+/** "Riprendi": il terzo brano di Emozioni, dalla playlist Viaggio in auto, due ore fa. */
+private val HERO: LastListen
+    get() = LastListen(
+        serverId = SERVER_ID,
+        queueId = "xonos-screens",
+        queueItemId = "q4",
+        track = LastListen.Track(
+            uri = EMOZIONI[2].uri,
+            name = EMOZIONI[2].name,
+            mediaType = "track",
+            artists = listOf(ArtistRef("library://artist/battisti", "Lucio Battisti")),
+            album = Ref("library://album/emozioni", "Emozioni"),
+            image = image("emozioni"),
+            durationSec = EMOZIONI[2].durationSec,
+        ),
+        positionSec = 102.0,
+        index = 3,
+        count = 18,
+        source = QueueSource("library://playlist/viaggio", "Viaggio in auto", "playlist", image("viaggio")),
+        next = listOf(EMOZIONI[3], Catalog.track("bollicine", 2), Catalog.track("padrone", 3)).map {
+            LastListen.Upcoming(it.uri, it.name, it.artists.firstOrNull()?.name, it.image)
+        },
+        shuffle = false,
+        repeat = "off",
+        ended = false,
+        timeMs = System.currentTimeMillis() - 2 * 3_600_000L,
+    )
+
+/** La Home salvata l'ultima volta (versione 2), in una cartella temporanea. */
+private fun savedHome(): ScreenCache {
+    val dir = java.nio.file.Files.createTempDirectory("xonos-screens").toFile().apply { deleteOnExit() }
+    val home = HomePage().also(::richHome)
+    val snapshot = HomeSnapshot(
+        base = System.getProperty("xonos.url"),
+        serverId = SERVER_ID,
+        timeMs = System.currentTimeMillis() - 3_600_000L,
+        recent = CONTEXTS,
+        rows = home.rows.value.orEmpty().map { HomeSnapshot.Row(it.row, it.items.value) } + home.more.map { HomeSnapshot.Row(it.row, null) },
+        inProgress = IN_PROGRESS,
+        mixes = MIXES,
+        genres = GENRES,
+        resume = null,
+    )
+    return ScreenCache(dir).also { it.write(PhoneModel.HOME_CACHE, snapshot.toJson()) }
+}
+
+/** La copia dell'ultimo ascolto, come la scrive il servizio. */
+private fun savedListen(): LastListenStore {
+    val file = java.io.File.createTempFile("last-listen", ".json").apply { deleteOnExit() }
+    return LastListenStore(file).also { it.write(HERO) }
+}
+
+/** Music Assistant sul telefono, in uso, mentre parte (l'indirizzo non risponde ancora). */
+private class ServerStarting : PhoneServerControl by ScreenServer() {
+    override val url = URL
+    override val state = PhoneServerControl.State.STARTING
+    override val installed = true
+
+    companion object {
+        const val URL = "http://127.0.0.1:9"
+    }
+}
+
 private val SCENES = listOf(
-    "home" to Scene {
+    // La Home piena mentre il telefono suona: senza "Riprendi" (c'è il mini-lettore).
+    "home" to Scene { richHome(page as HomePage) },
+    // La Home col telefono fermo: in cima "Riprendi", da dove si era lasciato.
+    "home-resume" to Scene(now = null) {
         val home = page as HomePage
-        home.recent = ready(
-            listOf(
-                Catalog.album("emozioni"),
-                Catalog.playlist("viaggio", "Viaggio in auto", "Xonos"),
-                Catalog.podcast("morning", "Morning", "Il Post"),
-                Catalog.album("bollicine"),
-                Catalog.radio("deejay", "Radio Deejay"),
-            ),
-        )
+        richHome(home)
+        home.resume = HERO
+    },
+    // Un Music Assistant con della musica ma ancora nessun ascolto.
+    "home-first-run" to Scene(now = null) {
+        val home = page as HomePage
+        home.recent = ready(emptyList())
+        home.mixes = MIXES
+        home.inProgress = ready(emptyList())
         home.rows = ready(
             listOf(
-                HomePage.Row(Catalog.folder("added", "Recently added albums", null), ready(listOf("padrone", "creuza", "nero", "mare").map(Catalog::album))),
-                HomePage.Row(Catalog.folder("artists", "Random artists", null), ready(listOf("battisti", "vasco", "mina", "dalla", "battiato").map { Catalog.artist(it) })),
-                HomePage.Row(
-                    Catalog.folder("playlists", "Favorite playlists", "Your playlists"),
-                    ready(listOf(Catalog.playlist("domenica", "Domenica mattina", "Spotify"), Catalog.playlist("ottanta", "Anni Ottanta", "Spotify"), Catalog.playlist("viaggio", "Viaggio in auto", "Xonos"))),
-                ),
+                HomePage.Row(Catalog.folder("recently_added_albums", "Recently added albums", null), ready(listOf("padrone", "creuza", "nero", "mare", "west").map(Catalog::album))),
+                HomePage.Row(Catalog.folder("favorite_playlists", "Favorite playlists", null), ready(emptyList())),
             ),
         )
         home.started = true
+        home.shown = true
     },
+    // Music Assistant sul telefono sta partendo: la Home viene dal disco (la Home salvata e la copia dell'ultimo ascolto).
+    "home-starting" to Scene(
+        now = null,
+        server = ServerStarting(),
+        config = Settings.Config(ServerStarting.URL, "", "screens"),
+        cache = ::savedHome,
+        listen = ::savedListen,
+    ) {},
     "library" to Scene {
         select(Tab.LIBRARY)
         val library = page as LibraryPage
@@ -461,6 +624,31 @@ private val SCENES = listOf(
         }
         push(settings)
     },
+    // Impostazioni › Per te: la cronologia degli ascolti con i conteggi (240 ascolti finti in 5 mesi).
+    "settings-per-te" to Scene {
+        (page as HomePage).started = true
+        val settings = settingsPage()
+        push(settings)
+        val files = Listening(java.nio.file.Files.createTempDirectory("perte").toFile(), { true }, java.util.concurrent.Executor { r -> r.run() })
+        val nowMs = System.currentTimeMillis()
+        for (i in 0 until 240) {
+            val artist = ArtistRef("x://artist/${i % 23}", "A")
+            files.journal.add("srv", Listen(nowMs - i * 15L * 3_600_000L, "x://track/${i % 70}", null, "B", "track", listOf(artist), null, 200, 190.0, true, false, null, "telefono"))
+        }
+        listening = { files }
+        openPerTe(settings)
+    },
+    // Lo stesso con la cronologia spenta e la domanda prima di cancellarla.
+    "settings-per-te-clear" to Scene {
+        (page as HomePage).started = true
+        val settings = settingsPage()
+        push(settings)
+        listening = { null }
+        openPerTe(settings)
+        perTe!!.counts = Load.Ready(JournalCounts(1234, 320, 85, System.currentTimeMillis() - 150L * 86_400_000L, 380_000))
+        perTe!!.enabled = false
+        perTe!!.confirmClear = true
+    },
     "welcome" to Scene(now = null, configured = false) {},
     // "Fai diventare Xonos il tuo server Music Assistant": la domanda con quanto pesa, poi il download.
     "phone-server-ask" to Scene {
@@ -478,6 +666,10 @@ private val SCENES = listOf(
     },
     // Il server sul telefono non è partito: il perché nella Home, con Riprova.
     "phone-server-failed" to Scene(server = ServerFailed(), config = Settings.Config(ServerFailed.URL, "", "screens")) {
+        (page as HomePage).started = true
+    },
+    // Xonos aggiornato, il server sul telefono no: la Home lo dice, col tasto per le Impostazioni.
+    "phone-server-outdated" to Scene(server = ServerOutdated(), config = Settings.Config(ServerFailed.URL, "", "screens")) {
         (page as HomePage).started = true
     },
     "play-on" to Scene {

@@ -315,4 +315,118 @@
         <item quantity="many">Осталось %d мин</item>
         <item quantity="other">Осталось %d мин</item>
     </plurals>
+
+    <!-- La Home «Per te» (0.1.58): saluti, sezioni, righe di Music Assistant, Riprendi, In corso, cronologia -->
+    <string name="greeting_morning">Доброе утро</string>
+    <string name="greeting_afternoon">Добрый день</string>
+    <string name="greeting_evening">Добрый вечер</string>
+    <string name="greeting_night">Доброй ночи</string>
+    <string name="home_in_progress_eyebrow">Подкасты и аудиокниги</string>
+    <string name="home_quick_eyebrow">Ваш недавний выбор</string>
+    <string name="home_for_you_eyebrow">Миксы и исполнители</string>
+    <string name="home_rediscover_title">Откройте заново</string>
+    <string name="home_rediscover_eyebrow">Давно не слушали</string>
+    <string name="home_library_title">Из вашей библиотеки</string>
+    <string name="home_library_eyebrow">Сохранено вами</string>
+    <string name="home_other_title">Ещё</string>
+    <string name="home_other_eyebrow">Другие подборки Music Assistant</string>
+    <string name="home_genres_title">Ваши жанры</string>
+    <string name="home_genres_eyebrow">Исследуйте</string>
+    <string name="home_more_show">Показать</string>
+    <string name="home_more_hide">Скрыть</string>
+    <string name="row_in_progress">Не дослушано</string>
+    <string name="row_recently_played">Вернуться к прослушиванию</string>
+    <string name="row_recently_added_tracks">Недавно добавленные треки</string>
+    <string name="row_recently_added_albums">Недавно добавленные</string>
+    <string name="row_random_artists">Случайные исполнители</string>
+    <string name="row_random_albums">Случайные альбомы</string>
+    <string name="row_recent_favorite_tracks">Новое в избранном</string>
+    <string name="row_favorite_playlists">Избранные плейлисты</string>
+    <string name="row_favorite_radio">Избранные радиостанции</string>
+    <string name="row_recent_artists">Исполнители, которых вы слушаете</string>
+    <string name="row_recent_tracks">Недавно прослушанные треки</string>
+    <string name="row_forgotten_tracks">Треки, которые стоит вспомнить</string>
+    <string name="row_forgotten_albums">Альбомы, которые стоит вспомнить</string>
+    <string name="row_forgotten_artists">Исполнители, которых стоит вспомнить</string>
+    <string name="row_most_played_tracks">Самое прослушиваемое</string>
+    <string name="row_never_played_tracks">Почти не слушали</string>
+    <string name="hero_eyebrow">Продолжить · %1$s</string>
+    <string name="hero_just_now">только что</string>
+    <string name="hero_from_playlist">из плейлиста %1$s</string>
+    <string name="hero_from_album">из альбома %1$s</string>
+    <string name="hero_from_artist">из треков исполнителя %1$s</string>
+    <string name="hero_from_genre">из жанра %1$s</string>
+    <string name="hero_from_podcast">из подкаста %1$s</string>
+    <string name="hero_from">из %1$s</string>
+    <string name="hero_resume">Продолжить</string>
+    <string name="hero_open">Открыть</string>
+    <string name="hero_restart">Сначала</string>
+    <string name="hero_hide">Скрыть</string>
+    <string name="hero_hidden">Скрыто до следующего прослушивания</string>
+    <string name="hero_time">%1$s из %2$s</string>
+    <string name="hero_track_of">трек %1$d из %2$d</string>
+    <string name="hero_listen_again">Послушать снова</string>
+    <string name="hero_then">Далее:</string>
+    <string name="hero_a11y">Продолжить «%1$s»</string>
+    <string name="in_progress_from_start">С начала</string>
+    <string name="in_progress_mark_played">Отметить как прослушанное</string>
+    <string name="notice_marked_played">Отмечено как прослушанное</string>
+    <string name="undo">Отменить</string>
+    <string name="playing_from">Играет из</string>
+    <string name="per_te_help">Что Xonos запоминает, чтобы предлагать музыку на главной.</string>
+    <string name="journal_title">История прослушиваний</string>
+    <string name="journal_help">Xonos запоминает, что вы слушаете на этом телефоне, чтобы предлагать музыку на главной. История хранится на этом телефоне один год, не попадает в резервные копии Android и никому не передаётся.</string>
+    <string name="journal_off">Выключено: Xonos не записывает новые прослушивания.</string>
+    <string name="journal_empty">Прослушиваний пока нет.</string>
+    <string name="journal_since">С %1$s</string>
+    <string name="journal_clear">Очистить историю</string>
+    <string name="journal_clear_title">Очистить историю прослушиваний?</string>
+    <string name="journal_clear_text">Xonos забудет все прослушивания, сохранённые на этом телефоне, и рекомендации на главной начнутся заново. Это нельзя отменить.</string>
+    <string name="journal_clear_confirm">Очистить</string>
+    <string name="journal_cleared">История очищена</string>
+    <plurals name="ago_minutes">
+        <item quantity="one">%d минуту назад</item>
+        <item quantity="few">%d минуты назад</item>
+        <item quantity="many">%d минут назад</item>
+        <item quantity="other">%d минуты назад</item>
+    </plurals>
+    <plurals name="ago_hours">
+        <item quantity="one">%d час назад</item>
+        <item quantity="few">%d часа назад</item>
+        <item quantity="many">%d часов назад</item>
+        <item quantity="other">%d часа назад</item>
+    </plurals>
+    <plurals name="ago_days">
+        <item quantity="one">%d день назад</item>
+        <item quantity="few">%d дня назад</item>
+        <item quantity="many">%d дней назад</item>
+        <item quantity="other">%d дня назад</item>
+    </plurals>
+    <plurals name="journal_listens">
+        <item quantity="one">%d прослушивание</item>
+        <item quantity="few">%d прослушивания</item>
+        <item quantity="many">%d прослушиваний</item>
+        <item quantity="other">%d прослушивания</item>
+    </plurals>
+    <plurals name="journal_months">
+        <item quantity="one">%d месяц</item>
+        <item quantity="few">%d месяца</item>
+        <item quantity="many">%d месяцев</item>
+        <item quantity="other">%d месяца</item>
+    </plurals>
+
+    <!-- La Home «Per te» (0.1.58): testata, prima volta, Infinite Mix -->
+    <string name="home_date_pattern">EEEE, d MMMM</string>
+    <plurals name="home_live_in_progress">
+        <item quantity="one">%d в процессе</item>
+        <item quantity="few">%d в процессе</item>
+        <item quantity="many">%d в процессе</item>
+        <item quantity="other">%d в процессе</item>
+    </plurals>
+    <string name="home_first_run">Включите что-нибудь: здесь появится место, где вы остановились, и ваш недавний выбор.</string>
+    <string name="mix_eyebrow">Микс</string>
+    <string name="mix_infinite_library">Бесконечный микс</string>
+    <string name="mix_infinite_library_sub">Из всей вашей библиотеки</string>
+    <string name="mix_infinite_favorites">Бесконечный микс избранного</string>
+    <string name="mix_infinite_favorites_sub">Из вашего избранного</string>
 </resources>

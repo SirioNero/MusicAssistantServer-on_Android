@@ -87,6 +87,33 @@ class Settings(context: Context) {
             prefs.edit().putString(KEY_PHONE_SERVER_PASSWORD, value).apply()
         }
 
+    /**
+     * La cronologia degli ascolti (Impostazioni › Per te, vedi data/taste/Journal.kt): accesa di base, come ha deciso
+     * l'utente. Resta sul telefono, per un anno; spenta, Xonos non scrive nuovi ascolti.
+     */
+    var journalEnabled: Boolean
+        get() = prefs.getBoolean(KEY_JOURNAL, true)
+        set(value) {
+            prefs.edit().putBoolean(KEY_JOURNAL, value).apply()
+        }
+
+    /**
+     * L'ultimo ascolto che la persona ha tolto dalla Home trascinando "Riprendi" (vedi LastListen.key): resta nascosto
+     * fino al prossimo ascolto.
+     */
+    var hiddenResume: String?
+        get() = prefs.getString(KEY_HIDDEN_RESUME, null)
+        set(value) {
+            prefs.edit().putString(KEY_HIDDEN_RESUME, value).apply()
+        }
+
+    /** La sezione "Altro" della Home aperta: si ricorda tra un'apertura e l'altra. */
+    var homeMoreOpen: Boolean
+        get() = prefs.getBoolean(KEY_HOME_MORE, false)
+        set(value) {
+            prefs.edit().putBoolean(KEY_HOME_MORE, value).apply()
+        }
+
     /** Chiave con cui l'app firma gli indirizzi delle copertine: le serve solo per sé (vedi ArtworkProvider). */
     val artKey: ByteArray
         @Synchronized get() {
@@ -108,6 +135,9 @@ class Settings(context: Context) {
         private const val KEY_LANGUAGE = "language"
         private const val KEY_USER = "username"
         private const val KEY_PHONE_SERVER_PASSWORD = "phone_server_password"
+        private const val KEY_JOURNAL = "journal_enabled"
+        private const val KEY_HIDDEN_RESUME = "hidden_resume"
+        private const val KEY_HOME_MORE = "home_more_open"
 
         const val DEFAULT_NAME = "Xonos"
 

@@ -11,6 +11,7 @@ import kotlinx.coroutines.coroutineScope
 import java.text.Normalizer
 import it.xonos.ma.data.MaException
 import it.xonos.ma.data.Problem
+import it.xonos.ma.phone.model.HomeRows
 import kotlinx.coroutines.CancellationException
 
 /** Una voce del menu dell'auto, prima che [BrowseTree] la trasformi in un MediaItem. */
@@ -43,6 +44,12 @@ interface MenuLabels {
 
     val topTracks: String
     val allTracks: String
+
+    /**
+     * Il nome di Xonos per una riga di "Per te" della libreria di Music Assistant (`row_<item_id>`, lo stesso della Home
+     * del telefono); null se Xonos non ne ha uno, e allora resta quello di Music Assistant.
+     */
+    fun row(itemId: String): String? = null
 }
 
 /**
@@ -228,9 +235,14 @@ class Menu(
         val category = Category.entries.firstOrNull { "cat|${it.id}" == id } ?: return emptyList()
         val items = when (category) {
             Category.RECENT -> library.recent()
-            Category.FOR_YOU -> return library.recommendations().filter { it.mediaType == "folder" }.map { row ->
-                rows.put("rec|${row.provider}|${row.itemId}", row)
-                folder("rec|${row.provider}|${row.itemId}", row.name, row.subtitle, "foryou")
+            // Le righe nello stesso ordine della Home del telefono e coi nomi di Xonos; quelle che Xonos non conosce
+            // (di altri servizi) col nome di Music Assistant, quelle nascoste no. Con il nome di Xonos niente
+            // sottotitolo di Music Assistant: in molte lingue (l'italiano) resta in inglese, accanto a un titolo tradotto.
+            Category.FOR_YOU -> return HomeRows.forCar(library.recommendations()).map { (row, place) ->
+                val id = "rec|${row.provider}|${row.itemId}"
+                rows.put(id, row)
+                val xonos = if (place.known) labels.row(row.itemId) else null
+                folder(id, xonos ?: row.name, if (xonos != null) null else row.subtitle, "foryou")
             }.onEach { known.put(it.id, it) }
             Category.FAVORITES -> library.libraryItems("tracks", favorite = true, orderBy = "timestamp_added_desc")
             Category.GENRES -> library.genres()

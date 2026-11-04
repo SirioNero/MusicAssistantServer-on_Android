@@ -30,6 +30,8 @@ class ResourceLabels(private val context: Context, private val language: () -> L
 
     override val allTracks: String get() = resources.getString(R.string.all_tracks)
 
+    override fun row(itemId: String): String? = ROWS[itemId]?.let { resources.getString(it) }
+
     private companion object {
         val CATEGORIES = mapOf(
             "recent" to R.string.cat_recent,
@@ -56,6 +58,29 @@ class ResourceLabels(private val context: Context, private val language: () -> L
             "audiobooks" to R.string.cat_audiobooks,
             "radio" to R.string.cat_radios,
             "genres" to R.string.cat_genres,
+        )
+
+        /**
+         * Le righe di "Per te" della libreria di Music Assistant (HomeRows.LIBRARY_ROWS): le stesse scritte della Home.
+         * Scritte una per una e non cercate per nome: con shrinkResources una risorsa cercata per nome può mancare.
+         */
+        val ROWS = mapOf(
+            "in_progress" to R.string.row_in_progress,
+            "recently_played" to R.string.row_recently_played,
+            "recently_added_tracks" to R.string.row_recently_added_tracks,
+            "recently_added_albums" to R.string.row_recently_added_albums,
+            "random_artists" to R.string.row_random_artists,
+            "random_albums" to R.string.row_random_albums,
+            "recent_favorite_tracks" to R.string.row_recent_favorite_tracks,
+            "favorite_playlists" to R.string.row_favorite_playlists,
+            "favorite_radio" to R.string.row_favorite_radio,
+            "recent_artists" to R.string.row_recent_artists,
+            "recent_tracks" to R.string.row_recent_tracks,
+            "forgotten_tracks" to R.string.row_forgotten_tracks,
+            "forgotten_albums" to R.string.row_forgotten_albums,
+            "forgotten_artists" to R.string.row_forgotten_artists,
+            "most_played_tracks" to R.string.row_most_played_tracks,
+            "never_played_tracks" to R.string.row_never_played_tracks,
         )
 
         val COUNTS = mapOf(

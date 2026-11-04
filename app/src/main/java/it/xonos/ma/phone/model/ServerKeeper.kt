@@ -1,5 +1,6 @@
 package it.xonos.ma.phone.model
 
+import it.xonos.ma.data.taste.CarSessions
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -9,6 +10,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.util.concurrent.Executor
 import kotlin.math.max
 import kotlin.math.min
 
@@ -26,6 +28,9 @@ private const val MINUTE = 60_000L
  * ferma, e il primo che arriva dopo lo fa ripartire. Avvio e arresto vanno uno alla volta.
  *
  * Un bisogno si può tenere più volte (due schermate aperte insieme): conta quante, e si lascia quando l'ultima lo lascia.
+ *
+ * Il tempo in cui [Need.CAR] è tenuto è un viaggio in auto: con [recordCars] se ne segnano inizio e fine (il diario degli
+ * ascolti lo usa per il luogo, vedi data/taste/Journal.kt), per qualsiasi Music Assistant.
  *
  * Senza Android: il banco di prova (KeeperCheck) lo prova con un tempo finto.
  */
@@ -46,6 +51,8 @@ class ServerKeeper(
     private val sleep: suspend (Long) -> Unit = { delay(it) },
     /** Una riga nel registro. */
     private val log: (String) -> Unit = {},
+    /** L'ora vera in ms dal 1970, per gli intervalli in auto (il diario conta in ore vere, non da quando il telefono è acceso). */
+    private val wallClock: () -> Long = System::currentTimeMillis,
 ) {
     /** Chi ha bisogno del server, con quanto resta acceso dopo che lo lascia. */
     enum class Need(val graceMs: Long) {
@@ -78,6 +85,24 @@ class ServerKeeper(
 
     private val lock = Any()
     private val holds = Need.entries.associateWith { Hold() }
+
+    /** Dove si segnano i viaggi in auto e chi scrive il file (mai il thread principale); null finché non si sa. */
+    private var cars: Pair<CarSessions, Executor>? = null
+
+    /**
+     * Da qui i viaggi in auto (il tempo in cui [Need.CAR] è tenuto) si segnano in [sessions], scritti da [writer] (un
+     * thread solo, così inizio e fine restano in ordine). Lo chiama il servizio appena parte: prima l'auto non c'è.
+     */
+    fun recordCars(sessions: CarSessions, writer: Executor) {
+        synchronized(lock) { cars = sessions to writer }
+    }
+
+    /** L'auto è arrivata ([on]) o se n'è andata: solo inizio e fine, all'ora di adesso. Col lock tenuto. */
+    private fun carChanged(on: Boolean) {
+        val (sessions, writer) = cars ?: return
+        val now = wallClock()
+        writer.execute { if (on) sessions.begin(now) else sessions.end(now) }
+    }
     private var timer: Job? = null
     private val turn = Mutex()
 
@@ -93,6 +118,7 @@ class ServerKeeper(
             hold.count++
             timer?.cancel()
             timer = null
+            if (need == Need.CAR && hold.count == 1) carChanged(true)
             hold.count == 1
         }
         if (first) note("Server sul telefono: serve per $need")
@@ -112,6 +138,7 @@ class ServerKeeper(
                     hold.count--
                     if (hold.count > 0) return
                     hold.until = now + graceMs
+                    if (need == Need.CAR) carChanged(false)
                 }
                 hold.until > now -> hold.until = min(hold.until, now + graceMs)
                 else -> return

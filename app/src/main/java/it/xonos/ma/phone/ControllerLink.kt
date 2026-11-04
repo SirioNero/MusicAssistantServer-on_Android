@@ -6,6 +6,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.session.MediaController
 import it.xonos.ma.phone.model.NowPlaying
+import it.xonos.ma.phone.model.PlayContext
 import it.xonos.ma.phone.model.PlayerLink
 import it.xonos.ma.phone.model.QueueEntry
 import it.xonos.ma.phone.model.Repeat
@@ -51,6 +52,7 @@ class ControllerLink : PlayerLink, Player.Listener {
         }
         val metadata = c.mediaMetadata
         val extras = metadata.extras
+        val sourceUri = extras?.getString(MaPlayer.EXTRA_SOURCE_URI)
         val timeline = c.currentTimeline
         val queue = (0 until timeline.windowCount).map { i ->
             val item = timeline.getWindow(i, window).mediaItem.mediaMetadata
@@ -79,6 +81,17 @@ class ControllerLink : PlayerLink, Player.Listener {
             queue = queue,
             queueIndex = c.currentMediaItemIndex,
             queueEditableFrom = extras?.getInt(MaPlayer.EXTRA_EDITABLE_FROM, Int.MAX_VALUE) ?: Int.MAX_VALUE,
+            // Da dove suona la coda ("In riproduzione da"), se MaPlayer lo sa.
+            context = if (extras != null && sourceUri != null) {
+                PlayContext(
+                    uri = sourceUri,
+                    name = extras.getString(MaPlayer.EXTRA_SOURCE_NAME).orEmpty(),
+                    type = extras.getString(MaPlayer.EXTRA_SOURCE_TYPE) ?: sourceUri.substringAfter("://").substringBefore('/'),
+                    image = extras.getString(MaPlayer.EXTRA_SOURCE_IMAGE),
+                )
+            } else {
+                null
+            },
         )
     }
 

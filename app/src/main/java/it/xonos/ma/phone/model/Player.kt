@@ -38,7 +38,15 @@ data class NowPlaying(
     val queueIndex: Int,
     /** Da qui in poi, in [queue], i brani si possono togliere o spostare (prima: già suonati, in corso o nel buffer). */
     val queueEditableFrom: Int = Int.MAX_VALUE,
+    /** Da dove suona la coda, per "In riproduzione da" nel lettore; null se non si sa (un brano scelto da solo). */
+    val context: PlayContext? = null,
 )
+
+/**
+ * La sorgente della coda (la prima delle `sources` di Music Assistant): album, playlist, artista, genere, podcast,
+ * radio. [type] è il media_type di Music Assistant; [image] è ciò che si passa a Coil, come [NowPlaying.artwork].
+ */
+data class PlayContext(val uri: String, val name: String, val type: String, val image: String?)
 
 /** Il lettore del telefono visto dallo schermo: sul telefono il MediaController del servizio. */
 interface PlayerLink {

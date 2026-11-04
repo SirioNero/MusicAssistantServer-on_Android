@@ -1,5 +1,6 @@
 package it.xonos.ma.phone.ui
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -123,9 +124,18 @@ fun XonosScreen(model: PhoneModel, player: PlayerLink, host: Host) {
                 },
             ) { padding ->
                 val pages = rememberSaveableStateHolder()
-                val page = model.page
+                val reduced = reducedMotion()
                 Box(Modifier.padding(padding).fillMaxSize()) {
-                    pages.SaveableStateProvider(page.id) { PageScreen(page, model, link, host) }
+                    // Avanti, indietro o un'altra scheda: la pagina nuova entra col suo movimento (Motion.kt).
+                    AnimatedContent(
+                        targetState = PageSlot(model.page, model.tab, model.depth),
+                        modifier = Modifier.fillMaxSize(),
+                        contentKey = { it.page.id },
+                        transitionSpec = { pageTransition(PageSlot.move(initialState, targetState), reduced) },
+                        label = "page",
+                    ) { slot ->
+                        pages.SaveableStateProvider(slot.page.id) { PageScreen(slot.page, model, link, host) }
+                    }
                 }
             }
             Notices(model, host, snackbar)
@@ -151,6 +161,18 @@ fun XonosScreen(model: PhoneModel, player: PlayerLink, host: Host) {
             model.playlistPicker?.let { PlaylistSheet(it, model, host) }
         }
         PlatformBackHandler(enabled = configured && (model.playerOpen || model.depth > 0 || model.tab != Tab.HOME)) { model.back() }
+    }
+}
+
+/** La pagina mostrata, con la scheda e quante pagine ha sotto: dice se si va avanti, indietro o di lato. */
+private data class PageSlot(val page: Page, val tab: Tab, val depth: Int) {
+    companion object {
+        fun move(from: PageSlot, to: PageSlot): PageMove = when {
+            from.tab != to.tab -> PageMove.TAB
+            to.depth > from.depth -> PageMove.FORWARD
+            to.depth < from.depth -> PageMove.BACK
+            else -> PageMove.REPLACE
+        }
     }
 }
 

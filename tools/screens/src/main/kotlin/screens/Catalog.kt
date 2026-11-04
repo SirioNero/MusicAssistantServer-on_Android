@@ -91,6 +91,16 @@ object Catalog {
 
     fun radio(id: String, name: String) = MaItem.from(base("radio", id, name, id))!!
 
+    /** Un genere della libreria (le tessere della Home). */
+    fun genre(id: String, name: String, cover: String? = null) = MaItem.from(base("genre", id, name, cover))!!
+
+    /** Una Infinite Mix di Music Assistant: una playlist del servizio builtin ([kind]: infinite_mix o infinite_mix_favorites). */
+    fun infiniteMix(kind: String, name: String) = MaItem.from(playlistJson(kind, name, "Music Assistant", "builtin").put("is_editable", false))!!
+
+    /** Una riga dei consigli di un servizio che Xonos non conosce (per esempio i podcast di tendenza). */
+    fun serviceRow(provider: String, id: String, name: String) =
+        MaItem.from(JSONObject().put("uri", "$provider://folder/$id").put("media_type", "folder").put("item_id", id).put("provider", provider).put("name", name))!!
+
     fun folder(id: String, name: String, subtitle: String?) =
         MaItem.from(JSONObject().put("uri", "library://folder/$id").put("media_type", "folder").put("item_id", id).put("provider", "recommendations").put("name", name).put("subtitle", subtitle))!!
 

@@ -41,6 +41,14 @@ fun main(): Unit = runBlocking {
         val kids = menu.children("open|${small.second.uri}")
         check("Playlist corta (${small.first.size}): come prima, senza cartelle", kids.none { it.id.startsWith("part|") })
     }
+    // "Per te": le righe di Music Assistant in una cartella sola, ben sotto un pezzo; e una riga aperta resta divisa
+    // come gli altri elenchi se è lunga.
+    val forYou = menu.children("cat|foryou")
+    check("Per te: ${forYou.size} righe, nessuna cartella di pezzi", forYou.isNotEmpty() && forYou.size < Menu.PART && forYou.none { it.id.startsWith("part|") })
+    for (row in forYou.take(4)) {
+        val kids = menu.children(row.id)
+        check("Per te, \"${row.title}\": ${kids.size} voci entro un pezzo o divise", kids.size <= Menu.PART)
+    }
     repo.release()
     println(if (failures == 0) "Tutto bene" else "$failures prove non passate")
     kotlin.system.exitProcess(if (failures == 0) 0 else 1)

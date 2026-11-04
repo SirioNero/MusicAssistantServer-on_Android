@@ -27,6 +27,12 @@ class Settings {
 
     var phoneServerPassword: String? = null
 
+    var journalEnabled: Boolean = true
+
+    var hiddenResume: String? = null
+
+    var homeMoreOpen: Boolean = false
+
     var playerName: String = DEFAULT_NAME
         set(value) {
             field = value.trim().ifEmpty { DEFAULT_NAME }

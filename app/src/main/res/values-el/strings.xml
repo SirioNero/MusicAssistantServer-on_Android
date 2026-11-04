@@ -293,4 +293,106 @@
         <item quantity="one">Απομένει %d λεπ.</item>
         <item quantity="other">Απομένουν %d λεπ.</item>
     </plurals>
+
+    <!-- La Home «Per te» (0.1.58): saluti, sezioni, righe di Music Assistant, Riprendi, In corso, cronologia -->
+    <string name="greeting_morning">Καλημέρα</string>
+    <string name="greeting_afternoon">Καλό απόγευμα</string>
+    <string name="greeting_evening">Καλησπέρα</string>
+    <string name="greeting_night">Καληνύχτα</string>
+    <string name="home_in_progress_eyebrow">Podcast και ηχητικά βιβλία</string>
+    <string name="home_quick_eyebrow">Οι πρόσφατες επιλογές σας</string>
+    <string name="home_for_you_eyebrow">Μίξεις και καλλιτέχνες</string>
+    <string name="home_rediscover_title">Ανακαλύψτε ξανά</string>
+    <string name="home_rediscover_eyebrow">Δεν τα έχετε ακούσει καιρό</string>
+    <string name="home_library_title">Από τη βιβλιοθήκη σας</string>
+    <string name="home_library_eyebrow">Αποθηκευμένα από εσάς</string>
+    <string name="home_other_title">Περισσότερα</string>
+    <string name="home_other_eyebrow">Άλλες σειρές του Music Assistant</string>
+    <string name="home_genres_title">Τα είδη σας</string>
+    <string name="home_genres_eyebrow">Εξερευνήστε</string>
+    <string name="home_more_show">Εμφάνιση</string>
+    <string name="home_more_hide">Απόκρυψη</string>
+    <string name="row_in_progress">Σε εξέλιξη</string>
+    <string name="row_recently_played">Επιστροφή στα πρόσφατα</string>
+    <string name="row_recently_added_tracks">Τραγούδια που προστέθηκαν πρόσφατα</string>
+    <string name="row_recently_added_albums">Προστέθηκαν πρόσφατα</string>
+    <string name="row_random_artists">Καλλιτέχνες έκπληξη</string>
+    <string name="row_random_albums">Άλμπουμ έκπληξη</string>
+    <string name="row_recent_favorite_tracks">Νέα αγαπημένα</string>
+    <string name="row_favorite_playlists">Αγαπημένες λίστες αναπαραγωγής</string>
+    <string name="row_favorite_radio">Αγαπημένοι σταθμοί</string>
+    <string name="row_recent_artists">Καλλιτέχνες που ακούτε</string>
+    <string name="row_recent_tracks">Τραγούδια που ακούσατε πρόσφατα</string>
+    <string name="row_forgotten_tracks">Τραγούδια να ανακαλύψετε ξανά</string>
+    <string name="row_forgotten_albums">Άλμπουμ να ανακαλύψετε ξανά</string>
+    <string name="row_forgotten_artists">Καλλιτέχνες να ανακαλύψετε ξανά</string>
+    <string name="row_most_played_tracks">Τα πιο πολυακουσμένα</string>
+    <string name="row_never_played_tracks">Ποτέ ή σπάνια ακουσμένα</string>
+    <string name="hero_eyebrow">Συνέχεια · %1$s</string>
+    <string name="hero_just_now">μόλις τώρα</string>
+    <string name="hero_from_playlist">από τη λίστα %1$s</string>
+    <string name="hero_from_album">από το άλμπουμ %1$s</string>
+    <string name="hero_from_artist">από τον καλλιτέχνη %1$s</string>
+    <string name="hero_from_genre">από το είδος %1$s</string>
+    <string name="hero_from_podcast">από το podcast %1$s</string>
+    <string name="hero_from">από %1$s</string>
+    <string name="hero_resume">Συνέχεια</string>
+    <string name="hero_open">Άνοιγμα</string>
+    <string name="hero_restart">Από την αρχή</string>
+    <string name="hero_hide">Απόκρυψη</string>
+    <string name="hero_hidden">Κρυμμένο μέχρι την επόμενη ακρόαση</string>
+    <string name="hero_time">%1$s από %2$s</string>
+    <string name="hero_track_of">τραγούδι %1$d από %2$d</string>
+    <string name="hero_listen_again">Ακούστε ξανά</string>
+    <string name="hero_then">Μετά:</string>
+    <string name="hero_a11y">Συνέχεια «%1$s»</string>
+    <string name="in_progress_from_start">Από την αρχή</string>
+    <string name="in_progress_mark_played">Σήμανση ως ακουσμένο</string>
+    <string name="notice_marked_played">Σημειώθηκε ως ακουσμένο</string>
+    <string name="undo">Αναίρεση</string>
+    <string name="playing_from">Αναπαραγωγή από</string>
+    <string name="per_te_help">Τι θυμάται το Xonos για να σας προτείνει μουσική στην Αρχική.</string>
+    <string name="journal_title">Ιστορικό ακρόασης</string>
+    <string name="journal_help">Το Xonos θυμάται τι ακούτε σε αυτό το τηλέφωνο για να σας προτείνει μουσική στην Αρχική. Το ιστορικό μένει σε αυτό το τηλέφωνο για έναν χρόνο, εκτός των αντιγράφων ασφαλείας του Android, και δεν κοινοποιείται ποτέ.</string>
+    <string name="journal_off">Απενεργοποιημένο: το Xonos δεν καταγράφει νέες ακροάσεις.</string>
+    <string name="journal_empty">Καμία ακρόαση ακόμα.</string>
+    <string name="journal_since">Από %1$s</string>
+    <string name="journal_clear">Διαγραφή ιστορικού</string>
+    <string name="journal_clear_title">Διαγραφή του ιστορικού ακρόασης;</string>
+    <string name="journal_clear_text">Το Xonos ξεχνά όλες τις ακροάσεις που είναι αποθηκευμένες σε αυτό το τηλέφωνο, και οι προτάσεις της Αρχικής ξεκινούν από την αρχή. Δεν μπορεί να αναιρεθεί.</string>
+    <string name="journal_clear_confirm">Διαγραφή</string>
+    <string name="journal_cleared">Το ιστορικό διαγράφηκε</string>
+    <plurals name="ago_minutes">
+        <item quantity="one">πριν από %d λεπτό</item>
+        <item quantity="other">πριν από %d λεπτά</item>
+    </plurals>
+    <plurals name="ago_hours">
+        <item quantity="one">πριν από %d ώρα</item>
+        <item quantity="other">πριν από %d ώρες</item>
+    </plurals>
+    <plurals name="ago_days">
+        <item quantity="one">πριν από %d μέρα</item>
+        <item quantity="other">πριν από %d μέρες</item>
+    </plurals>
+    <plurals name="journal_listens">
+        <item quantity="one">%d ακρόαση</item>
+        <item quantity="other">%d ακροάσεις</item>
+    </plurals>
+    <plurals name="journal_months">
+        <item quantity="one">%d μήνας</item>
+        <item quantity="other">%d μήνες</item>
+    </plurals>
+
+    <!-- La Home «Per te» (0.1.58): testata, prima volta, Infinite Mix -->
+    <string name="home_date_pattern">EEEE d MMMM</string>
+    <plurals name="home_live_in_progress">
+        <item quantity="one">%d σε εξέλιξη</item>
+        <item quantity="other">%d σε εξέλιξη</item>
+    </plurals>
+    <string name="home_first_run">Βάλτε κάτι να παίξει: εδώ θα βρίσκετε πού σταματήσατε και τις πρόσφατες επιλογές σας.</string>
+    <string name="mix_eyebrow">Μιξ</string>
+    <string name="mix_infinite_library">Ατελείωτο μιξ</string>
+    <string name="mix_infinite_library_sub">Από όλη τη βιβλιοθήκη σας</string>
+    <string name="mix_infinite_favorites">Ατελείωτο μιξ αγαπημένων</string>
+    <string name="mix_infinite_favorites_sub">Από τα αγαπημένα σας</string>
 </resources>

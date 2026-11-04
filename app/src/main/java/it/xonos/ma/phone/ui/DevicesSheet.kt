@@ -19,6 +19,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -30,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -166,6 +168,9 @@ internal fun RemoteVolume(remote: RemoteLink) {
                 dragging?.let { remote.setVolume((it * 100).toInt()) }
                 dragging = null
             },
+            // Sul fondo del lettore (il «profondo» della copertina, che fa anche da secondaryContainer) la parte vuota
+            // di base sparirebbe: come la barra del brano.
+            colors = SliderDefaults.colors(inactiveTrackColor = Color.White.copy(alpha = 0.2f)),
             modifier = Modifier.weight(1f).testTag("remote_volume"),
         )
     }

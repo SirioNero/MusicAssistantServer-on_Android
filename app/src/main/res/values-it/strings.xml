@@ -293,4 +293,106 @@
         <item quantity="one">Manca %d min</item>
         <item quantity="other">Mancano %d min</item>
     </plurals>
+
+    <!-- La Home «Per te» (0.1.58): saluti, sezioni, righe di Music Assistant, Riprendi, In corso, cronologia -->
+    <string name="greeting_morning">Buongiorno</string>
+    <string name="greeting_afternoon">Buon pomeriggio</string>
+    <string name="greeting_evening">Buonasera</string>
+    <string name="greeting_night">Buonanotte</string>
+    <string name="home_in_progress_eyebrow">Podcast e audiolibri</string>
+    <string name="home_quick_eyebrow">Le tue scelte recenti</string>
+    <string name="home_for_you_eyebrow">Mix e artisti</string>
+    <string name="home_rediscover_title">Riscopri</string>
+    <string name="home_rediscover_eyebrow">Da un po’ non li ascolti</string>
+    <string name="home_library_title">Dalla tua libreria</string>
+    <string name="home_library_eyebrow">Salvati da te</string>
+    <string name="home_other_title">Altro</string>
+    <string name="home_other_eyebrow">Altre righe di Music Assistant</string>
+    <string name="home_genres_title">I tuoi generi</string>
+    <string name="home_genres_eyebrow">Esplora</string>
+    <string name="home_more_show">Mostra</string>
+    <string name="home_more_hide">Nascondi</string>
+    <string name="row_in_progress">In corso</string>
+    <string name="row_recently_played">Torna ad ascoltare</string>
+    <string name="row_recently_added_tracks">Brani aggiunti di recente</string>
+    <string name="row_recently_added_albums">Aggiunti di recente</string>
+    <string name="row_random_artists">Artisti a sorpresa</string>
+    <string name="row_random_albums">Album a sorpresa</string>
+    <string name="row_recent_favorite_tracks">Nuovi preferiti</string>
+    <string name="row_favorite_playlists">Playlist preferite</string>
+    <string name="row_favorite_radio">Radio preferite</string>
+    <string name="row_recent_artists">Artisti che ascolti</string>
+    <string name="row_recent_tracks">Brani ascoltati di recente</string>
+    <string name="row_forgotten_tracks">Brani da riscoprire</string>
+    <string name="row_forgotten_albums">Album da riscoprire</string>
+    <string name="row_forgotten_artists">Artisti da riscoprire</string>
+    <string name="row_most_played_tracks">I più ascoltati</string>
+    <string name="row_never_played_tracks">Mai o quasi mai ascoltati</string>
+    <string name="hero_eyebrow">Riprendi · %1$s</string>
+    <string name="hero_just_now">poco fa</string>
+    <string name="hero_from_playlist">dalla playlist %1$s</string>
+    <string name="hero_from_album">dall’album %1$s</string>
+    <string name="hero_from_artist">dall’artista %1$s</string>
+    <string name="hero_from_genre">dal genere %1$s</string>
+    <string name="hero_from_podcast">dal podcast %1$s</string>
+    <string name="hero_from">da %1$s</string>
+    <string name="hero_resume">Riprendi</string>
+    <string name="hero_open">Apri</string>
+    <string name="hero_restart">Ricomincia</string>
+    <string name="hero_hide">Nascondi</string>
+    <string name="hero_hidden">Nascosto fino al prossimo ascolto</string>
+    <string name="hero_time">%1$s di %2$s</string>
+    <string name="hero_track_of">brano %1$d di %2$d</string>
+    <string name="hero_listen_again">Ascolta di nuovo</string>
+    <string name="hero_then">poi:</string>
+    <string name="hero_a11y">Riprendi “%1$s”</string>
+    <string name="in_progress_from_start">Dall’inizio</string>
+    <string name="in_progress_mark_played">Segna come ascoltato</string>
+    <string name="notice_marked_played">Segnato come ascoltato</string>
+    <string name="undo">Annulla</string>
+    <string name="playing_from">In riproduzione da</string>
+    <string name="per_te_help">Cosa ricorda Xonos per proporti musica nella Home.</string>
+    <string name="journal_title">Cronologia degli ascolti</string>
+    <string name="journal_help">Xonos ricorda cosa ascolti su questo telefono per proporti musica nella Home. La cronologia resta su questo telefono per un anno, fuori dai backup di Android, e non viene mai condivisa.</string>
+    <string name="journal_off">Spenta: Xonos non registra nuovi ascolti.</string>
+    <string name="journal_empty">Ancora nessun ascolto.</string>
+    <string name="journal_since">Dal %1$s</string>
+    <string name="journal_clear">Cancella la cronologia</string>
+    <string name="journal_clear_title">Cancellare la cronologia degli ascolti?</string>
+    <string name="journal_clear_text">Xonos dimentica tutti gli ascolti salvati su questo telefono, e i consigli della Home ripartono da zero. Non si può annullare.</string>
+    <string name="journal_clear_confirm">Cancella</string>
+    <string name="journal_cleared">Cronologia cancellata</string>
+    <plurals name="ago_minutes">
+        <item quantity="one">%d min fa</item>
+        <item quantity="other">%d min fa</item>
+    </plurals>
+    <plurals name="ago_hours">
+        <item quantity="one">%d ora fa</item>
+        <item quantity="other">%d ore fa</item>
+    </plurals>
+    <plurals name="ago_days">
+        <item quantity="one">%d giorno fa</item>
+        <item quantity="other">%d giorni fa</item>
+    </plurals>
+    <plurals name="journal_listens">
+        <item quantity="one">%d ascolto</item>
+        <item quantity="other">%d ascolti</item>
+    </plurals>
+    <plurals name="journal_months">
+        <item quantity="one">%d mese</item>
+        <item quantity="other">%d mesi</item>
+    </plurals>
+
+    <!-- La Home «Per te» (0.1.58): testata, prima volta, Infinite Mix -->
+    <string name="home_date_pattern">EEEE d MMMM</string>
+    <plurals name="home_live_in_progress">
+        <item quantity="one">%d in corso</item>
+        <item quantity="other">%d in corso</item>
+    </plurals>
+    <string name="home_first_run">Fai partire qualcosa: qui ritroverai dove eri arrivato e le tue scelte recenti.</string>
+    <string name="mix_eyebrow">Mix</string>
+    <string name="mix_infinite_library">Mix infinito</string>
+    <string name="mix_infinite_library_sub">Da tutta la tua libreria</string>
+    <string name="mix_infinite_favorites">Mix infinito dei preferiti</string>
+    <string name="mix_infinite_favorites_sub">Dai tuoi preferiti</string>
 </resources>

@@ -75,10 +75,17 @@ prima di cominciare: le cose scritte qui sono già state verificate, non vanno r
   (F-Droid rifiuta quel blocco). Build riproducibili: il workflow "Riproducibile" compila la release
   come F-Droid (la loro immagine `fdroidserver:buildserver-trixie`, OpenJDK 21, Gradle del wrapper,
   senza `tools/`) e la confronta byte per byte con l'APK della release tolta la firma: per la 0.1.38, la
-  0.1.42, la 0.1.49, la 0.1.50, la 0.1.52, la 0.1.53, la 0.1.56 e la 0.1.57 identici. Così la ricetta ha `Binaries` e `AllowedAPKSigningKeys` (SHA-256 del certificato
+  0.1.42, la 0.1.49, la 0.1.50, la 0.1.52, la 0.1.53, la 0.1.56 e la 0.1.57 identici; la 0.1.58 no (sotto). Così la ricetta ha `Binaries` e `AllowedAPKSigningKeys` (SHA-256 del certificato
   `18ef3fc3…2c836`): F-Droid pubblica l'APK con la nostra firma e si passa da GitHub/Obtainium a F-Droid
-  senza disinstallare. Dopo ogni release va lanciato a mano "Riproducibile": una versione non identica
-  F-Droid non la pubblica. Il modello delle richieste di fdroiddata vuole in `commit` l'hash completo e
+  senza disinstallare. Dalla 0.1.59 "Riproducibile" parte da solo dopo "Compila Xonos" in main, solo se quel giro ha
+  fatto la release (il tag è sul suo commit); va guardato: una versione non identica F-Droid non la pubblica. La
+  0.1.58 non è identica: il dex sì, il profilo ART (`assets/dexopt/baseline.prof`) ha nella release una regola in più,
+  il costruttore `<init>(I)V` di `kotlin/LazyKt__LazyJVMKt` che R8 crea fondendo classi. Sette build rifatte da capo
+  (come F-Droid due volte, come la release con JDK 17 e 21 senza cache, tre volte con la cache di Gradle) danno tutte il
+  profilo senza quella regola: un caso della sola build della release (forse una corsa nel profilo riscritto da R8),
+  non il JDK. Se torna, si vede subito. Se è diverso il profilo, il log di Riproducibile dice se cambia il contenuto o
+  solo la compressione, lo mette in base64, elenca i profili intermedi e rifà la build per vedere se cambia fra due
+  build di fila (`.github/scripts/profilo.py`). Il modello delle richieste di fdroiddata vuole in `commit` l'hash completo e
   chiede di decidere le build riproducibili prima dell'inclusione (dopo non si può). `apksigcopier`
   di Debian non verifica gli APK firmati solo v2 (cerca `META-INF/MANIFEST.MF`).
 - La richiesta a fdroiddata (verificato il 26 ottobre 2026): l'Inclusion Policy vuole tre mesi di

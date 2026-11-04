@@ -8,10 +8,20 @@ import it.xonos.ma.data.Problem
 import it.xonos.ma.data.QueueState
 import it.xonos.ma.data.ScreenCache
 import it.xonos.ma.data.Settings
+import it.xonos.ma.data.ArtistRef
+import it.xonos.ma.data.LastListen
+import it.xonos.ma.data.LastListenStore
+import it.xonos.ma.data.toCache
+import it.xonos.ma.data.taste.Journal
+import it.xonos.ma.data.taste.Listen
+import it.xonos.ma.playback.Listening
 import it.xonos.ma.phone.model.ArtistPage
 import it.xonos.ma.phone.model.ConnectionCheck
 import it.xonos.ma.phone.model.FixedFinder
 import it.xonos.ma.phone.model.HomePage
+import it.xonos.ma.phone.model.HomeRows
+import it.xonos.ma.phone.model.HomeSection
+import it.xonos.ma.phone.model.PhoneServerControl
 import it.xonos.ma.phone.model.ItemPage
 import it.xonos.ma.phone.model.LibraryPage
 import it.xonos.ma.phone.model.ListPage
@@ -40,6 +50,7 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
 import java.nio.file.Files
+import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 
 /**
@@ -72,41 +83,15 @@ fun main(): Unit = runBlocking {
     // Le schermate salvate vanno in una cartella temporanea: alla fine le legge una seconda app senza server.
     val cache = ScreenCache(Files.createTempDirectory("xonos-cache").toFile())
     val model = PhoneModel(repo, library, settings, cache, FixedFinder(), "Xonos (prova)", { playerId }, ready, CoroutineScope(SupervisorJob() + main))
-    var failures = 0
+    val bench = Bench(repo, playerId)
 
-    fun check(label: String, ok: Boolean, detail: String = "") {
-        if (!ok) failures++
-        println("${if (ok) "OK " else "NO "} $label${if (detail.isNotEmpty()) " · $detail" else ""}")
-    }
+    fun check(label: String, ok: Boolean, detail: String = "") = bench.check(label, ok, detail)
 
-    suspend fun <T> loaded(what: () -> Load<T>?): T? = withTimeoutOrNull(60_000) {
-        while (true) {
-            when (val load = what()) {
-                is Load.Ready -> return@withTimeoutOrNull load.value
-                is Load.Failed -> {
-                    println("   errore: ${load.error.message}")
-                    return@withTimeoutOrNull null
-                }
-                else -> delay(50)
-            }
-        }
-        @Suppress("UNREACHABLE_CODE")
-        null
-    }
+    suspend fun <T> loaded(what: () -> Load<T>?): T? = bench.loaded(what)
 
-    suspend fun queue(): QueueState? = QueueState.from(repo.command("player_queues/get") { put("queue_id", playerId) } as? JSONObject)
+    suspend fun queue(): QueueState? = bench.queue()
 
-    suspend fun settle(until: (QueueState?) -> Boolean): QueueState? {
-        var q: QueueState? = null
-        withTimeoutOrNull(10_000) {
-            while (true) {
-                q = queue()
-                if (until(q)) break
-                delay(200)
-            }
-        }
-        return q
-    }
+    suspend fun settle(until: (QueueState?) -> Boolean): QueueState? = bench.settle(until)
 
     // ---------- Home ----------
     val home = model.page as HomePage
@@ -115,7 +100,7 @@ fun main(): Unit = runBlocking {
     check("Home: righe di Per te", !rows.isNullOrEmpty(), "${rows?.size} righe: ${rows?.take(4)?.joinToString { it.row.name }}")
     delay(2_000)
     rows?.take(6)?.forEach { row -> println("   - ${row.row.name}: ${row.items.value?.size ?: row.items}") }
-    check("Home: ascoltati di recente", loaded { home.recent } != null)
+    bench.homeSections(model, home, settings, rows)
     model.refresh(home)
     check("Home: aggiornando resta quello di prima", home.refreshing && home.recent is Load.Ready && home.rows is Load.Ready)
     withTimeoutOrNull(30_000) { while (home.refreshing) delay(50) }
@@ -252,6 +237,8 @@ fun main(): Unit = runBlocking {
     q = settle { it?.playing == true && it.current?.title == episodes[2].name }
     check("Podcast: suona l'episodio scelto", q?.current?.title == episodes[2].name, "${q?.items} in coda")
 
+    bench.resumeChecks(model, home, settings, library, emozioni, albumTracks, episodes)
+
     // ---------- Una playlist lunga: i primi brani si vedono prima del resto ----------
     val big = library.libraryPage("playlists", 0, search = "Playlist grande").firstOrNull { it.name == "Playlist grande" }
     check("Playlist grande nella libreria", big != null)
@@ -320,7 +307,18 @@ fun main(): Unit = runBlocking {
         { playerId },
         MutableStateFlow(false),
         CoroutineScope(SupervisorJob() + main),
+        StartingServer("http://127.0.0.1:1"),
     )
+    // La copia dell'ultimo ascolto, come la lascia il servizio: "Riprendi" si vede anche col server fermo.
+    val lastCopy = LastListenStore(Files.createTempFile("last-listen", ".json").toFile())
+    val serverId = (repo.connection.value as Connection.Connected).server.id
+    val heroListen = LastListen(
+        serverId, playerId, "q1",
+        LastListen.Track("library://track/1", "Brano", "track", listOf(ArtistRef("library://artist/1", "Artista")), null, null, 200),
+        80.0, 2, 10, null, emptyList(), false, "off", false, System.currentTimeMillis(),
+    )
+    lastCopy.write(heroListen)
+    offline.lastListen = { lastCopy }
     val offlineHome = offline.page as HomePage
     val shownAt = System.nanoTime()
     offline.start(offlineHome)
@@ -331,6 +329,13 @@ fun main(): Unit = runBlocking {
         offlineHome.recent is Load.Ready && savedRows.isNotEmpty() && savedRows.all { it.items is Load.Ready },
         "${savedRows.size} righe in ${(System.nanoTime() - shownAt) / 1_000_000} ms",
     )
+    check(
+        "Cache v2: mix, In corso, generi, Altro e il server",
+        offlineHome.mixes.size == 2 && offlineHome.genres.isNotEmpty() && offlineHome.inProgress is Load.Ready &&
+            offlineHome.more.isNotEmpty() && offlineHome.quickPicks.isNotEmpty() && offlineHome.serverId != null,
+        "mix ${offlineHome.mixes.size}, generi ${offlineHome.genres.size}, altro ${offlineHome.more.size}, server ${offlineHome.serverId != null}",
+    )
+    check("Server sul telefono che parte: la Home lo dice e non dà errori", offline.phoneServerStarting && offlineHome.recent is Load.Ready)
     val savedCover = savedRows.flatMap { it.items.value.orEmpty() }.firstOrNull { it.image != null }
     check("Cache: copertine dall'indirizzo salvato", offline.image(savedCover?.image, 256)?.startsWith(url) == true, "${offline.image(savedCover?.image, 256)}")
     offline.select(Tab.LIBRARY)
@@ -342,7 +347,87 @@ fun main(): Unit = runBlocking {
     offline.show(offlineAlbums)
     withTimeoutOrNull(3_000) { while (offlineAlbums.items.isEmpty()) delay(10) }
     check("Cache: prima pagina degli album", offlineAlbums.items.size == 100 && offlineAlbums.loading, "${offlineAlbums.items.size}")
+    check("Cache: Riprendi dalla copia, col server fermo", offlineHome.resume == heroListen && offline.resumeVisible(offlineHome))
+
+    // Il collegamento arriva dopo i 20 s di attesa: la Home dal disco non è fresca, e collegati si aggiorna da sola.
+    // Prima risultava fresca (le sezioni salvate sono "pronte") e restava quella del disco.
+    withTimeoutOrNull(40_000) { while (offlineHome.job?.isActive == true) delay(100) }
+    check("Home dal disco, Music Assistant mai arrivato: non è fresca", !offlineHome.fresh && offlineHome.recent is Load.Ready)
+    val loadedBefore = offlineHome.loadedAt
+    offlineSettings.save(Settings.Config(url, "", token))
+    offlineRepo.reconnect()
+    val updated = withTimeoutOrNull(40_000) {
+        offlineRepo.connection.first { it is Connection.Connected }
+        while (!offlineHome.fresh || offlineHome.job?.isActive == true) delay(100)
+        true
+    } == true
+    check("Collegato dopo i 20 s: la Home si aggiorna da sola", updated && offlineHome.loadedAt > loadedBefore, "fresca ${offlineHome.fresh}")
+    offlineSettings.save(Settings.Config("http://127.0.0.1:1", "", "x"))
     offlineRepo.release()
+
+    // Cambiato server: finché il nuovo non risponde, "Riprendi" non mostra la copia del server di prima (toccandola
+    // suonava altro). Un'app con la Home salvata e la copia di questo Music Assistant.
+    val otherCache = ScreenCache(Files.createTempDirectory("xonos-cache-other").toFile())
+    cache.read(PhoneModel.HOME_CACHE)?.let { otherCache.write(PhoneModel.HOME_CACHE, it) }
+    val otherSettings = Settings().also { it.save(Settings.Config("http://127.0.0.1:1", "", "x")) }
+    val otherRepo = MaRepository(otherSettings)
+    otherRepo.acquire()
+    fun otherModel(cacheOf: ScreenCache) =
+        PhoneModel(otherRepo, Library(otherRepo), otherSettings, cacheOf, FixedFinder(), "Xonos (prova)", { playerId }, MutableStateFlow(false), CoroutineScope(SupervisorJob() + main))
+            .also { it.lastListen = { lastCopy } }
+    val other = otherModel(otherCache)
+    val otherHome = other.page as HomePage
+    other.start(otherHome)
+    withTimeoutOrNull(3_000) { while (otherHome.resume == null) delay(10) }
+    check("Prima del cambio di server: Riprendi dalla copia", otherHome.resume == heroListen)
+    other.openSettings()
+    val change = other.page as SettingsPage
+    change.home = "http://127.0.0.1:2"
+    other.save(change)
+    other.back()
+    val changedHome = other.page as HomePage
+    other.start(changedHome)
+    delay(1_000)
+    check(
+        "Cambiato server, non ancora collegato: niente Riprendi del server di prima",
+        changedHome !== otherHome && changedHome.resume == null && !other.resumeVisible(changedHome),
+        "${changedHome.resume?.track?.name}",
+    )
+    // Riaperta l'app prima di collegarsi: la Home salvata non c'è più (cancellata dal cambio), la copia sì.
+    val restarted = otherModel(ScreenCache(Files.createTempDirectory("xonos-cache-empty").toFile()))
+    val reopenedHome = restarted.page as HomePage
+    restarted.start(reopenedHome)
+    delay(1_000)
+    check("Riaperta dopo il cambio, senza Home salvata: niente Riprendi finché non si sa il server", reopenedHome.resume == null)
+    // Collegati a un Music Assistant (questo, che è quello della copia): Riprendi torna.
+    otherSettings.save(Settings.Config(url, "", token))
+    otherRepo.reconnect()
+    val back = withTimeoutOrNull(30_000) { while (changedHome.resume == null) delay(100); true } == true
+    check("Collegati al server della copia: Riprendi torna", back && changedHome.resume?.serverId == serverId)
+    check("Collegati: l'ultimo server collegato è salvato", otherSettings.lastServerId == serverId, "${otherSettings.lastServerId}")
+    // Android ha svuotato la cache (la Home salvata non c'è più) e il server è fermo: la copia è dell'ultimo server
+    // collegato, quindi Riprendi c'è subito. Cambiando server invece no, nemmeno riaprendo l'app.
+    otherSettings.save(Settings.Config("http://127.0.0.1:1", "", "x"))
+    otherRepo.reconnect()
+    withTimeoutOrNull(10_000) { otherRepo.connection.first { it !is Connection.Connected } }
+    val cleared = otherModel(ScreenCache(Files.createTempDirectory("xonos-cache-cleared").toFile()))
+    val clearedHome = cleared.page as HomePage
+    cleared.start(clearedHome)
+    withTimeoutOrNull(3_000) { while (clearedHome.resume == null) delay(10) }
+    check("Cache svuotata, server fermo: Riprendi dalla copia dell'ultimo server collegato", clearedHome.resume == heroListen && cleared.resumeVisible(clearedHome))
+    cleared.openSettings()
+    val away = cleared.page as SettingsPage
+    away.home = "http://127.0.0.1:3"
+    cleared.save(away)
+    check("Cambiato server: l'ultimo server collegato si dimentica", otherSettings.lastServerId == null)
+    val afterSwitch = otherModel(ScreenCache(Files.createTempDirectory("xonos-cache-empty2").toFile()))
+    val reopenedAgain = afterSwitch.page as HomePage
+    afterSwitch.start(reopenedAgain)
+    delay(1_000)
+    check("Cache svuotata dopo un cambio di server: niente Riprendi del server di prima", reopenedAgain.resume == null)
+    otherRepo.release()
+
+    bench.oldCacheChecks(model, home, rows, offlineSettings, library, emozioni, url, main)
 
     // ---------- Impostazioni ----------
     model.openSettings()
@@ -354,6 +439,41 @@ fun main(): Unit = runBlocking {
     settingsPage.remote = ""
     model.save(settingsPage)
     withTimeout(15_000) { repo.connection.first { it is Connection.Connected } }
+
+    // ---------- Impostazioni › Per te: la cronologia degli ascolti ----------
+    val perTeFiles = Listening(Files.createTempDirectory("xonos-perte").toFile(), { settings.journalEnabled }, Executor { it.run() })
+    val day = 86_400_000L
+    fun heard(t: Long, i: Int) = Listen(t, "spotify--x://track/$i", "library://track/$i", "Brano $i", "track", listOf(ArtistRef("library://artist/1", "Artista")), null, 200, 190.0, true, false, null, Journal.PLACE_PHONE)
+    perTeFiles.journal.add("server-a", heard(System.currentTimeMillis() - 40 * day, 1))
+    perTeFiles.journal.add("server-a", heard(System.currentTimeMillis() - day, 2))
+    perTeFiles.journal.add("server-b", heard(System.currentTimeMillis(), 2))
+    model.listening = { perTeFiles }
+    model.openPerTe(settingsPage)
+    val perTe = model.perTe
+    val numbers = perTe?.let { state -> loaded { state.counts } }
+    check(
+        "Per te: i numeri di tutti i Music Assistant",
+        numbers?.listens == 3 && numbers.tracks == 2 && numbers.artists == 1 && perTe.months() in 2..3 && perTe.enabled && perTe.over == settingsPage.id,
+        "$numbers, ${perTe?.months()} mesi",
+    )
+    model.setJournal(perTe!!, false)
+    check("Per te: cronologia spenta (e salvata)", !perTe.enabled && !settings.journalEnabled)
+    model.setJournal(perTe, true)
+    model.askClearJournal(perTe)
+    check("Per te: prima di cancellare si chiede", perTe.confirmClear)
+    model.dismissClearJournal(perTe)
+    check("Per te: \"Annulla\" non cancella", !perTe.confirmClear && perTeFiles.journal.servers().size == 2)
+    model.askClearJournal(perTe)
+    model.clearJournal(perTe)
+    withTimeoutOrNull(5_000) { while (!perTe.cleared || perTe.clearing || perTe.counts.value?.listens != 0) delay(20) }
+    check("Per te: cancellata", perTe.cleared && !perTe.confirmClear && perTe.counts.value?.listens == 0 && perTeFiles.journal.servers().isEmpty() && perTe.months() == 0)
+    model.closePerTe()
+    check("Per te: chiusa", model.perTe == null)
+    model.listening = { null }
+    model.openPerTe(settingsPage)
+    val missing = withTimeoutOrNull(PhoneModel.LISTENING_WAIT_MS + 3_000) { while (model.perTe?.counts is Load.Loading) delay(50); model.perTe?.counts }
+    check("Per te: senza i file del servizio, un errore (non zero ascolti)", missing is Load.Failed)
+    model.closePerTe()
 
     // ---------- Un server trovato in rete: il token di quello salvato non gli si manda ----------
     val chooser = model.settingsPage()
@@ -390,9 +510,292 @@ fun main(): Unit = runBlocking {
 
     repo.command("player_queues/stop") { put("queue_id", playerId) }
     delay(500)
-    println(if (failures == 0) "\nTutto bene" else "\n$failures prove non riuscite")
+    println(if (bench.failures == 0) "\nTutto bene" else "\n${bench.failures} prove non riuscite")
     client.stop()
     engine.release()
     repo.release()
-    kotlin.system.exitProcess(if (failures == 0) 0 else 1)
+    kotlin.system.exitProcess(if (bench.failures == 0) 0 else 1)
+}
+
+/** Music Assistant sul telefono che sta partendo: risponde a [url] solo più tardi. */
+private class StartingServer(override val url: String) : PhoneServerControl {
+    override val state = PhoneServerControl.State.STARTING
+    override val error = ""
+    override val installed = true
+    override val outdated = false
+    override suspend fun downloadSize(): Long? = null
+    override suspend fun download(progress: (done: Long, total: Long) -> Unit) = Unit
+    override suspend fun remove() = Unit
+    override suspend fun log() = ""
+    override suspend fun start() = false
+    override fun stop() = Unit
+}
+
+/** I conti delle prove e gli aiuti comuni (fuori dal main, che sennò diventa troppo grande per la JVM). */
+private class Bench(val repo: MaRepository, val playerId: String) {
+    var failures = 0
+
+    fun check(label: String, ok: Boolean, detail: String = "") {
+        if (!ok) failures++
+        println("${if (ok) "OK " else "NO "} $label${if (detail.isNotEmpty()) " · $detail" else ""}")
+    }
+
+    suspend fun <T> loaded(what: () -> Load<T>?): T? = withTimeoutOrNull(60_000) {
+        while (true) {
+            when (val load = what()) {
+                is Load.Ready -> return@withTimeoutOrNull load.value
+                is Load.Failed -> {
+                    println("   errore: ${load.error.message}")
+                    return@withTimeoutOrNull null
+                }
+                else -> delay(50)
+            }
+        }
+        @Suppress("UNREACHABLE_CODE")
+        null
+    }
+
+    suspend fun queue(): QueueState? = QueueState.from(repo.command("player_queues/get") { put("queue_id", playerId) } as? JSONObject)
+
+    suspend fun settle(until: (QueueState?) -> Boolean): QueueState? {
+        var q: QueueState? = null
+        withTimeoutOrNull(10_000) {
+            while (true) {
+                q = queue()
+                if (until(q)) break
+                delay(200)
+            }
+        }
+        return q
+    }
+}
+
+/** La Home 0.1.58: Scelte rapide, righe al loro posto, Infinite Mix, generi, In corso, "Altro". */
+private suspend fun Bench.homeSections(model: PhoneModel, home: HomePage, settings: Settings, rows: List<HomePage.Row>?) {
+    val contexts = loaded { home.recent }
+    check(
+        "Home: Scelte rapide dai contesti scelti (niente brani sparsi)",
+        contexts != null && contexts.all { it.mediaType in Library.CONTEXT_TYPES },
+        "${contexts?.size}: ${contexts?.joinToString { it.mediaType }}",
+    )
+    val picks = home.quickPicks
+    check(
+        "Home: Scelte rapide al massimo 6, senza doppioni, riempite con le playlist preferite",
+        picks.size in 1..HomeRows.QUICK_PICKS && picks.distinctBy { it.uri }.size == picks.size && picks.all { it.available } &&
+            (picks.size == HomeRows.QUICK_PICKS || picks.size >= contexts.orEmpty().count { it.available }),
+        "${picks.size}: ${picks.joinToString { it.mediaType }}",
+    )
+    check(
+        "Home: righe al loro posto (Per te, Riscopri, Libreria; Altro a parte)",
+        rows.orEmpty().all { it.place.section in PhoneModel.SHOWN_SECTIONS } && home.more.isNotEmpty() &&
+            home.more.all { it.place.section == HomeSection.OTHER },
+        "${rows?.map { it.row.itemId }} · altro ${home.more.map { it.row.itemId }}",
+    )
+    check("Home: Altro chiusa, niente richieste per le sue righe", !home.moreOpen && home.more.all { it.items is Load.Loading })
+    check("Home: Dalla tua libreria al massimo 3 righe", home.section(HomeSection.LIBRARY).size <= HomePage.LIBRARY_ROWS)
+    withTimeoutOrNull(10_000) { while (home.mixes.isEmpty() || home.genres.isEmpty() || home.inProgress is Load.Loading) delay(50) }
+    check(
+        "Home: le Infinite Mix nel carosello Per te",
+        home.mixes.size == 2 && home.mixes.map { HomePage.mixKind(it) } == listOf(HomePage.MIX_LIBRARY, HomePage.MIX_FAVORITES) &&
+            home.perTe.take(2) == home.mixes,
+        "${home.mixes.map { it.name }} · carosello ${home.perTe.size}",
+    )
+    check("Home: I tuoi generi", home.genres.isNotEmpty() && home.genres.all { it.mediaType == "genre" }, "${home.genres.size}")
+    val progress = home.inProgress.value.orEmpty()
+    check(
+        "Home: In corso con la posizione (item_by_uri)",
+        progress.isEmpty() || progress.take(HomePage.IN_PROGRESS_DETAILS).filter { it.providerDomain != "spotify" }.all { it.resumeMs > 0 && it.durationSec > 0 },
+        progress.joinToString { "${it.mediaType} ${it.resumeMs / 1000}/${it.durationSec} s" },
+    )
+    model.toggleMore(home)
+    withTimeoutOrNull(20_000) { while (home.more.any { it.items is Load.Loading }) delay(50) }
+    check(
+        "Home: aperta Altro, le sue righe arrivano",
+        home.moreOpen && settings.homeMoreOpen && home.moreRows.isNotEmpty() && home.more.none { it.items is Load.Loading },
+        home.more.joinToString { "${it.row.itemId} ${it.items.value?.size ?: it.items}" },
+    )
+    model.toggleMore(home)
+    check("Home: Altro richiusa (e ricordata)", !home.moreOpen && !settings.homeMoreOpen)
+}
+
+/** "Riprendi" dalla coda e dalla copia sul telefono, nascondi, ricomincia; "In corso": segna come ascoltato e annulla. */
+private suspend fun Bench.resumeChecks(
+    model: PhoneModel,
+    home: HomePage,
+    settings: Settings,
+    library: Library,
+    album: it.xonos.ma.data.MaItem,
+    albumTracks: List<it.xonos.ma.data.MaItem>,
+    episodes: List<it.xonos.ma.data.MaItem>,
+) {
+    var q: QueueState?
+    // ---------- Home: Riprendi ----------
+    // Un brano dell'album, a 10 s, in pausa: la Home lo propone dalla coda di Music Assistant.
+    model.play(albumTracks, 0, album.uri)
+    settle { it?.playing == true && it.current?.title == albumTracks[0].name }
+    library.seek(playerId, 10)
+    delay(1_000)
+    repo.command("player_queues/pause") { put("queue_id", playerId) }
+    settle { it?.playing == false }
+    model.select(Tab.HOME)
+    model.refresh(home)
+    withTimeoutOrNull(30_000) { while (home.refreshing) delay(50) }
+    val paused = queue()
+    check(
+        "Riprendi: dalla coda in pausa",
+        home.resume?.queueItemId == paused?.current?.id && home.resume?.track?.name == albumTracks[0].name && model.resumeVisible(home),
+        "${home.resume?.track?.name} a ${home.resume?.positionSec} s, da ${home.resume?.source?.mediaType}",
+    )
+    check("Riprendi: \"Apri\" porta all'album", PhoneModel.resumeContext(home.resume) == album.uri, "${PhoneModel.resumeContext(home.resume)}")
+    val shownKey = home.resume?.key
+    model.hideResume(home)
+    check("Riprendi: nascosto (e ricordato)", !model.resumeVisible(home) && settings.hiddenResume == shownKey && home.justHidden == shownKey)
+    model.unhideResume(home)
+    check("Riprendi: \"Annulla\" lo rimette", model.resumeVisible(home) && settings.hiddenResume == null)
+    // La copia sul telefono più recente e più avanti: "Riprendi" parte da lì (play_index con seek).
+    val copies = LastListenStore(Files.createTempFile("last-listen", ".json").toFile())
+    val serverId = (repo.connection.value as Connection.Connected).server.id
+    val base = home.resume!!
+    val ahead = base.positionSec + 20
+    copies.write(base.copy(positionSec = ahead, timeMs = System.currentTimeMillis()))
+    model.lastListen = { copies }
+    model.wake()
+    withTimeoutOrNull(5_000) { while (home.resume?.positionSec != ahead) delay(50) }
+    check("Riprendi: la copia sul telefono vince se è più recente", home.resume?.positionSec == ahead && home.resume?.serverId == serverId)
+    model.resume(home)
+    check("Riprendi: la rotella mentre parte", model.starting)
+    withTimeoutOrNull(30_000) { while (model.starting) delay(50) }
+    q = settle { it?.playing == true }
+    check(
+        "Riprendi: suona dal punto della copia",
+        q?.playing == true && q.current?.id == base.queueItemId && q.elapsedSec >= ahead - 5,
+        "${q?.current?.title} a ${q?.elapsedSec} s (copia $ahead)",
+    )
+    model.phonePlaying(true)
+    check("Riprendi: mentre suona non si vede", !model.resumeVisible(home))
+    model.phonePlaying(false)
+    model.resume(home, restart = true)
+    withTimeoutOrNull(30_000) { while (model.starting) delay(50) }
+    q = settle { it?.playing == true && it.elapsedSec < 10 }
+    check("Riprendi: \"Ricomincia\" dall'inizio", q?.playing == true && q.elapsedSec < 10 && q.current?.id == base.queueItemId, "${q?.elapsedSec} s")
+    model.lastListen = { null }
+
+    // Un episodio: "Apri" porta al podcast, "Ricomincia" dall'inizio (Music Assistant da sé riprenderebbe dal punto).
+    model.play(episodes, 2, null)
+    settle { it?.playing == true && it.current?.title == episodes[2].name }
+    delay(3_000)
+    repo.command("player_queues/pause") { put("queue_id", playerId) }
+    settle { it?.playing == false }
+    model.refresh(home)
+    withTimeoutOrNull(30_000) { while (home.refreshing) delay(50) }
+    check(
+        "Riprendi: un episodio, \"Apri\" porta al podcast",
+        home.resume?.spoken == true && PhoneModel.resumeContext(home.resume)?.substringAfter("://")?.startsWith("podcast/") == true,
+        "${PhoneModel.resumeContext(home.resume)}",
+    )
+    model.resume(home, restart = true)
+    withTimeoutOrNull(30_000) { while (model.starting) delay(50) }
+    q = settle { it?.playing == true && it.elapsedSec < 10 }
+    check("Riprendi: \"Ricomincia\" un episodio dall'inizio", q?.playing == true && q.elapsedSec < 10, "${q?.elapsedSec} s")
+    // Music Assistant scrive un ascolto solo dopo 5 s: così l'episodio resta "In corso".
+    delay(7_000)
+    repo.command("player_queues/pause") { put("queue_id", playerId) }
+    settle { it?.playing == false }
+
+    // ---------- Home: In corso ----------
+    model.refresh(home)
+    withTimeoutOrNull(30_000) { while (home.refreshing) delay(50) }
+    val started = home.inProgress.value.orEmpty().firstOrNull { it.resumeMs > 0 && it.providerDomain != "spotify" }
+    check("In corso: c'è un episodio a metà", started != null, home.inProgress.value.orEmpty().joinToString { "${it.name} ${it.resumeMs}" })
+    if (started != null) {
+        val point = library.item(started.uri)?.resumeMs ?: started.resumeMs
+        val ref = JSONObject().put("media_type", started.mediaType).put("item_id", started.itemId).put("provider", started.provider)
+            .put("name", started.name).put("uri", started.uri)
+        model.markPlayed(home, started)
+        check("In corso: segnato, con Annulla", started.uri in home.marked)
+        delay(1_500)
+        // Music Assistant lo sa solo finito il tempo di "Annulla": mark_played cancella il punto.
+        check("In corso: durante Annulla Music Assistant non lo sa ancora", library.inProgress().any { it.uri == started.uri })
+        model.undoMarkPlayed(home, started)
+        delay(PhoneModel.UNDO_MS + 1_000)
+        val back = library.item(started.uri)
+        check(
+            "In corso: \"Annulla\" lo lascia dov'era",
+            started.uri !in home.marked && library.inProgress().any { it.uri == started.uri } && back?.fullyPlayed == false &&
+                kotlin.math.abs(back.resumeMs - point) < 1_500 && home.inProgress.value.orEmpty().any { it.uri == started.uri },
+            "${back?.resumeMs} ms (era $point)",
+        )
+        // Una card senza punto (dalla sesta, o un episodio di Spotify: In corso non lo dice). Prima "Annulla" mandava
+        // seconds_played 0: l'episodio usciva da In corso e il punto si perdeva.
+        val unknown = started.copy(resumeMs = 0)
+        model.markPlayed(home, unknown)
+        delay(1_000)
+        model.undoMarkPlayed(home, unknown)
+        delay(1_500)
+        val kept = library.item(started.uri)
+        check(
+            "In corso: \"Annulla\" di una card senza punto non lo perde",
+            library.inProgress().any { it.uri == started.uri } && kept != null && kotlin.math.abs(kept.resumeMs - point) < 1_500,
+            "${kept?.resumeMs} ms (era $point)",
+        )
+        // Passato il tempo di "Annulla": Music Assistant lo sa ascoltato, la card sparisce.
+        model.markPlayed(home, started)
+        delay(PhoneModel.UNDO_MS + 2_000)
+        check(
+            "In corso: finito Annulla, segnato in Music Assistant e la card sparita",
+            library.inProgress().none { it.uri == started.uri } && home.inProgress.value.orEmpty().none { it.uri == started.uri } &&
+                started.uri !in home.marked && library.item(started.uri)?.fullyPlayed == true,
+        )
+        // "Dall'inizio" (start_from_beginning): da capo.
+        model.playFromStart(started)
+        val again = settle { it?.playing == true && it.current?.title == started.name }
+        check("In corso: \"Dall'inizio\" da capo", again != null && again.elapsedSec < 5, "${again?.elapsedSec} s")
+        repo.command("player_queues/pause") { put("queue_id", playerId) }
+        settle { it?.playing == false }
+        // Rimesso a metà, com'era, per la prossima volta.
+        repo.command("music/mark_played") {
+            put("media_item", ref)
+            put("fully_played", false)
+            put("seconds_played", (point / 1000).toInt())
+        }
+    }
+}
+
+/** La Home salvata dalle versioni di prima (versione 1) si legge ancora. */
+private suspend fun Bench.oldCacheChecks(
+    model: PhoneModel,
+    home: HomePage,
+    rows: List<HomePage.Row>?,
+    offlineSettings: Settings,
+    library: Library,
+    emozioni: it.xonos.ma.data.MaItem,
+    url: String,
+    main: kotlinx.coroutines.CoroutineDispatcher,
+) {
+    // La Home salvata dalla 0.1.57 (versione 1): si legge ancora, e dei suoi ascolti restano i contesti.
+    val oldCache = ScreenCache(Files.createTempDirectory("xonos-cache-v1").toFile())
+    val v1Track = library.search("brava")["tracks"]!!.first()
+    oldCache.write(
+        PhoneModel.HOME_CACHE,
+        JSONObject().put("base", url).put("recent", listOf(v1Track, emozioni).toCache()).put(
+            "rows",
+            org.json.JSONArray(
+                rows.orEmpty().map { JSONObject().put("row", it.row.toCache()).put("items", it.items.value.orEmpty().toCache()) } +
+                    home.more.map { JSONObject().put("row", it.row.toCache()).put("items", it.items.value.orEmpty().toCache()) },
+            ),
+        ),
+    )
+    val oldRepo = MaRepository(offlineSettings)
+    oldRepo.acquire()
+    val old = PhoneModel(oldRepo, Library(oldRepo), offlineSettings, oldCache, FixedFinder(), "Xonos (prova)", { playerId }, MutableStateFlow(false), CoroutineScope(SupervisorJob() + main))
+    old.lastListen = { null }
+    val oldHome = old.page as HomePage
+    old.start(oldHome)
+    withTimeoutOrNull(3_000) { while (oldHome.rows !is Load.Ready) delay(10) }
+    check(
+        "Cache v1: si legge ancora (contesti, righe al loro posto)",
+        oldHome.recent.value?.map { it.uri } == listOf(emozioni.uri) && oldHome.rows.value?.size == rows?.size && oldHome.more.size == home.more.size,
+        "${oldHome.recent.value?.map { it.mediaType }}, ${oldHome.rows.value?.size} righe, altro ${oldHome.more.size}",
+    )
+    oldRepo.release()
 }

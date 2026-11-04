@@ -151,9 +151,20 @@ data class MaItem(
     val position: Int = 0,
     /** Una playlist in cui si possono aggiungere e togliere brani. */
     val editable: Boolean = false,
+    /**
+     * Falso se il servizio dell'elemento non è caricato adesso (lo dicono gli ascolti recenti di Music Assistant, per
+     * esempio dopo che Spotify si è scaricato): si mostra, ma suonarlo non va. Vero quando Music Assistant non lo dice.
+     */
+    val available: Boolean = true,
 ) {
     /** Cosa si apre come elenco; il resto si suona e basta. */
     val browsable: Boolean get() = mediaType in BROWSABLE
+
+    /**
+     * Il dominio del servizio ("spotify", "recommendations"...): [provider] è l'istanza ("spotify--Ab12"). Le righe di
+     * "Per te" si riconoscono da qui e da [itemId]: Music Assistant su /ws non manda la loro translation_key.
+     */
+    val providerDomain: String get() = QueueItem.domainOf(provider)
 
     companion object {
         private val BROWSABLE = setOf("album", "playlist", "artist", "podcast", "genre", "folder")
@@ -191,6 +202,7 @@ data class MaItem(
                 fullyPlayed = o.optBoolean("fully_played"),
                 position = o.optInt("position"),
                 editable = o.optBoolean("is_editable"),
+                available = !o.has("available") || o.isNull("available") || o.optBoolean("available", true),
             )
         }
 
@@ -219,6 +231,48 @@ data class Ref(val uri: String, val name: String) {
     }
 }
 
+/**
+ * Un artista di un brano, con l'id di MusicBrainz quando Music Assistant lo conosce (serve ai consigli: novità e
+ * artisti simili si chiedono per mbid).
+ */
+data class ArtistRef(val uri: String, val name: String, val mbid: String? = null) {
+    companion object {
+        fun from(o: JSONObject?): ArtistRef? {
+            if (o == null) return null
+            val uri = o.str("uri") ?: return null
+            return ArtistRef(uri, o.str("name") ?: return null, mbidOf(o, "musicbrainz_artistid"))
+        }
+    }
+}
+
+/**
+ * L'id di MusicBrainz di un elemento ([kind]: "musicbrainz_artistid", "musicbrainz_recordingid"...). Music Assistant
+ * manda `external_ids` come elenco di coppie [tipo, valore].
+ */
+internal fun mbidOf(o: JSONObject, kind: String): String? {
+    val ids = o.optJSONArray("external_ids") ?: return null
+    for (i in 0 until ids.length()) {
+        val pair = ids.optJSONArray(i) ?: continue
+        if (pair.optString(0) == kind) return pair.optString(1).takeIf { it.isNotEmpty() && it != "null" }
+    }
+    return null
+}
+
+/**
+ * Da dove suona una coda (la prima delle sue `sources`): l'album, la playlist, l'artista, il genere, il podcast o la
+ * radio scelti. Per "In riproduzione da" e per ricostruire la coda se Music Assistant l'ha persa.
+ */
+data class QueueSource(val uri: String, val name: String, val mediaType: String, val image: MaImage?) {
+    companion object {
+        fun from(o: JSONObject?): QueueSource? {
+            if (o == null) return null
+            val uri = o.str("uri") ?: return null
+            val type = o.str("media_type") ?: uri.substringAfter("://").substringBefore('/').ifEmpty { return null }
+            return QueueSource(uri, o.str("name").orEmpty(), type, MaImage.from(o.optJSONObject("image")))
+        }
+    }
+}
+
 /** Un elemento della coda di Music Assistant. */
 data class QueueItem(
     val id: String,
@@ -240,7 +294,17 @@ data class QueueItem(
      * Music Assistant ha scelto, se il brano ha già suonato, altrimenti tutti quelli che lo hanno.
      */
     val sources: Set<String> = emptySet(),
+    /** Tutti gli artisti del brano, con l'mbid se c'è (per il diario degli ascolti e la copia dell'ultimo ascolto). */
+    val artists: List<ArtistRef> = emptyList(),
+    /**
+     * L'uri del brano in un servizio ("spotify--Ab12://track/x"), anche quando [uri] è quello della libreria
+     * ("library://track/12"): il primo servizio disponibile che lo ha. Null se non si sa.
+     */
+    val serviceUri: String? = null,
 ) {
+    /** L'uri della libreria di Music Assistant, se il brano è in libreria. */
+    val libraryUri: String? get() = uri?.takeIf { it.startsWith("library://") }
+
     /**
      * Vero se l'audio può arrivare da un servizio che dà un flusso alla volta: lì i salti fatti in
      * fretta vanno raccolti in uno. Senza notizie si fa come se lo fosse.
@@ -278,7 +342,22 @@ data class QueueItem(
                 artistRef = media?.optJSONArray("artists").objects().firstNotNullOfOrNull(Ref::from)
                     ?: Ref.from(media?.optJSONObject("podcast")),
                 sources = sourcesOf(o, media),
+                artists = media?.optJSONArray("artists").objects().mapNotNull(ArtistRef::from),
+                serviceUri = serviceUriOf(media),
             )
+        }
+
+        /** L'uri nel servizio: quello dell'elemento se non è della libreria, sennò dal primo servizio disponibile. */
+        private fun serviceUriOf(media: JSONObject?): String? {
+            if (media == null) return null
+            val uri = media.str("uri")
+            if (uri != null && !uri.startsWith("library://")) return uri
+            val type = media.str("media_type") ?: return null
+            val mappings = media.optJSONArray("provider_mappings").objects()
+            val mapping = mappings.firstOrNull { it.optBoolean("available", true) } ?: mappings.firstOrNull() ?: return null
+            val instance = mapping.str("provider_instance") ?: return null
+            val id = mapping.str("item_id") ?: return null
+            return "$instance://$type/$id"
         }
 
         private fun sourcesOf(o: JSONObject, media: JSONObject?): Set<String> {
@@ -307,15 +386,43 @@ data class QueueState(
     val streamTitle: String?,
     /** Il brano che il server sta già mandando al lettore: fin lì la coda non si può cambiare. */
     val indexInBuffer: Int? = null,
+    /** L'id della coda (per il telefono è l'id del lettore). */
+    val queueId: String = "",
+    /**
+     * Dove riprende la coda dopo una pausa, in secondi (`resume_pos`): Music Assistant lo segna alla pausa e lo azzera a
+     * ogni play_index. 0 se non c'è.
+     */
+    val resumePosSec: Int = 0,
+    /** Da dove suona: album, playlist, artista... La prima è quella scelta (vedi [source]). */
+    val sources: List<QueueSource> = emptyList(),
+    /** La coda è arrivata in fondo: play la fa ripartire dal primo brano (Music Assistant 2.10.8 o più nuovo). */
+    val ended: Boolean = false,
+    /** Quando Music Assistant ha segnato [elapsedSec], in secondi dal 1970 (`elapsed_time_last_updated`); 0 se non si sa. */
+    val elapsedUpdatedAt: Double = 0.0,
+    /**
+     * La coda è dinamica (`is_dynamic`): si riempie da sé da una sorgente come un'Infinite Mix. Allora casuale e ripeti
+     * non si cambiano, e i brani non vengono da una sorgente con un ordine. Falso prima della 2.10.8.
+     */
+    val dynamic: Boolean = false,
 ) {
     val playing: Boolean get() = state == "playing"
 
     /** Il primo brano che si può togliere o spostare: quelli già in corso o nel buffer no. */
     val firstEditable: Int get() = max(currentIndex ?: -1, indexInBuffer ?: -1) + 1
 
+    /** La sorgente scelta, quella di "In riproduzione da". */
+    val source: QueueSource? get() = sources.firstOrNull()
+
+    /** Il punto dove riprenderebbe Music Assistant: `resume_pos` se c'è, sennò il tempo trascorso (la sua regola). */
+    val resumeSec: Double get() = if (resumePosSec > 0) resumePosSec.toDouble() else elapsedSec
+
+    /** Il punto nel brano adesso ([nowSec] in secondi dal 1970): mentre suona va avanti dal momento in cui è stato segnato. */
+    fun elapsedAt(nowSec: Double): Double =
+        if (playing && elapsedUpdatedAt > 0) elapsedSec + max(0.0, nowSec - elapsedUpdatedAt) else elapsedSec
+
     companion object {
         fun from(o: JSONObject?): QueueState? {
-            if (o == null || o.str("queue_id") == null) return null
+            val queueId = o?.str("queue_id") ?: return null
             val current = o.optJSONObject("current_item")
             return QueueState(
                 state = o.str("state") ?: "idle",
@@ -327,6 +434,14 @@ data class QueueState(
                 current = QueueItem.from(current),
                 streamTitle = current?.optJSONObject("streamdetails")?.str("stream_title"),
                 indexInBuffer = if (o.isNull("index_in_buffer")) null else o.optInt("index_in_buffer"),
+                queueId = queueId,
+                resumePosSec = o.optDouble("resume_pos", 0.0).takeUnless { it.isNaN() }?.toInt() ?: 0,
+                // Prima della 2.10 la sorgente si chiamava radio_source (ora Music Assistant la manda sempre vuota).
+                sources = (o.optJSONArray("sources")?.takeIf { it.length() > 0 } ?: o.optJSONArray("radio_source"))
+                    .objects().mapNotNull(QueueSource::from),
+                ended = o.optBoolean("ended"),
+                elapsedUpdatedAt = o.optDouble("elapsed_time_last_updated", 0.0).takeUnless { it.isNaN() } ?: 0.0,
+                dynamic = o.optBoolean("is_dynamic"),
             )
         }
     }

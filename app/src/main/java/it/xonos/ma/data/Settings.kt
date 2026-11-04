@@ -87,6 +87,54 @@ class Settings(context: Context) {
             prefs.edit().putString(KEY_PHONE_SERVER_PASSWORD, value).apply()
         }
 
+    /**
+     * La cronologia degli ascolti (Impostazioni › Per te, vedi data/taste/Journal.kt): accesa di base, come ha deciso
+     * l'utente. Resta sul telefono, per un anno; spenta, Xonos non scrive nuovi ascolti.
+     */
+    var journalEnabled: Boolean
+        get() = prefs.getBoolean(KEY_JOURNAL, true)
+        set(value) {
+            prefs.edit().putBoolean(KEY_JOURNAL, value).apply()
+        }
+
+    /**
+     * L'ultimo ascolto che la persona ha tolto dalla Home trascinando "Riprendi" (vedi LastListen.key): resta nascosto
+     * fino al prossimo ascolto.
+     */
+    var hiddenResume: String?
+        get() = prefs.getString(KEY_HIDDEN_RESUME, null)
+        set(value) {
+            prefs.edit().putString(KEY_HIDDEN_RESUME, value).apply()
+        }
+
+    /**
+     * Il Music Assistant (server_id) dell'ultima Home collegata; null dopo un cambio di server, finché il nuovo non
+     * risponde. Senza la Home salvata (è nella cache, che Android può svuotare) dice se la copia di "Riprendi" è di questo
+     * server anche col server fermo.
+     */
+    var lastServerId: String?
+        get() = prefs.getString(KEY_LAST_SERVER, null)
+        set(value) {
+            prefs.edit().putString(KEY_LAST_SERVER, value).apply()
+        }
+
+    /**
+     * I numeri della diagnosi di "Per te" (quanti artisti, con generi, con MBID) e per quale Music Assistant e versione
+     * di Xonos li si è contati (vedi playback/Listening.kt, savedDiagnosis): si contano una volta per versione.
+     */
+    var perTeDiagnosis: String?
+        get() = prefs.getString(KEY_PER_TE_DIAGNOSIS, null)
+        set(value) {
+            prefs.edit().putString(KEY_PER_TE_DIAGNOSIS, value).apply()
+        }
+
+    /** La sezione "Altro" della Home aperta: si ricorda tra un'apertura e l'altra. */
+    var homeMoreOpen: Boolean
+        get() = prefs.getBoolean(KEY_HOME_MORE, false)
+        set(value) {
+            prefs.edit().putBoolean(KEY_HOME_MORE, value).apply()
+        }
+
     /** Chiave con cui l'app firma gli indirizzi delle copertine: le serve solo per sé (vedi ArtworkProvider). */
     val artKey: ByteArray
         @Synchronized get() {
@@ -108,6 +156,11 @@ class Settings(context: Context) {
         private const val KEY_LANGUAGE = "language"
         private const val KEY_USER = "username"
         private const val KEY_PHONE_SERVER_PASSWORD = "phone_server_password"
+        private const val KEY_JOURNAL = "journal_enabled"
+        private const val KEY_HIDDEN_RESUME = "hidden_resume"
+        private const val KEY_HOME_MORE = "home_more_open"
+        private const val KEY_PER_TE_DIAGNOSIS = "per_te_diagnosis"
+        private const val KEY_LAST_SERVER = "last_server_id"
 
         const val DEFAULT_NAME = "Xonos"
 

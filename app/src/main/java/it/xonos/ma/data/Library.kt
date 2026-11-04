@@ -74,6 +74,48 @@ class Library(private val repo: MaRepository) {
     }
 
     /**
+     * Le ultime cose scelte dalla persona da cui far ripartire la musica (le "Scelte rapide" della Home): album,
+     * playlist, artisti, generi, podcast, audiolibri, radio, solo quelli suonati perché scelti (`user_initiated_only`),
+     * non i brani passati da soli. Music Assistant segna un album quando un suo brano finisce, gli altri al play.
+     */
+    suspend fun recentContexts(limit: Int = RECENT_CONTEXTS) = items("music/recently_played_items") {
+        put("limit", limit)
+        put("user_initiated_only", true)
+        put("fully_played_only", false)
+        put("media_types", JSONArray(CONTEXT_TYPES))
+    }
+
+    /** Episodi e audiolibri lasciati a metà (Music Assistant tiene gli episodi solo per una settimana). */
+    suspend fun inProgress(limit: Int = IN_PROGRESS) = items("music/in_progress_items") { put("limit", limit) }
+
+    /** La coda [queueId] com'è adesso; null se Music Assistant non la conosce. */
+    suspend fun queue(queueId: String): QueueState? =
+        QueueState.from(repo.command("player_queues/get") { put("queue_id", queueId) } as? JSONObject)
+
+    /** Un pezzo della coda [queueId]: [limit] brani da [offset] (per esempio i 3 dopo quello in corso). */
+    suspend fun queueItems(queueId: String, offset: Int, limit: Int): List<QueueItem> =
+        (repo.command("player_queues/items") {
+            put("queue_id", queueId)
+            put("offset", offset)
+            put("limit", limit)
+        } as? JSONArray).objects().mapNotNull(QueueItem::from)
+
+    /**
+     * Alcuni generi musicali con qualcosa dentro, per una riga di tessere ([orderBy] come per la libreria: di base i
+     * più suonati come genere). Vuoto prima della 2.10 (allora i generi non c'erano).
+     */
+    suspend fun genreTiles(limit: Int = GENRE_TILES, orderBy: String = "play_count_desc"): List<MaItem> = try {
+        items("music/genres/library_items") {
+            put("hide_empty", true)
+            put("content_type", "music")
+            put("order_by", orderBy)
+            put("limit", limit)
+        }
+    } catch (e: MaException) {
+        if (e.problem == Problem.REFUSED || e.code == 12) emptyList() else throw e
+    }
+
+    /**
      * Una pagina della libreria, per gli elenchi del telefono che si caricano scorrendo.
      * [orderBy]: "sort_name", "sort_name_desc", "timestamp_added_desc", "last_played_desc", "play_count_desc", "year".
      */
@@ -222,7 +264,9 @@ class Library(private val repo: MaRepository) {
     /**
      * Suona sulla coda [queueId]: uno o più indirizzi, eventualmente partendo da [startItem].
      * [option]: "replace" sostituisce la coda, "next" mette dopo il brano in corso, "add" in fondo.
-     * [shuffle] mescola ciò che parte.
+     * [shuffle] mescola ciò che parte. Con [fromStart] un episodio parte dall'inizio anche se Music Assistant o il suo
+     * servizio (Spotify) ricordano un punto (`start_from_beginning`, 2.10.8; prima lo ignora); per gli audiolibri vedi
+     * [backToStart].
      */
     suspend fun playMedia(
         queueId: String,
@@ -230,6 +274,7 @@ class Library(private val repo: MaRepository) {
         startItem: String? = null,
         option: String = "replace",
         shuffle: Boolean = false,
+        fromStart: Boolean = false,
     ) {
         if (shuffle) {
             // Prima della 2.10 play_media non ha "shuffle" (lo ignora): vale il casuale della coda.
@@ -246,9 +291,34 @@ class Library(private val repo: MaRepository) {
                 if (startItem != null) put("start_item", startItem)
                 // Dalla 2.10 un album suona in ordine anche con il casuale acceso, se non si chiede altro.
                 if (shuffle) put("shuffle", true)
+                if (fromStart) put("start_from_beginning", true)
             }
         }
     }
+
+    /**
+     * Dopo un play "dall'inizio" ([playMedia] con fromStart): se un episodio o un audiolibro è partito da un punto
+     * ricordato, lo riporta all'inizio. Serve agli audiolibri, per cui Music Assistant non ha start_from_beginning (quelli
+     * di Spotify e di Audiobookshelf hanno un punto loro), e ai Music Assistant più vecchi della 2.10.8. Dal secondo
+     * [START_S]: con 0 Music Assistant riprenderebbe dal punto ricordato.
+     */
+    suspend fun backToStart(queueId: String) {
+        val q = queue(queueId) ?: return
+        if (q.current?.mediaType !in SPOKEN || q.elapsedSec <= RESUMED_S) return
+        try {
+            seek(queueId, START_S)
+        } catch (e: MaException) {
+            // Senza durata non si sposta: la musica suona lo stesso.
+            if (e.problem != Problem.REFUSED) throw e
+        }
+    }
+
+    /**
+     * Music Assistant 2.10 o più nuovo (schema 63): play_media conosce "shuffle" e col casuale tiene tutta la sorgente,
+     * col brano di partenza per primo. Senza connessione si suppone di sì.
+     */
+    val shufflesOnPlay: Boolean
+        get() = ((repo.connection.value as? Connection.Connected)?.server?.schemaVersion ?: SHUFFLE_SCHEMA) >= SHUFFLE_SCHEMA
 
     /** Le playlist della libreria in cui si possono mettere brani: quelle di Music Assistant e dei servizi che lo permettono. */
     suspend fun editablePlaylists(): List<MaItem> = libraryItems("playlists").filter { it.editable && it.provider == "library" }
@@ -301,6 +371,51 @@ class Library(private val repo: MaRepository) {
     /** Riprende la coda da dove si era fermata (play su una coda ferma la fa ripartire). */
     suspend fun resume(queueId: String) {
         unlock.retrying(queueId) { repo.command("player_queues/play") { put("queue_id", queueId) } }
+    }
+
+    /**
+     * Suona la voce [queueItemId] della coda (o, con un numero, quella in quella posizione) da [seekSec] secondi.
+     * Music Assistant risponde quando la musica parte.
+     */
+    suspend fun playIndex(queueId: String, queueItemId: String, seekSec: Int = 0) =
+        playIndexOf(queueId, queueItemId, seekSec)
+
+    suspend fun playIndex(queueId: String, index: Int, seekSec: Int = 0) = playIndexOf(queueId, index, seekSec)
+
+    private suspend fun playIndexOf(queueId: String, index: Any, seekSec: Int) {
+        unlock.retrying(queueId) {
+            repo.command("player_queues/play_index", playTimeoutMs) {
+                put("queue_id", queueId)
+                put("index", index)
+                if (seekSec > 0) put("seek_position", seekSec)
+            }
+        }
+    }
+
+    /** Sposta il brano in corso a [seconds] (Music Assistant rifà partire il flusso da lì). */
+    suspend fun seek(queueId: String, seconds: Int) {
+        unlock.retrying(queueId) {
+            repo.command("player_queues/seek", playTimeoutMs) {
+                put("queue_id", queueId)
+                put("position", seconds)
+            }
+        }
+    }
+
+    /** Casuale acceso o spento sulla coda. */
+    suspend fun setShuffle(queueId: String, on: Boolean) {
+        repo.command("player_queues/shuffle") {
+            put("queue_id", queueId)
+            put("shuffle_enabled", on)
+        }
+    }
+
+    /** Ripeti: "off", "one" o "all". */
+    suspend fun setRepeat(queueId: String, mode: String) {
+        repo.command("player_queues/repeat") {
+            put("queue_id", queueId)
+            put("repeat_mode", mode)
+        }
     }
 
     /** Aggiunge o toglie dai preferiti; per toglierlo serve l'elemento della libreria. */
@@ -394,6 +509,30 @@ class Library(private val repo: MaRepository) {
 
         /** Quanto registro di Music Assistant si condivide: come per il server sul telefono, circa 96 KB. */
         const val LOG_CHARS = 96 * 1024
+
+        /** Quanti contesti recenti si chiedono: 6 riempiono le Scelte rapide, gli altri restano per quelli non disponibili. */
+        const val RECENT_CONTEXTS = 12
+
+        /** Episodi e audiolibri in corso: le card della Home. */
+        const val IN_PROGRESS = 10
+
+        /** I generi della riga di tessere. */
+        const val GENRE_TILES = 12
+
+        /** Episodi e audiolibri: quelli che Music Assistant fa ripartire dal punto ricordato. */
+        val SPOKEN = setOf("podcast_episode", "audiobook")
+
+        /** Partito più avanti di così dopo un "dall'inizio": era il punto ricordato ([backToStart]). */
+        const val RESUMED_S = 5.0
+
+        /** L'inizio di un episodio per un seek: 1 s (lo 0 per Music Assistant è "dal punto ricordato"). */
+        const val START_S = 1
+
+        /** Lo schema di Music Assistant 2.10 (vedi [shufflesOnPlay]). */
+        const val SHUFFLE_SCHEMA = 63
+
+        /** I tipi da cui la musica riparte: un contenitore, o una cosa che si ascolta da sola (audiolibro, radio). */
+        val CONTEXT_TYPES = listOf("album", "playlist", "artist", "genre", "podcast", "audiobook", "radio")
 
         val SEARCH_TYPES = listOf("artists", "tracks", "albums", "playlists", "podcasts", "audiobooks", "radio", "genres")
     }

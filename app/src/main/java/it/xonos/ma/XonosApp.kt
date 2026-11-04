@@ -24,6 +24,7 @@ import it.xonos.ma.phone.model.PhoneModel
 import it.xonos.ma.phone.model.PhoneServerControl
 import it.xonos.ma.phone.model.PhoneServerControl.State
 import it.xonos.ma.phone.model.ServerKeeper
+import it.xonos.ma.playback.Listening
 import it.xonos.ma.server.PhoneServer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -138,6 +139,10 @@ class XonosApp : Application(), SingletonImageLoader.Factory {
         // Prima di tutto: nel logcat i dettagli (titoli, indirizzi, testi d'errore) solo nella build di prova.
         Logged.details = BuildConfig.DEBUG
         super.onCreate()
+        // La cronologia degli ascolti e la copia dell'ultimo ascolto: una sola per il processo (servizio, schermo, keeper).
+        // Aperta qui, la Home trova "Riprendi" anche prima che parta il servizio. Sul thread principale non legge niente:
+        // l'ascolto rimasto a metà dal processo di prima e la potatura dell'anno vanno sul thread dei file (Listening.init).
+        Listening.open(noBackupFilesDir) { settings.journalEnabled }
         // Il Music Assistant sul telefono non parte più con l'app: lo avvia chi ne ha bisogno (lo schermo, la musica,
         // l'auto, myCar), vedi [keeper]. Se il suo processo si ferma da solo (Android lo ha chiuso per fare spazio)
         // mentre serve, la connessione non riesce e lo si fa ripartire.

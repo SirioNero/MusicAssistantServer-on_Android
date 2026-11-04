@@ -35,7 +35,12 @@ class NsdFinder(context: Context) : ServerFinder {
     // Il nome mDNS di ogni server trovato, per toglierlo quando sparisce.
     private val names = mutableMapOf<String, String>()
 
+    // Quante schermate vogliono la ricerca. Fra due pagine delle impostazioni (schede Home e Libreria) la nuova chiede
+    // start() prima che la vecchia, che sta uscendo, chieda stop(): si smette solo quando l'ultima non la vuole più.
+    private var users = 0
+
     override fun start() {
+        users++
         if (listener != null || nsd == null) return
         val discovery = object : NsdManager.DiscoveryListener {
             override fun onDiscoveryStarted(serviceType: String) = Unit
@@ -77,6 +82,8 @@ class NsdFinder(context: Context) : ServerFinder {
     }
 
     override fun stop() {
+        if (users > 0) users--
+        if (users > 0) return
         val discovery = listener ?: return
         listener = null
         waiting.clear()

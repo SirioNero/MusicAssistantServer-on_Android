@@ -7,7 +7,7 @@ SRC="$HERE/../../app/src/main/java/it/xonos/ma"
 DST="$HERE/src/main/kotlin/app"
 rm -rf "$DST" && mkdir -p "$DST"
 for f in Language.kt data/Model.kt data/Lyrics.kt data/MaClient.kt data/MaRepository.kt data/Library.kt data/Cache.kt data/Account.kt data/Services.kt data/SkipSender.kt data/SkipTrace.kt data/SoloistUnlock.kt data/PlaylistRemover.kt data/TokenInfo.kt data/Logged.kt playback/Menu.kt \
-  phone/model/Player.kt phone/model/Pages.kt phone/model/PhoneModel.kt phone/model/ConnectionCheck.kt phone/model/Discovery.kt phone/model/ServicePages.kt phone/model/ServicesModel.kt phone/model/RemoteLink.kt phone/model/PhoneServerControl.kt data/Devices.kt; do
+  phone/model/Player.kt phone/model/Pages.kt phone/model/PhoneModel.kt phone/model/ConnectionCheck.kt phone/model/Discovery.kt phone/model/ServicePages.kt phone/model/ServicesModel.kt phone/model/RemoteLink.kt phone/model/PhoneServerControl.kt data/Devices.kt data/LastListen.kt data/taste/Journal.kt phone/model/HomeRows.kt phone/model/ResumePlan.kt playback/Listening.kt; do
   mkdir -p "$DST/$(dirname $f)"; cp "$SRC/$f" "$DST/$f"
 done
 # L'interfaccia tutta, tranne Platform.kt: quello per la JVM sta in src/main/kotlin/it/xonos/ma/phone/ui.

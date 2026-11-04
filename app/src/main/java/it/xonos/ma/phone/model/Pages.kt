@@ -2,9 +2,11 @@ package it.xonos.ma.phone.model
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import it.xonos.ma.data.Device
+import it.xonos.ma.data.LastListen
 import it.xonos.ma.data.MaImage
 import it.xonos.ma.data.MaItem
 import kotlinx.coroutines.Job
@@ -35,13 +37,62 @@ sealed class Page {
     }
 }
 
-/** La prima scheda: ascolti recenti e i consigli di Music Assistant ("Per te"). */
+/**
+ * La prima scheda, dall'alto (vedi docs/per-te-piano.md, capitolo 2): testata, "Riprendi" ([resume]), Scelte rapide
+ * ([quickPicks]), il carosello Per te ([perTe]), In corso ([inProgress]), i generi ([genres]), Riscopri e Dalla tua
+ * libreria (le righe di [rows], vedi [section]) e "Altro" ([more], chiusa finché non si apre).
+ *
+ * All'apertura si vede subito ciò che c'è sul telefono (la Home salvata e la copia dell'ultimo ascolto), poi Music
+ * Assistant aggiorna. Le sezioni qui sotto leggono valori di Compose: lo schermo si ridisegna da solo quando cambiano.
+ */
 class HomePage : Page() {
+    /**
+     * Le ultime cose scelte dalla persona (album, playlist, artisti, generi, podcast, audiolibri, radio): le Scelte
+     * rapide. Fino alla 0.1.57 erano tutti gli ascolti recenti.
+     */
     var recent by mutableStateOf<Load<List<MaItem>>>(Load.Loading)
+
+    /** Le righe di Music Assistant che si mostrano subito: gli artisti del carosello, Riscopri, Dalla tua libreria. */
     var rows by mutableStateOf<Load<List<Row>>>(Load.Loading)
+
+    /**
+     * Le righe di "Altro" (a caso, mai ascoltati, quelle dei servizi che Xonos non conosce): il loro contenuto si chiede
+     * solo con "Altro" aperta. Una riga di un servizio può costare richieste a Spotify.
+     */
+    var more by mutableStateOf<List<Row>>(emptyList())
+
+    /** "Altro" aperta (si ricorda nelle impostazioni). */
+    var moreOpen by mutableStateOf(false)
+
+    /** "Riprendi": l'ultimo ascolto, dalla copia sul telefono o dalla coda di Music Assistant (il più recente). */
+    var resume by mutableStateOf<LastListen?>(null)
+
+    /** L'ascolto che la persona ha nascosto (vedi [LastListen.key]): l'eroe non si mostra finché non se ne fa un altro. */
+    var hiddenResume by mutableStateOf<String?>(null)
+
+    /** Appena nascosto: per qualche secondo al posto dell'eroe una riga con "Annulla". */
+    var justHidden by mutableStateOf<String?>(null)
+
+    /** Episodi e audiolibri a metà; i primi [IN_PROGRESS_DETAILS] con la posizione. */
+    var inProgress by mutableStateOf<Load<List<MaItem>>>(Load.Loading)
+
+    /**
+     * Gli episodi appena segnati come ascoltati, che aspettano la fine di "Annulla" (uri → secondi a cui erano arrivati,
+     * se In corso lo dice): Music Assistant lo sa solo dopo.
+     */
+    val marked = mutableStateMapOf<String, Int>()
+
+    /** Le playlist Infinite Mix di Music Assistant, in testa al carosello Per te. */
+    var mixes by mutableStateOf<List<MaItem>>(emptyList())
+
+    /** I generi con qualcosa dentro (vuoto se Music Assistant non ne ha, o prima della 2.10). */
+    var genres by mutableStateOf<List<MaItem>>(emptyList())
 
     /** Vero mentre si aggiorna trascinando in giù: intanto resta quello di prima. */
     var refreshing by mutableStateOf(false)
+
+    /** Vero da quando c'è qualcosa da vedere: dal disco o da Music Assistant. Per PlatformReportReady. */
+    var shown by mutableStateOf(false)
 
     /** Quando si è caricata l'ultima volta (System.currentTimeMillis). */
     internal var loadedAt = 0L
@@ -49,10 +100,80 @@ class HomePage : Page() {
     /** Vero quando ciò che si vede è arrivato da Music Assistant, non dalla Home salvata sul disco. */
     internal var fresh = false
     internal var job: Job? = null
+    internal var moreJob: Job? = null
 
-    /** Una riga di consigli: il suo titolo e cosa c'è dentro. */
+    /** Quando si sono caricate l'ultima volta le righe di "Altro". */
+    internal var moreLoadedAt = 0L
+
+    /** Il Music Assistant di questa Home (server_id), se si sa: la copia di un altro server non vale. */
+    internal var serverId: String? = null
+
+    /**
+     * La copia sul telefono può essere di un altro Music Assistant: la Home è di un server appena scelto (allora anche la
+     * Home salvata è del server di prima), o non ce n'è una salvata. Finché non si sa a quale server si è collegati
+     * ([serverId]), "Riprendi" non la mostra.
+     */
+    internal var otherServer = false
+
+    /** "Riprendi" come lo dice la coda di Music Assistant (l'ultima volta che la si è letta). */
+    internal var queueResume: LastListen? = null
+
+    /** Una riga di consigli: il suo titolo, il suo posto nella Home e cosa c'è dentro. */
     class Row(val row: MaItem, items: Load<List<MaItem>>) {
         var items by mutableStateOf(items)
+        val place: RowPlace = HomeRows.place(row)
+    }
+
+    /**
+     * Le Scelte rapide (griglia 2×3): i contesti recenti che si possono suonare, poi le playlist preferite fino a
+     * [HomeRows.QUICK_PICKS]. Vuoto finché non si sa niente.
+     */
+    val quickPicks: List<MaItem>
+        get() {
+            val picks = LinkedHashMap<String, MaItem>()
+            for (item in recent.value.orEmpty()) {
+                if (picks.size >= HomeRows.QUICK_PICKS) break
+                if (item.available) picks.putIfAbsent(item.uri, item)
+            }
+            val filler = rows.value.orEmpty().firstOrNull { it.row.itemId == HomeRows.QUICK_FILLER && it.place.known }
+            for (item in filler?.items?.value.orEmpty()) {
+                if (picks.size >= HomeRows.QUICK_PICKS) break
+                picks.putIfAbsent(item.uri, item)
+            }
+            return picks.values.toList()
+        }
+
+    /** Il carosello Per te: le playlist Infinite Mix, poi gli artisti che si ascoltano. */
+    val perTe: List<MaItem>
+        get() = mixes + section(HomeSection.PER_TE).flatMap { it.items.value.orEmpty() }.distinctBy { it.uri }
+
+    /** Le righe di una sezione che hanno qualcosa (o che stanno arrivando), in ordine. */
+    fun section(section: HomeSection): List<Row> {
+        val all = if (section == HomeSection.OTHER) more else rows.value.orEmpty()
+        val shown = all.filter { it.place.section == section && it.items.let { load -> load is Load.Loading || !load.value.isNullOrEmpty() } }
+        return if (section == HomeSection.LIBRARY) shown.take(LIBRARY_ROWS) else shown
+    }
+
+    /** "Altro": le righe che si mostrano aprendola (quelle vuote no). */
+    val moreRows: List<Row> get() = section(HomeSection.OTHER)
+
+    companion object {
+        /** Le due Infinite Mix di Music Assistant: tutta la libreria e i preferiti (vedi [mixKind]). */
+        const val MIX_LIBRARY = "infinite_mix"
+        const val MIX_FAVORITES = "infinite_mix_favorites"
+
+        /** Quale Infinite Mix è [item] (dalla sua voce nel servizio builtin); null se non lo è. */
+        fun mixKind(item: MaItem): String? {
+            if (!HomeRows.isInfiniteMix(item)) return null
+            val ids = item.mappings.filter { (instance, _) -> instance.substringBefore("--") == "builtin" }.map { it.second } + item.itemId
+            return if (MIX_FAVORITES in ids) MIX_FAVORITES else MIX_LIBRARY
+        }
+
+        /** Quante righe di Music Assistant al massimo in "Dalla tua libreria". */
+        const val LIBRARY_ROWS = 3
+
+        /** Per quante card di "In corso" si chiede la posizione (item_by_uri): quelle che si vedono. */
+        const val IN_PROGRESS_DETAILS = 5
     }
 }
 

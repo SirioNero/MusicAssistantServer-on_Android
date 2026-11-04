@@ -293,4 +293,106 @@
         <item quantity="one">Noch %d Min.</item>
         <item quantity="other">Noch %d Min.</item>
     </plurals>
+
+    <!-- La Home «Per te» (0.1.58): saluti, sezioni, righe di Music Assistant, Riprendi, In corso, cronologia -->
+    <string name="greeting_morning">Guten Morgen</string>
+    <string name="greeting_afternoon">Guten Tag</string>
+    <string name="greeting_evening">Guten Abend</string>
+    <string name="greeting_night">Gute Nacht</string>
+    <string name="home_in_progress_eyebrow">Podcasts und Hörbücher</string>
+    <string name="home_quick_eyebrow">Zuletzt von dir gewählt</string>
+    <string name="home_for_you_eyebrow">Mixe und Künstler</string>
+    <string name="home_rediscover_title">Wiederentdecken</string>
+    <string name="home_rediscover_eyebrow">Länger nicht gehört</string>
+    <string name="home_library_title">Aus deiner Bibliothek</string>
+    <string name="home_library_eyebrow">Von dir gespeichert</string>
+    <string name="home_other_title">Mehr</string>
+    <string name="home_other_eyebrow">Weitere Zeilen von Music Assistant</string>
+    <string name="home_genres_title">Deine Genres</string>
+    <string name="home_genres_eyebrow">Entdecken</string>
+    <string name="home_more_show">Anzeigen</string>
+    <string name="home_more_hide">Ausblenden</string>
+    <string name="row_in_progress">Angefangen</string>
+    <string name="row_recently_played">Weiterhören</string>
+    <string name="row_recently_added_tracks">Neu hinzugefügte Titel</string>
+    <string name="row_recently_added_albums">Zuletzt hinzugefügt</string>
+    <string name="row_random_artists">Zufällige Künstler</string>
+    <string name="row_random_albums">Zufällige Alben</string>
+    <string name="row_recent_favorite_tracks">Neue Lieblingstitel</string>
+    <string name="row_favorite_playlists">Lieblingsplaylists</string>
+    <string name="row_favorite_radio">Lieblingssender</string>
+    <string name="row_recent_artists">Künstler, die du hörst</string>
+    <string name="row_recent_tracks">Kürzlich gehörte Titel</string>
+    <string name="row_forgotten_tracks">Titel zum Wiederentdecken</string>
+    <string name="row_forgotten_albums">Alben zum Wiederentdecken</string>
+    <string name="row_forgotten_artists">Künstler zum Wiederentdecken</string>
+    <string name="row_most_played_tracks">Meistgehört</string>
+    <string name="row_never_played_tracks">Nie oder selten gehört</string>
+    <string name="hero_eyebrow">Fortsetzen · %1$s</string>
+    <string name="hero_just_now">gerade eben</string>
+    <string name="hero_from_playlist">aus der Playlist %1$s</string>
+    <string name="hero_from_album">aus dem Album %1$s</string>
+    <string name="hero_from_artist">von %1$s</string>
+    <string name="hero_from_genre">aus dem Genre %1$s</string>
+    <string name="hero_from_podcast">aus dem Podcast %1$s</string>
+    <string name="hero_from">aus %1$s</string>
+    <string name="hero_resume">Fortsetzen</string>
+    <string name="hero_open">Öffnen</string>
+    <string name="hero_restart">Von vorn</string>
+    <string name="hero_hide">Ausblenden</string>
+    <string name="hero_hidden">Ausgeblendet bis zum nächsten Hören</string>
+    <string name="hero_time">%1$s von %2$s</string>
+    <string name="hero_track_of">Titel %1$d von %2$d</string>
+    <string name="hero_listen_again">Nochmal hören</string>
+    <string name="hero_then">Danach:</string>
+    <string name="hero_a11y">„%1$s“ fortsetzen</string>
+    <string name="in_progress_from_start">Von Anfang an</string>
+    <string name="in_progress_mark_played">Als gehört markieren</string>
+    <string name="notice_marked_played">Als gehört markiert</string>
+    <string name="undo">Rückgängig</string>
+    <string name="playing_from">Wiedergabe aus</string>
+    <string name="per_te_help">Was Xonos sich merkt, um dir auf der Startseite Musik vorzuschlagen.</string>
+    <string name="journal_title">Hörverlauf</string>
+    <string name="journal_help">Xonos merkt sich, was du auf diesem Telefon hörst, um dir auf der Startseite Musik vorzuschlagen. Der Verlauf bleibt ein Jahr lang auf diesem Telefon, außerhalb der Android-Backups, und wird nie geteilt.</string>
+    <string name="journal_off">Aus: Xonos speichert nichts Neues.</string>
+    <string name="journal_empty">Noch nichts gehört.</string>
+    <string name="journal_since">Seit %1$s</string>
+    <string name="journal_clear">Verlauf löschen</string>
+    <string name="journal_clear_title">Hörverlauf löschen?</string>
+    <string name="journal_clear_text">Xonos vergisst alles, was auf diesem Telefon gespeichert ist, und die Vorschläge der Startseite beginnen von vorn. Das lässt sich nicht rückgängig machen.</string>
+    <string name="journal_clear_confirm">Löschen</string>
+    <string name="journal_cleared">Verlauf gelöscht</string>
+    <plurals name="ago_minutes">
+        <item quantity="one">vor %d Min.</item>
+        <item quantity="other">vor %d Min.</item>
+    </plurals>
+    <plurals name="ago_hours">
+        <item quantity="one">vor %d Stunde</item>
+        <item quantity="other">vor %d Stunden</item>
+    </plurals>
+    <plurals name="ago_days">
+        <item quantity="one">vor %d Tag</item>
+        <item quantity="other">vor %d Tagen</item>
+    </plurals>
+    <plurals name="journal_listens">
+        <item quantity="one">%d Wiedergabe</item>
+        <item quantity="other">%d Wiedergaben</item>
+    </plurals>
+    <plurals name="journal_months">
+        <item quantity="one">%d Monat</item>
+        <item quantity="other">%d Monate</item>
+    </plurals>
+
+    <!-- La Home «Per te» (0.1.58): testata, prima volta, Infinite Mix -->
+    <string name="home_date_pattern">EEEE, d. MMMM</string>
+    <plurals name="home_live_in_progress">
+        <item quantity="one">%d angefangen</item>
+        <item quantity="other">%d angefangen</item>
+    </plurals>
+    <string name="home_first_run">Spiel etwas ab: Hier siehst du, wo du aufgehört hast, und was du zuletzt ausgewählt hast.</string>
+    <string name="mix_eyebrow">Mix</string>
+    <string name="mix_infinite_library">Endlos-Mix</string>
+    <string name="mix_infinite_library_sub">Aus deiner ganzen Bibliothek</string>
+    <string name="mix_infinite_favorites">Endlos-Mix der Favoriten</string>
+    <string name="mix_infinite_favorites_sub">Aus deinen Favoriten</string>
 </resources>

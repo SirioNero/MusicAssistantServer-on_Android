@@ -282,4 +282,100 @@
     <plurals name="episode_left">
         <item quantity="other">还剩 %d 分钟</item>
     </plurals>
+
+    <!-- La Home «Per te» (0.1.58): saluti, sezioni, righe di Music Assistant, Riprendi, In corso, cronologia -->
+    <string name="greeting_morning">早上好</string>
+    <string name="greeting_afternoon">下午好</string>
+    <string name="greeting_evening">晚上好</string>
+    <string name="greeting_night">夜深了</string>
+    <string name="home_in_progress_eyebrow">播客和有声书</string>
+    <string name="home_quick_eyebrow">你最近的选择</string>
+    <string name="home_for_you_eyebrow">精选合辑和艺人</string>
+    <string name="home_rediscover_title">重温</string>
+    <string name="home_rediscover_eyebrow">好久没听了</string>
+    <string name="home_library_title">来自你的音乐库</string>
+    <string name="home_library_eyebrow">你收藏的</string>
+    <string name="home_other_title">更多</string>
+    <string name="home_other_eyebrow">Music Assistant 的其他推荐</string>
+    <string name="home_genres_title">你的流派</string>
+    <string name="home_genres_eyebrow">探索</string>
+    <string name="home_more_show">显示</string>
+    <string name="home_more_hide">隐藏</string>
+    <string name="row_in_progress">正在收听</string>
+    <string name="row_recently_played">继续聆听</string>
+    <string name="row_recently_added_tracks">最近添加的歌曲</string>
+    <string name="row_recently_added_albums">最近添加</string>
+    <string name="row_random_artists">随机艺人</string>
+    <string name="row_random_albums">随机专辑</string>
+    <string name="row_recent_favorite_tracks">新收藏</string>
+    <string name="row_favorite_playlists">收藏的播放列表</string>
+    <string name="row_favorite_radio">收藏的电台</string>
+    <string name="row_recent_artists">你常听的艺人</string>
+    <string name="row_recent_tracks">最近听过的歌曲</string>
+    <string name="row_forgotten_tracks">值得重温的歌曲</string>
+    <string name="row_forgotten_albums">值得重温的专辑</string>
+    <string name="row_forgotten_artists">值得重温的艺人</string>
+    <string name="row_most_played_tracks">最常听</string>
+    <string name="row_never_played_tracks">从未或很少听过</string>
+    <string name="hero_eyebrow">继续播放 · %1$s</string>
+    <string name="hero_just_now">刚刚</string>
+    <string name="hero_from_playlist">来自播放列表 %1$s</string>
+    <string name="hero_from_album">来自专辑 %1$s</string>
+    <string name="hero_from_artist">来自艺人 %1$s</string>
+    <string name="hero_from_genre">来自流派 %1$s</string>
+    <string name="hero_from_podcast">来自播客 %1$s</string>
+    <string name="hero_from">来自 %1$s</string>
+    <string name="hero_resume">继续播放</string>
+    <string name="hero_open">打开</string>
+    <string name="hero_restart">从头开始</string>
+    <string name="hero_hide">隐藏</string>
+    <string name="hero_hidden">已隐藏，直到你下次收听</string>
+    <string name="hero_time">%1$s / %2$s</string>
+    <string name="hero_track_of">第 %1$d 首，共 %2$d 首</string>
+    <string name="hero_listen_again">再听一遍</string>
+    <string name="hero_then">接下来：</string>
+    <string name="hero_a11y">继续播放“%1$s”</string>
+    <string name="in_progress_from_start">从头开始</string>
+    <string name="in_progress_mark_played">标记为已收听</string>
+    <string name="notice_marked_played">已标记为已收听</string>
+    <string name="undo">撤销</string>
+    <string name="playing_from">播放来源</string>
+    <string name="per_te_help">Xonos 会记住哪些内容，以便在首页为你推荐音乐。</string>
+    <string name="journal_title">收听记录</string>
+    <string name="journal_help">Xonos 会记住你在这部手机上听过的内容，以便在首页为你推荐音乐。记录只在这部手机上保存一年，不会进入 Android 备份，也绝不会分享。</string>
+    <string name="journal_off">已关闭：Xonos 不会记录新的收听。</string>
+    <string name="journal_empty">还没有收听记录。</string>
+    <string name="journal_since">自 %1$s 起</string>
+    <string name="journal_clear">清除记录</string>
+    <string name="journal_clear_title">要清除收听记录吗？</string>
+    <string name="journal_clear_text">Xonos 会忘记这部手机上保存的所有收听记录，首页推荐将从头开始。此操作无法撤销。</string>
+    <string name="journal_clear_confirm">清除</string>
+    <string name="journal_cleared">记录已清除</string>
+    <plurals name="ago_minutes">
+        <item quantity="other">%d 分钟前</item>
+    </plurals>
+    <plurals name="ago_hours">
+        <item quantity="other">%d 小时前</item>
+    </plurals>
+    <plurals name="ago_days">
+        <item quantity="other">%d 天前</item>
+    </plurals>
+    <plurals name="journal_listens">
+        <item quantity="other">%d 次收听</item>
+    </plurals>
+    <plurals name="journal_months">
+        <item quantity="other">%d 个月</item>
+    </plurals>
+
+    <!-- La Home «Per te» (0.1.58): testata, prima volta, Infinite Mix -->
+    <string name="home_date_pattern">M月d日 EEEE</string>
+    <plurals name="home_live_in_progress">
+        <item quantity="other">%d 项进行中</item>
+    </plurals>
+    <string name="home_first_run">播放点什么吧：这里会显示你上次停下的地方和最近的选择。</string>
+    <string name="mix_eyebrow">混音</string>
+    <string name="mix_infinite_library">无尽混音</string>
+    <string name="mix_infinite_library_sub">来自你的整个音乐库</string>
+    <string name="mix_infinite_favorites">无尽收藏混音</string>
+    <string name="mix_infinite_favorites_sub">来自你的收藏</string>
 </resources>

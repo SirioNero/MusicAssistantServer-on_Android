@@ -126,7 +126,14 @@ class MaPlayer(
      * Il Music Assistant dell'ultima connessione (server_id): lo stesso da casa e da fuori, così dopo un calo la musica
      * riprende anche se ci si ricollega dall'indirizzo remoto, ma non su un altro server.
      */
-    private var serverId: String? = null
+    var serverId: String? = null
+        private set
+
+    /**
+     * Il Music Assistant ([serverId]) che ha mandato [queue]. Passati a un altro server, la coda di prima resta qui finché
+     * non arriva quella nuova: non è sua (vedi [queueState]).
+     */
+    private var queueServer: String? = null
 
     private class Expectation(val test: (QueueState?) -> Boolean, val future: SettableFuture<Void?>)
     private val expectations = mutableListOf<Expectation>()
@@ -280,8 +287,16 @@ class MaPlayer(
                     putString(EXTRA_TYPE, item.mediaType)
                     putString(EXTRA_ALBUM, item.albumRef?.uri)
                     putString(EXTRA_ARTIST, item.artistRef?.uri)
-                    // Sul brano in corso: da dove in poi la coda si può cambiare.
-                    if (isCurrent) putInt(EXTRA_EDITABLE_FROM, editableFrom)
+                    // Sul brano in corso: da dove in poi la coda si può cambiare, e da dove suona ("In riproduzione da").
+                    if (isCurrent) {
+                        putInt(EXTRA_EDITABLE_FROM, editableFrom)
+                        q.source?.let { source ->
+                            putString(EXTRA_SOURCE_URI, source.uri)
+                            putString(EXTRA_SOURCE_NAME, source.name)
+                            putString(EXTRA_SOURCE_TYPE, source.mediaType)
+                            putString(EXTRA_SOURCE_IMAGE, artwork(source.image, SOURCE_ART)?.toString())
+                        }
+                    }
                 },
             )
             .apply { if (item.durationSec > 0) setDurationMs(item.durationSec * 1000L) }
@@ -334,6 +349,7 @@ class MaPlayer(
     private fun apply(q: QueueState, itemsChanged: Boolean = false) {
         val old = queue
         queue = q
+        queueServer = serverId
         if (q.playing) lastPlayingAt = SystemClock.elapsedRealtime()
         val jumped = old == null || old.currentIndex != q.currentIndex || old.current?.id != q.current?.id
         setElapsed(q.elapsedSec, fromServer = !jumped)
@@ -795,6 +811,34 @@ class MaPlayer(
 
     val isPlayingOnServer: Boolean get() = queue?.playing == true
 
+    /**
+     * Lo stato della coda come l'ha detto Music Assistant l'ultima volta (per la copia dell'ultimo ascolto e il diario).
+     * Null se è del server di prima: passati a un altro Music Assistant, la sua coda non c'è ancora, e quella vecchia
+     * finirebbe nella copia e nel diario del nuovo.
+     */
+    val queueState: QueueState? get() = queue?.takeIf { queueServer != null && queueServer == serverId }
+
+    /** Dove è arrivato ciò che si sente, in secondi (la posizione mostrata, un po' indietro dopo un avvio lento). */
+    val heardPositionSec: Double
+        get() {
+            val q = queue ?: return 0.0
+            val now = (currentPositionMs() - lateMs()).coerceAtLeast(0)
+            val duration = (q.current?.durationSec ?: 0) * 1000L
+            return (if (duration > 0) min(now, duration) else now) / 1000.0
+        }
+
+    /**
+     * I brani dopo quello in corso, al massimo [count], dalla finestra della coda già chiesta (niente richieste in più).
+     * Vuoto se la finestra non è ancora quella del brano in corso.
+     */
+    fun upcoming(count: Int): List<QueueItem> {
+        val q = queue ?: return emptyList()
+        val current = q.current ?: return emptyList()
+        val position = (q.currentIndex ?: return emptyList()) - windowStart
+        if (position < 0 || window.getOrNull(position)?.id != current.id) return emptyList()
+        return window.drop(position + 1).take(count)
+    }
+
     /** Il brano in corso, per i preferiti. */
     val currentItem: QueueItem? get() = queue?.current
 
@@ -955,6 +999,15 @@ class MaPlayer(
         const val EXTRA_ALBUM = "xonos.album"
         const val EXTRA_ARTIST = "xonos.artist"
 
+        /**
+         * Sul brano in corso, la sorgente della coda (la prima delle `sources` di Music Assistant: album, playlist,
+         * artista...): uri, nome, tipo e copertina (un indirizzo `content://` di [Artwork], come quella del brano).
+         */
+        const val EXTRA_SOURCE_URI = "xonos.source.uri"
+        const val EXTRA_SOURCE_NAME = "xonos.source.name"
+        const val EXTRA_SOURCE_TYPE = "xonos.source.type"
+        const val EXTRA_SOURCE_IMAGE = "xonos.source.image"
+
         private const val TAG = "Xonos"
 
         private fun yesNo(value: Boolean) = if (value) "sì" else "no"
@@ -963,6 +1016,7 @@ class MaPlayer(
         private const val AHEAD = 50
         private const val AHEAD_MARGIN = 5
         private const val NOW_PLAYING_ART = 512
+        private const val SOURCE_ART = 256
         private const val POSITION_TOLERANCE_MS = 1_500L
         private const val WINDOW_DEBOUNCE_MS = 150L
         private const val EXPECT_TIMEOUT_MS = 3_000L

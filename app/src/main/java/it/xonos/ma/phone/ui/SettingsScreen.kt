@@ -17,11 +17,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -32,8 +34,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -52,6 +56,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -64,7 +69,13 @@ import it.xonos.ma.data.Connection
 import it.xonos.ma.phone.model.ConnectionCheck
 import it.xonos.ma.phone.model.PhoneModel
 import it.xonos.ma.phone.model.SettingsPage
+import it.xonos.ma.phone.model.Load
 import kotlinx.coroutines.delay
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+import java.util.Locale
 
 /** Il primo avvio: le impostazioni da sole, finché Xonos non sa a quale Music Assistant collegarsi. */
 @Composable
@@ -86,10 +97,17 @@ internal fun Onboarding(model: PhoneModel, host: Host, onDone: () -> Unit) {
  */
 @Composable
 internal fun SettingsScreen(page: SettingsPage, model: PhoneModel, host: Host, onboarding: Boolean, onDone: () -> Unit) {
+    // Prima di "Per te": resta nella composizione mentre "Per te" è aperta, e chiudendola le impostazioni tornano dov'erano.
+    val scroll = rememberScrollState()
+    // "Per te" sta sopra le impostazioni da cui si è aperta: indietro la chiude.
+    model.perTe?.takeIf { !onboarding && it.over == page.id }?.let { state ->
+        PerTeScreen(state, model, host)
+        return
+    }
     val focus = LocalFocusManager.current
     Column(
         Modifier.fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scroll)
             .statusBarsPadding()
             .navigationBarsPadding()
             .imePadding()
@@ -203,6 +221,8 @@ internal fun SettingsScreen(page: SettingsPage, model: PhoneModel, host: Host, o
                 // Il registro del server a cui Xonos è collegato; quello sul telefono ha il suo tasto nella sua scheda.
                 if (!model.onPhoneServer) ServerLogRow(model, host)
             }
+            // Cosa ricorda Xonos per i consigli della Home: per tutti, non solo per gli amministratori.
+            if (!onboarding) PerTeEntry { model.openPerTe(page) }
             if (onboarding && page.results.any { it is ConnectionCheck.Result.Ok }) {
                 FilledTonalButton(onClick = onDone, modifier = Modifier.testTag("onboarding_done").fillMaxWidth().height(52.dp)) { Text(stringResource(R.string.onboarding_done)) }
             }
@@ -221,6 +241,145 @@ internal fun SettingsScreen(page: SettingsPage, model: PhoneModel, host: Host, o
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
             )
+        }
+    }
+}
+
+/** La voce delle impostazioni che apre "Per te". */
+@Composable
+private fun PerTeEntry(onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.testTag("open_per_te").fillMaxWidth(),
+    ) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(XIcons.ForYou, null, tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(16.dp))
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.cat_foryou), style = MaterialTheme.typography.bodyLarge)
+                Text(stringResource(R.string.per_te_help), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Icon(XIcons.Chevron, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+/**
+ * Impostazioni › Per te: la cronologia degli ascolti (accesa di base), cosa tiene e per quanto, quanti ascolti ci sono
+ * e "Cancella la cronologia" con una domanda prima. Sta sopra le impostazioni, nella stessa schermata.
+ */
+@Composable
+private fun PerTeScreen(state: PhoneModel.PerTeSettings, model: PhoneModel, host: Host) {
+    PlatformBackHandler(enabled = true) { model.closePerTe() }
+    Column(
+        Modifier.fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(bottom = 24.dp)
+            .testTag("per_te"),
+    ) {
+        Row(Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = model::closePerTe) { Icon(XIcons.Back, stringResource(R.string.back)) }
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.cat_foryou), style = MaterialTheme.typography.titleLarge)
+        }
+        Column(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Text(stringResource(R.string.per_te_help), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .toggleable(state.enabled, role = Role.Switch) { model.setJournal(state, it) }
+                            .testTag("journal_switch"),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(XIcons.Recent, null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(16.dp))
+                        Text(stringResource(R.string.journal_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                        Spacer(Modifier.width(12.dp))
+                        Switch(checked = state.enabled, onCheckedChange = null)
+                    }
+                    Text(stringResource(R.string.journal_help), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (!state.enabled) {
+                        Text(stringResource(R.string.journal_off), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+                    }
+                    JournalNumbers(state, host)
+                    if (state.cleared) {
+                        Text(stringResource(R.string.journal_cleared), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                    }
+                    val listens = (state.counts as? Load.Ready)?.value?.listens ?: 0
+                    OutlinedButton(
+                        onClick = { model.askClearJournal(state) },
+                        enabled = listens > 0 && !state.clearing,
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        modifier = Modifier.testTag("clear_journal"),
+                    ) {
+                        if (state.clearing) {
+                            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.width(12.dp))
+                        }
+                        Icon(XIcons.Delete, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.journal_clear))
+                    }
+                }
+            }
+        }
+    }
+    if (state.confirmClear) {
+        AlertDialog(
+            onDismissRequest = { model.dismissClearJournal(state) },
+            title = { Text(stringResource(R.string.journal_clear_title)) },
+            text = { Text(stringResource(R.string.journal_clear_text)) },
+            confirmButton = {
+                TextButton(onClick = { model.clearJournal(state) }, modifier = Modifier.testTag("clear_journal_confirm")) {
+                    Text(stringResource(R.string.journal_clear_confirm), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { model.dismissClearJournal(state) }) { Text(stringResource(R.string.flow_cancel)) }
+            },
+        )
+    }
+}
+
+/** Quanti ascolti tiene il diario, in quanti mesi, quanti brani e artisti diversi, e da quando. */
+@Composable
+private fun JournalNumbers(state: PhoneModel.PerTeSettings, host: Host) {
+    when (val counts = state.counts) {
+        Load.Loading -> LinearProgressIndicator(Modifier.fillMaxWidth())
+        is Load.Failed -> Text(host.describe(counts.error), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+        is Load.Ready -> {
+            val numbers = counts.value
+            val first = numbers.firstMs
+            if (numbers.listens == 0 || first == null) {
+                Text(stringResource(R.string.journal_empty), style = MaterialTheme.typography.bodyMedium)
+                return
+            }
+            val months = state.months()
+            Column(Modifier.testTag("journal_counts"), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    pluralStringResource(R.plurals.journal_listens, numbers.listens, numbers.listens) + " · " +
+                        pluralStringResource(R.plurals.journal_months, months, months),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Text(
+                    pluralStringResource(R.plurals.count_tracks, numbers.tracks, numbers.tracks) + " · " +
+                        pluralStringResource(R.plurals.count_artists, numbers.artists, numbers.artists),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                val language = host.language
+                val since = remember(first, language) {
+                    DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG)
+                        .withLocale(Locale.forLanguageTag(language.tag))
+                        .format(Instant.ofEpochMilli(first).atZone(ZoneId.systemDefault()))
+                }
+                Text(stringResource(R.string.journal_since, since), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
 }

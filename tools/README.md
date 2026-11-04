@@ -38,6 +38,11 @@ MA_TOKEN=... LANG_XONOS=it QUERIES="vasco,podcast morning" build/install/harness
 | `SearchCheckKt` | La ricerca del telefono: dopo quanto compaiono i risultati della libreria e dopo quanto quelli dei servizi (`QUERY`, separate da virgole). MA ricorda le ricerche: serve una parola nuova, e un servizio lento (`SEARCH_DELAY` del finto iTunes) |
 | `ServicesCheckKt` | I servizi di MA con il servizio finto `xonos_test`: elenco, icone, flusso (modulo con errore, accesso "nel browser", fine), opzioni, pulsante, riconfigura, rimozione; poi lo stesso dal `PhoneModel` (anche la fine ricavata al ritorno nell'app) e la lingua dei moduli |
 | `PhoneServerCheckKt` | "Fai diventare Xonos il tuo server Music Assistant" dal `PhoneModel`, contro un Music Assistant vuoto (di solito il server di Xonos avviato sul computer con `python -m xonos_server`): la domanda con quanto pesa il pacchetto, il download finto con l'avanzamento, poi primo account creato da Xonos, token e connessione; con il token perso si rientra con la password tenuta; "Usa un altro Music Assistant"; la rimozione; un download che non riesce e un server che non parte |
+| `HomeRowsCheckKt` | Le righe "Per te" di Music Assistant riconosciute da servizio e `item_id` (non da `translation_key`): sezione, ordine e titolo nelle 9 lingue, le sconosciute in "Altro" col loro nome, l'ordine in auto, il saluto, le Infinite Mix; contro il Music Assistant di prova anche `recentContexts`, `inProgress`, `genreTiles` |
+| `ResumeCheckKt` | "Riprendi" (`ResumePlan`): la coda nei formati nuovo e vecchio, i casi a–c e la coda finita, la copia `last-listen.json`; dal vivo un lettore del banco suona "Bollicine", va in pausa, si stacca e si riattacca, perde la coda: si torna sempre allo stesso brano e allo stesso punto |
+| `JournalCheckKt` | Il diario degli ascolti (`data/taste/Journal.kt`): file mensili, un anno, righe rovinate, spento, conteggi, viaggi in auto, `ListenRecorder` (finito, saltato, pausa, seek, ripeti uno), 20.000 righe lette in meno di 300 ms, niente titoli nel registro, "Cancella" |
+| `ListeningCheckKt` | `playback/Listening.kt`: quando si riscrive la copia dell'ultimo ascolto (solo per un brano sentito suonare), le righe del diario dal lettore, il luogo "auto" dai viaggi del servizio (`carTrip`, anche a cronologia spenta), l'ascolto in corso ritrovato dopo un processo morto (`pending-listen.json`), la copia che non torna indietro dopo un distacco e segna la fine della coda, l'interruttore, "Cancella", la riga di diagnosi (artisti, generi, MBID, salvata per server e versione) contro il Music Assistant di prova |
+| `PaletteCheckKt` | `ArtPalette`: i colori presi dalla copertina su 2000+2000 copertine a caso, rossa, pastello, grigia, bianca, nera, trasparente; i contrasti (bianco sul profondo, vivo sul fondo, suVivo), sempre lo stesso risultato, il tempo per copertina, la cache; le copertine del Music Assistant di prova |
 
 `MA_URL` (predefinito `http://127.0.0.1:8095`) e `MA_TOKEN` indicano il server.
 
@@ -61,9 +66,11 @@ cd tools/screens && sh sync.sh && gradle -q installDist
 JAVA_OPTS="-Dxonos.out=/tmp/shots -Dxonos.lang=it -Dxonos.only=home,player" build/install/screens/bin/screens
 ```
 
-Le scene: `home`, `library`, `album`, `artist`, `artist-more`, `search`, `player`, `lyrics`, `queue`,
-`podcast`, `settings`, `welcome`, `services`, `add-service`, `service-flow`, `service-login`, `spotify-phone`, `service`,
-`play-on`, `remote`, `remote-mini`, `add-to-playlist`
+Le scene: `home`, `home-resume`, `home-first-run`, `home-starting`, `library`, `album`, `artist`, `artist-more`,
+`search`, `player`, `lyrics`, `queue`, `podcast`, `settings`, `settings-per-te`, `settings-per-te-clear`, `welcome`,
+`phone-server-ask`, `phone-server-download`, `phone-server-preparing`, `phone-server-failed`, `phone-server-outdated`,
+`services`, `add-service`, `service-flow`, `service-login`, `spotify-phone`, `flow-leave`, `service`, `play-on`, `remote`,
+`remote-mini`, `add-to-playlist`
 (1080×2340, densità 2,625). Le scritte sono nella lingua di `-Dxonos.lang`. Con `-Dxonos.height=5400`
 la schermata è più alta e si vedono intere le pagine lunghe (le impostazioni).
 

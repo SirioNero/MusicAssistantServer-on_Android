@@ -75,10 +75,17 @@ prima di cominciare: le cose scritte qui sono già state verificate, non vanno r
   (F-Droid rifiuta quel blocco). Build riproducibili: il workflow "Riproducibile" compila la release
   come F-Droid (la loro immagine `fdroidserver:buildserver-trixie`, OpenJDK 21, Gradle del wrapper,
   senza `tools/`) e la confronta byte per byte con l'APK della release tolta la firma: per la 0.1.38, la
-  0.1.42, la 0.1.49, la 0.1.50, la 0.1.52, la 0.1.53, la 0.1.56 e la 0.1.57 identici. Così la ricetta ha `Binaries` e `AllowedAPKSigningKeys` (SHA-256 del certificato
+  0.1.42, la 0.1.49, la 0.1.50, la 0.1.52, la 0.1.53, la 0.1.56 e la 0.1.57 identici; la 0.1.58 no (sotto). Così la ricetta ha `Binaries` e `AllowedAPKSigningKeys` (SHA-256 del certificato
   `18ef3fc3…2c836`): F-Droid pubblica l'APK con la nostra firma e si passa da GitHub/Obtainium a F-Droid
-  senza disinstallare. Dopo ogni release va lanciato a mano "Riproducibile": una versione non identica
-  F-Droid non la pubblica. Il modello delle richieste di fdroiddata vuole in `commit` l'hash completo e
+  senza disinstallare. Dalla 0.1.59 "Riproducibile" parte da solo dopo "Compila Xonos" in main, solo se quel giro ha
+  fatto la release (il tag è sul suo commit); va guardato: una versione non identica F-Droid non la pubblica. La
+  0.1.58 non è identica: il dex sì, il profilo ART (`assets/dexopt/baseline.prof`) ha nella release una regola in più,
+  il costruttore `<init>(I)V` di `kotlin/LazyKt__LazyJVMKt` che R8 crea fondendo classi. Sette build rifatte da capo
+  (come F-Droid due volte, come la release con JDK 17 e 21 senza cache, tre volte con la cache di Gradle) danno tutte il
+  profilo senza quella regola: un caso della sola build della release (forse una corsa nel profilo riscritto da R8),
+  non il JDK. Se torna, si vede subito. Se è diverso il profilo, il log di Riproducibile dice se cambia il contenuto o
+  solo la compressione, lo mette in base64, elenca i profili intermedi e rifà la build per vedere se cambia fra due
+  build di fila (`.github/scripts/profilo.py`). Il modello delle richieste di fdroiddata vuole in `commit` l'hash completo e
   chiede di decidere le build riproducibili prima dell'inclusione (dopo non si può). `apksigcopier`
   di Debian non verifica gli APK firmati solo v2 (cerca `META-INF/MANIFEST.MF`).
 - La richiesta a fdroiddata (verificato il 26 ottobre 2026): l'Inclusion Policy vuole tre mesi di
@@ -1191,6 +1198,64 @@ della 2; è solo app (pacchetto del server invariato, 2.10.8-12).
   salvataggi della coda, Spotify protetto, Riprendi in auto); 4 i mix del motore; 5 ListenBrainz novità e scoperte; 6
   Last.fm; 7 riordino e rifiniture. Scelte mie dette all'utente: mix come 6 playlist fisse di MA, Spotify me/top 6
   richieste a settimana, finestra di Riprendi 14/30 giorni.
+
+## Servizi che non si caricano senza rete (0.1.59, pacchetto 2.10.8-13)
+
+Dal registro dell'utente con la 0.1.58 (server sul telefono): il server ripartito con Xonos in secondo piano (cgroup
+`background`, forse myCar che chiede l'account) non aveva rete, e Spotify non si caricava (`ClientConnectorDNSError`,
+"No address associated with hostname", da `socket.gaierror` 7: Android toglie la rete a un'app in secondo piano senza
+servizio in primo piano). Music Assistant 2.10.8 riprova un servizio solo se l'errore è un `MusicAssistantError`, dopo
+120 s (`mass.load_provider`): un errore di aiohttp no, e Spotify restava fuori fino al riavvio del server. Poi ogni
+play_index "Skipping unplayable item … not available" e "No playable item found to start playback" (anche da myCar), e i
+brani della coda segnati non disponibili per sempre (`queue_item.available = False`).
+- **Fatto** (`_provider_retry` in prepare.py): un errore di rete (aiohttp tranne le risposte 4xx, timeout, `gaierror`,
+  errori di connessione, OSError coi numeri della rete; anche come `__cause__`, anche dentro un LoginFailed) si riprova
+  sempre, dopo 10, 20, 40, 60 s e poi ogni 120 (`_XONOS_RETRY_S`: sul telefono la rete manca quasi sempre per poco, e un
+  tentativo senza rete costa una ricerca DNS che fallisce subito), coi tentativi per istanza azzerati quando si carica; nel
+  registro "(will be retried later)" e una riga di Xonos (logger `xonos.servizi`, solo il dominio) col tentativo e fra
+  quanto. Anche un servizio già caricato una volta e ricaricato da fuori (`load_provider_config`: impostazioni,
+  `config/providers/reload` che Xonos usa per Soloist occupato) si riprova se fallisce per la rete. Finché un servizio
+  aspetta la rete, ogni 5 s si guarda la data del file del DNS (`XONOS_DNS_FILE`, che `PhoneServer.writeDns` riscrive
+  solo quando la rete cambia o Android la toglie e la ridà a Xonos): a un cambio si riprova fra 2 s. `load_provider` ora è un involucro che fa vedere il
+  caricamento in corso (`_xonos_loads`); il codice di Music Assistant è in `_xonos_load_provider`.
+- **Al play** (play_index, quindi anche player_queues/play e la ripresa, e play_media): un brano che non si suona perché
+  il suo servizio aspetta di riprovare o si sta caricando (`xonos_waiting`) fa ricaricare subito il servizio
+  (`xonos_revive`: uno solo anche con più play insieme, al massimo uno ogni 10 s, attesa al massimo 15 s), poi si riprova
+  il brano (`_xonos_load_item` in play_index). In play_media: se non c'è niente da suonare il servizio si cerca anche
+  nelle mappature di album, playlist e artisti trovati (il resolver ne toglie prima i brani non disponibili), e per
+  playlist di Music Assistant e generi, che non dicono da dove vengono i brani, fra i servizi che aspettano la rete
+  (`xonos_offline_waiting`); poi il play si rifà una volta, con fonti, elementi chiesti e album contati rimessi come prima
+  (sennò con ADD e NEXT entrano due volte). Se invece qualche brano si suona, il servizio si aspetta al massimo 3 s
+  (`_XONOS_REVIVE_SOON_S`: con la rete torna e ci sono tutti, senza si suona quello che c'è). Le due attese non si
+  sommano. Costa solo quando qualcosa è già risultato non suonabile. Se non torna: `xonos_service_offline` ("{0} non è
+  riuscito a collegarsi a internet … Music Assistant riprova da solo", 9 lingue) o `xonos_service_down`, e il brano non si
+  segna come non disponibile (né nel precarico del brano dopo).
+- **"Non disponibile" non è per sempre**: Music Assistant lo salva con la coda (`QueueItem.to_cache`) e non lo toglie mai.
+  Il brano scelto (il primo di un play_index) si prova davvero se uno dei suoi servizi è caricato, e una coda che torna
+  dalla cache dopo un riavvio del server (`on_player_register`) riparte coi brani tutti da provare: così anche la coda
+  rovinata nella 0.1.58 torna a suonare dopo l'aggiornamento.
+- **Dalle due revisioni avversarie**: il caricamento chiesto da un play e i timer di Xonos partono in un contesto vuoto
+  (`_xonos_detached`: col contesto del play la sincronizzazione di Spotify avrebbe avuto BYPASS_THROTTLER acceso e
+  sarebbe passata davanti ai limiti); la traccia dell'errore nel registro solo al primo tentativo fallito per la rete (70
+  righe di aiohttp ogni 10-120 s riempivano in un quarto d'ora le 96 KB condivise); non sono rete un indirizzo scritto male
+  (`InvalidURL`, `NonHttpUrlClientError`, come "192.168.1.10:8096" senza http://) né il limite di Music Assistant a un
+  passo del caricamento (`_provider_load_step` lo segna `xonos_step_limit`); un TimeoutError del codice del servizio sì.
+  Nell'app `PhoneServer` riscrive il file del DNS anche a `onBlockedStatusChanged` (Android 10+: la rete tolta a Xonos in
+  secondo piano e ridata sulla stessa rete, il caso del registro), con "(tolta a Xonos da Android)" nella prima riga:
+  Music Assistant riprova entro circa 7 s.
+- **Provato** in locale: prepare.py fino in fondo, py_compile e pyflakes dei file toccati (solo l'avviso che c'era già
+  in controller.py), la scelta di cosa è rete (`_xonos_network_error`) e il contesto vuoto presi da prepare.py da soli.
+  **Da far girare in CI** (Server MA) l'autotest `servizio-senza-rete`: un Music Assistant di prova non avviato col codice
+  vero e un servizio finto che alza `ClientConnectorDNSError`; controlla riprova fra 10 s e caricamento al timer vero,
+  10/20/40 con la traccia solo la prima volta, LoginFailed con la rete dentro 10 s, SetupFailedError 120 s, ValueError,
+  file mancante e indirizzo senza http:// mai, limite di un passo 120 s, timeout di una chiamata 10 s, play che ricarica
+  subito, due play un caricamento, brano scelto segnato non disponibile riprovato, senza rete `xonos_service_offline` e
+  niente secondo caricamento entro 10 s, cambio di rete, ricaricato da fuori, `_handle_play_media` vero su una coda finta
+  (album aggiunto in coda col play rifatto e fonti una volta sola, playlist di Music Assistant, album senza rete, lista col
+  servizio che torna e con un caricamento lento di 5 s: 3 s di attesa), caricamento da un play senza BYPASS_THROTTLER,
+  niente nome né istanza nelle righe di Xonos. Non coperti dall'autotest: le righe cambiate dentro play_index e il
+  precarico (`load_next_queue_item`), il ripristino della coda dalla cache. **Non provato**: sul telefono (la rete tolta e
+  ridata a Xonos, `onBlockedStatusChanged`) e con Spotify vero.
 
 ## Lingue
 

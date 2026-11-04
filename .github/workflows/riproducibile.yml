@@ -3,12 +3,18 @@ name: Riproducibile
 # Compila Xonos come lo compila F-Droid (la stessa immagine Docker e lo stesso JDK delle prove di
 # fdroiddata, senza tools/ e server/ e senza chiave) e confronta l'APK con quello firmato della release: se è
 # identico a parte la firma, F-Droid può pubblicare l'APK con la nostra firma (build riproducibili),
-# e chi passa da GitHub/Obtainium a F-Droid non deve disinstallare. Parte a mano, o quando cambia
-# questo file su un ramo claude/**.
+# e chi passa da GitHub/Obtainium a F-Droid non deve disinstallare. Parte da solo dopo "Compila Xonos" in main
+# (dalla 0.1.59: la 0.1.58 della release aveva nel profilo ART una regola in più di 7 build rifatte da capo, con JDK 17 o
+# 21, con o senza la cache di Gradle: un caso della build della release, e lo si è saputo solo a mano), a mano, o quando
+# cambia questo file su un ramo claude/**.
 on:
   push:
     branches: ["claude/**"]
     paths: [".github/workflows/riproducibile.yml"]
+  workflow_run:
+    workflows: ["Compila Xonos"]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
     inputs:
       version:
@@ -18,6 +24,8 @@ on:
 
 jobs:
   confronta:
+    # dopo "Compila Xonos" solo se è andata bene (la release si fa lì)
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     container: registry.gitlab.com/fdroid/fdroidserver:buildserver-trixie
     env:
@@ -45,12 +53,27 @@ jobs:
           VERSION="${{ inputs.version }}"
           [ -n "$VERSION" ] || VERSION=$(sed -n 's/^ *versionName = "\(.*\)"/\1/p' app/build.gradle.kts)
           # Lo script del confronto è di questo ramo: la release può essere più vecchia.
-          cp .github/scripts/senza_firma.py /tmp/
+          cp .github/scripts/senza_firma.py .github/scripts/profilo.py /tmp/
+          # Un push su un ramo claude/ con la versione nuova non ha ancora la sua release: niente da confrontare.
+          if ! git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+            echo "Nessuna release v$VERSION: niente da confrontare (lancialo a mano con una versione uscita)."
+            echo "SKIP=1" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          # Dopo "Compila Xonos" in main: solo se quel giro ha fatto la release (il tag è sul suo commit). Un push in
+          # main che non cambia l'app non fa release, e il tag della versione è di un commit di prima.
+          RUN_SHA="${{ github.event.workflow_run.head_sha }}"
+          if [ -n "$RUN_SHA" ] && [ "$(git rev-parse "v$VERSION^{commit}")" != "$RUN_SHA" ]; then
+            echo "Il giro di Compila Xonos non ha fatto la release v$VERSION: niente da confrontare."
+            echo "SKIP=1" >> "$GITHUB_ENV"
+            exit 0
+          fi
           git checkout -q "v$VERSION"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "Release v$VERSION, commit $(git rev-parse HEAD)"
 
       - name: NDK (come "ndk:" nella ricetta)
+        if: env.SKIP != '1'
         run: |
           # Dalla 0.1.49 l'APK ha proot, compilato con l'NDK scritto in app/build.gradle.kts (ndkVersion).
           NDK=$(sed -n 's/^ *ndkVersion = "\(.*\)"/\1/p' app/build.gradle.kts)
@@ -70,6 +93,7 @@ jobs:
           grep Pkg.Revision "$ANDROID_HOME/ndk/$NDK/source.properties"
 
       - name: Compila come F-Droid
+        if: env.SKIP != '1'
         run: |
           rm -rf tools server
           # Come gradlew-fdroid: la versione di Gradle scritta in gradle-wrapper.properties.
@@ -82,6 +106,7 @@ jobs:
           "$GRADLE" assembleRelease --no-daemon
 
       - name: Confronta con l'APK firmato della release
+        if: env.SKIP != '1'
         run: |
           curl -sSfL -o signed.apk "https://github.com/${{ github.repository }}/releases/download/v$VERSION/Xonos.apk"
           UNSIGNED=app/build/outputs/apk/release/app-release-unsigned.apk
@@ -100,6 +125,19 @@ jobs:
             diff diff/signed.txt diff/fdroid.txt || true
             zipinfo -v stripped.apk > diff/a.txt; zipinfo -v "$UNSIGNED" > diff/b.txt
             diff diff/a.txt diff/b.txt | head -n 80 || true
+            # Il profilo ART (assets/dexopt/baseline.prof) è diverso con lo stesso codice dalla 0.1.58: cosa
+            # cambia dentro, e se cambia anche fra due build di fila nello stesso ambiente.
+            if ! cmp -s diff/signed/assets/dexopt/baseline.prof diff/fdroid/assets/dexopt/baseline.prof; then
+              python3 /tmp/profilo.py signed.apk "$UNSIGNED" || true
+              echo "Profili intermedi di questa build:"
+              find app/build/intermediates -type f \( -name '*.txt' -path '*art_profile*' -o -name '*.prof' -o -name '*.profm' \) \
+                -exec sh -c 'printf "%s %s righe %s\n" "$(sha256sum "$1" | cut -c1-16)" "$(wc -l < "$1")" "$1"' _ {} \; | sort -k3
+              cp "$UNSIGNED" first.apk
+              GRADLE=$(ls -d /tmp/gradle/gradle-*)/bin/gradle
+              (cd app && "$GRADLE" assembleRelease --no-daemon --rerun-tasks -q) || true
+              echo "Seconda build di fila nello stesso ambiente:"
+              python3 /tmp/profilo.py first.apk "$UNSIGNED" breve || true
+            fi
             exit 1
           fi
           # Quindi l'APK della release è questo più la sua firma: che la firma sia buona lo dice apksigner

@@ -405,6 +405,7 @@ def _patch(root: Path) -> None:
     _soloist_preload(root)
     _phone_chain(root)
     _phone_buffers(root)
+    _provider_retry(root)
     _texts(root)
 
 
@@ -461,6 +462,720 @@ def _reasons(root: Path) -> None:
         "                        )\n"
         '            raise MediaNotFoundError("No playable items found", translation_key="xonos_not_available")\n',
     )
+
+
+def _provider_retry(root: Path) -> None:
+    """
+    I servizi che non si caricano per un errore di rete (pacchetto 2.10.8-13, Xonos 0.1.59).
+
+    Sul telefono la rete manca spesso per poco: il server che parte con Xonos in secondo piano (Android toglie la rete a
+    un'app senza servizio in primo piano, e getaddrinfo dà "No address associated with hostname"), il passaggio dal
+    Wi-Fi alla rete mobile, la VPN che si ricollega. Music Assistant riprova a caricare un servizio solo se l'errore è
+    uno dei suoi (MusicAssistantError), e dopo 120 s: un errore di aiohttp no, e Spotify restava fuori fino al riavvio
+    del server, con ogni brano "non disponibile" e "No playable item found to start playback".
+    - load_provider: un errore di rete (anche come __cause__ di un altro) si riprova sempre, dopo 10, 20, 40, 60 s e poi
+      ogni 120 (_XONOS_RETRY_S), coi tentativi contati per istanza e azzerati quando il caricamento riesce; finché un
+      servizio aspetta la rete, un cambio di rete (Xonos riscrive il file del DNS) lo fa riprovare subito. La traccia
+      dell'errore nel registro solo al primo tentativo. Non sono rete un indirizzo scritto male né il limite di Music
+      Assistant a un passo del caricamento (un servizio fermo per minuti): quelli come prima.
+    - al play (play_index, player_queues/play e play_media): un brano che non si suona perché il suo servizio aspetta di
+      riprovare (o si sta caricando) fa ricaricare subito il servizio, una volta sola anche con più play insieme e non
+      più di una volta ogni 10 s, e lo aspetta al massimo 15 s; poi si riprova il brano. In play_media anche quando il
+      resolver ha già tolto i brani (album, playlist, artisti: il servizio si cerca nelle loro mappature; playlist di
+      Music Assistant e generi: fra i servizi che aspettano la rete), e il play si rifà una volta con fonti ed elementi
+      chiesti di prima; se ci sono altri brani da suonare si aspetta al massimo 3 s. Costa solo quando qualcosa è già
+      risultato non suonabile. Il caricamento e i timer partono in un contesto vuoto (non quello del play, che ha
+      BYPASS_THROTTLER acceso).
+    - se non torna, l'errore dice quale servizio e perché (xonos_service_offline per la rete, sennò
+      xonos_service_down), e il brano non si segna come non disponibile (tornerebbe "non disponibile" anche dopo).
+    - "non disponibile" non resta per sempre: il brano scelto si prova davvero se un suo servizio è caricato, e una coda
+      che torna dalla cache dopo un riavvio del server riparte coi brani tutti da provare.
+    """
+    mass = root / "mass.py"
+    _replace(mass, "import asyncio\nimport inspect\n", "import asyncio\nimport contextvars\nimport errno\nimport inspect\n")
+    _replace(mass, "import pathlib\nimport threading\n", "import pathlib\nimport socket\nimport threading\n")
+    _replace(mass, "import aiofiles\n", "import aiofiles\nimport aiohttp\n")
+    _replace(mass, "\n\nclass MusicAssistant:\n", "\n" + PROVIDER_RETRY_HELPERS + "\n\nclass MusicAssistant:\n")
+    _replace(
+        mass,
+        "        self._tracked_timers: dict[str, asyncio.TimerHandle] = {}\n",
+        "        self._tracked_timers: dict[str, asyncio.TimerHandle] = {}\n" + PROVIDER_RETRY_STATE,
+    )
+    # load_provider diventa un involucro che fa vedere il caricamento in corso (un play lo aspetta invece di farne un
+    # altro); il codice di Music Assistant resta in _xonos_load_provider.
+    _replace(
+        mass,
+        "    async def load_provider(\n"
+        "        self,\n"
+        "        instance_id: str,\n"
+        "        allow_retry: bool = False,\n"
+        "        remove_if_unsupported: bool = False,\n"
+        "    ) -> None:\n"
+        '        """Try to load a provider and catch errors."""\n',
+        PROVIDER_RETRY_WRAPPER,
+    )
+    _replace(
+        mass,
+        "        if not prov_conf.enabled:\n            # Was disabled before we could run\n            return\n",
+        "        if not prov_conf.enabled:\n            # Was disabled before we could run\n            return\n"
+        "        self._xonos_domains[instance_id] = prov_conf.domain  # Xonos: per il registro e per chi suona\n",
+    )
+    _replace(
+        mass,
+        "            will_retry = (\n"
+        "                allow_retry\n"
+        "                and isinstance(exc, MusicAssistantError)\n",
+        "            # Xonos: un errore di rete passa da solo: si riprova anche se non è un errore di Music Assistant (anche\n"
+        "            # quelli di accesso, se dentro c'è la rete), e prima di 120 s (_xonos_retry_in)\n"
+        "            offline = _xonos_network_error(exc) if allow_retry else None\n"
+        "            self._xonos_offline.discard(instance_id)  # di nuovo dentro se si riprova per la rete\n"
+        "            will_retry = offline is not None or (\n"
+        "                allow_retry\n"
+        "                and isinstance(exc, MusicAssistantError)\n",
+    )
+    _replace(
+        mass,
+        "            if will_retry:\n                self.call_later(\n                    120,\n",
+        "            if will_retry:\n                self.call_later(\n"
+        "                    self._xonos_retry_in(instance_id, exc, offline),  # Xonos: invece di 120\n",
+    )
+    # La traccia dell'errore solo al primo tentativo fallito per la rete: è sempre la stessa (70 righe di aiohttp), e
+    # con un tentativo ogni 10-120 s riempirebbe in un quarto d'ora le ultime 96 KB del registro che la persona condivide.
+    _replace(
+        mass,
+        '                " (will be retried later)" if will_retry else "",\n'
+        "                exc_info=_provider_error_traceback(exc),\n",
+        '                " (will be retried later)" if will_retry else "",\n'
+        "                exc_info=None  # Xonos: la traccia solo la prima volta che manca la rete\n"
+        "                if offline is not None and self._xonos_tries.get(instance_id, 0) > 1\n"
+        "                else _provider_error_traceback(exc),\n",
+    )
+    # Il limite di Music Assistant a un passo del caricamento (300 s per l'avvio del servizio) non è la rete: un servizio
+    # fermo per minuti si riprova dopo 120 s come prima, e non si dice "non è riuscito a collegarsi".
+    _replace(
+        mass,
+        '            msg = f"Provider {domain} did not {action} within {timeout} seconds"\n',
+        '            msg = f"Provider {domain} did not {action} within {timeout} seconds"\n'
+        "            err.xonos_step_limit = True  # Xonos: per _xonos_network_error\n",
+    )
+    _replace(
+        mass,
+        "        # (re)load any dependents if needed\n        for dep_prov in self.providers:\n",
+        "        self._xonos_loaded(instance_id)  # Xonos: i tentativi ripartono da zero\n"
+        "        # (re)load any dependents if needed\n        for dep_prov in self.providers:\n",
+    )
+    # Ricaricato da fuori (le impostazioni, il flusso che riconfigura, config/providers/reload che Xonos usa per Soloist
+    # occupato, il cambio di rete dei flussi) e fallito per la rete: anche lì si riprova da solo.
+    _replace(
+        mass,
+        "                prov_conf.instance_id, _provider_error_from_exc(exc)\n"
+        "            )\n"
+        "            raise\n",
+        "                prov_conf.instance_id, _provider_error_from_exc(exc)\n"
+        "            )\n"
+        "            self._xonos_retry_outside(prov_conf.instance_id, exc)  # Xonos: senza rete si riprova da solo\n"
+        "            raise\n",
+    )
+    _replace(
+        mass,
+        "        # (re)load any dependents. The provider itself is loaded at this point",
+        "        self._xonos_loaded(prov_conf.instance_id)  # Xonos: anche quando lo carica chi cambia le impostazioni\n"
+        "        # (re)load any dependents. The provider itself is loaded at this point",
+    )
+    _replace(
+        mass,
+        "    async def unload_provider(self, instance_id: str, is_removed: bool = False) -> None:\n",
+        PROVIDER_RETRY_METHODS + "    async def unload_provider(self, instance_id: str, is_removed: bool = False) -> None:\n",
+    )
+
+    loader = root / "controllers" / "player_queues" / "queue_loader.py"
+    _replace(loader, "\nimport random\n", "\nimport asyncio\nimport random\n")
+    _replace(loader, "from contextlib import suppress\n", "from contextlib import suppress\nfrom contextvars import ContextVar\n")
+    _replace(
+        loader,
+        "if TYPE_CHECKING:\n    from music_assistant_models.media_items.metadata import MediaItemImage\n",
+        "if TYPE_CHECKING:\n    from music_assistant_models.media_items.metadata import MediaItemImage\n"
+        "    from music_assistant.mass import MusicAssistant\n",
+    )
+    _replace(
+        loader,
+        "\n\nclass QueueLoaderMixin(_PlayerQueuesBase):\n",
+        "\n" + PROVIDER_RETRY_LOADER + "\n\nclass QueueLoaderMixin(_PlayerQueuesBase):\n",
+    )
+    _replace(
+        loader,
+        "    async def _load_item(\n        self,\n        queue_item: QueueItem,\n",
+        PROVIDER_RETRY_LOADER_METHODS + "    async def _load_item(\n        self,\n        queue_item: QueueItem,\n",
+    )
+    # play_media, prima di tutto: le fonti e gli elementi chiesti come erano prima di questo play, per rifarlo quando un
+    # servizio torna (con ADD e NEXT entrerebbero due volte), e più sotto gli elementi trovati (album, playlist, artisti).
+    _replace(
+        loader,
+        "        media_items: list[MediaItemType] = []\n"
+        "        # the subset of media_items the user explicitly picked to play next\n",
+        "        # Xonos: le fonti e gli elementi chiesti di prima, per rifare il play se un servizio torna (_provider_retry)\n"
+        "        xonos_before = (\n"
+        "            list(queue_data.source_items),\n"
+        "            list(queue_data.enqueued_media_items),\n"
+        "            set(queue_data.credited_albums),\n"
+        "        )\n"
+        "        media_items: list[MediaItemType] = []\n"
+        "        # the subset of media_items the user explicitly picked to play next\n",
+    )
+    _replace(
+        loader,
+        "        # captured before the reassignment below replaces the local with the stored list\n"
+        "        new_sources = bool(source_items)\n",
+        "        # captured before the reassignment below replaces the local with the stored list\n"
+        "        new_sources = bool(source_items)\n"
+        "        xonos_parents = list(source_items)  # Xonos: gli elementi trovati in questo play (_provider_retry)\n",
+    )
+    # play_media: qualche brano non disponibile perché il suo servizio non c'è (x.available guarda i servizi caricati) e
+    # gli altri sì: il servizio si ricarica e lo si aspetta poco (3 s), poi gli altri suonano comunque. Solo se qualche
+    # brano manca. Se non c'è niente da suonare ci pensa il blocco qui sotto, con l'attesa intera.
+    _replace(
+        loader,
+        "            for x in media_items\n"
+        "            if x and x.available\n"
+        "        ]\n",
+        "            for x in media_items\n"
+        "            if x and x.available\n"
+        "        ]\n"
+        "        # Xonos: brani non disponibili perché il loro servizio non si è caricato (la rete mancava) e riprova da solo,\n"
+        "        # con altri da suonare: il servizio si ricarica subito, si aspetta poco e si guarda di nuovo (vedi\n"
+        "        # _provider_retry in prepare.py)\n"
+        "        if queue_items and len(queue_items) < len(media_items) and not _XONOS_AGAIN.get():\n"
+        "            missing = [x for x in media_items if x and not x.available]\n"
+        "            waiting = await self._xonos_waiting_service([], missing)\n"
+        "            if waiting is not None and await self.mass.xonos_revive(waiting, _XONOS_REVIVE_SOON_S):\n"
+        "                queue_items = [\n"
+        '                    build_queue_item(queue_id, cast("PlayableMediaItemType", x))\n'
+        "                    for x in media_items\n"
+        "                    if x and x.available\n"
+        "                ]\n",
+    )
+    # Niente da suonare: un uri di Spotify col servizio non caricato (non si trova), un album, una playlist o un artista
+    # i cui brani il resolver ha tolto perché non disponibili, o una playlist di Music Assistant e un genere (che non
+    # dicono da quali servizi vengono i brani). Il servizio si ricarica e il play si rifà, una volta, prima di _reasons
+    # (che dice il perché degli altri casi).
+    _replace(
+        loader,
+        "        if not queue_items:\n"
+        '            # Xonos: anche perché, invece del solo "There is nothing to play here."\n',
+        "        if not queue_items:\n"
+        "            # Xonos: un servizio che non si è caricato (la rete mancava) e riprova da solo si ricarica subito e il\n"
+        "            # play si rifà, una volta; se non torna, l'errore dice quale servizio e perché. Il servizio si cerca fra gli\n"
+        "            # elementi chiesti, quelli trovati e i brani; se non c'è nessun brano, anche fra quelli che aspettano la rete\n"
+        "            waiting = await self._xonos_waiting_service([*media_list, *xonos_parents], media_items)\n"
+        "            services = [waiting] if waiting is not None else []\n"
+        "            if not services and not media_items and not _XONOS_AGAIN.get():\n"
+        "                services = self.mass.xonos_offline_waiting()\n"
+        "            if services:\n"
+        "                if not _XONOS_AGAIN.get() and any(\n"
+        "                    await asyncio.gather(*(self.mass.xonos_revive(service) for service in services))\n"
+        "                ):\n"
+        '                    self.logger.info("Xonos: tornato un servizio fra %s, rifaccio il play", ", ".join(services))\n'
+        "                    # come prima di questo play: con ADD e NEXT fonti ed elementi chiesti entrerebbero due volte\n"
+        "                    self.store_sources(queue, xonos_before[0])\n"
+        "                    queue.is_dynamic = has_dynamic_source(xonos_before[0])\n"
+        "                    queue_data.enqueued_media_items[:] = xonos_before[1]\n"
+        "                    queue_data.credited_albums.clear()\n"
+        "                    queue_data.credited_albums.update(xonos_before[2])\n"
+        "                    again = _XONOS_AGAIN.set(True)\n"
+        "                    try:\n"
+        "                        return await self._handle_play_media(\n"
+        "                            queue_id,\n"
+        "                            media_list,\n"
+        "                            option=option,\n"
+        "                            radio_mode=False,\n"
+        "                            start_item=start_item,\n"
+        "                            sort_by=sort_by,\n"
+        "                            start_from_beginning=start_from_beginning,\n"
+        "                            shuffle=shuffle,\n"
+        "                        )\n"
+        "                    finally:\n"
+        "                        _XONOS_AGAIN.reset(again)\n"
+        "                raise _xonos_service_error(self.mass, services[0])\n"
+        '            # Xonos: anche perché, invece del solo "There is nothing to play here."\n',
+    )
+
+    controller = root / "controllers" / "player_queues" / "controller.py"
+    # play_index (anche player_queues/play e la ripresa passano di qui)
+    _replace(
+        controller,
+        "            # try to load the item, retry with next item if it fails\n            for attempt in range(5):\n",
+        "            # Xonos: per _xonos_load_item, se il brano scelto è già passato, se in questo play si è già provato a\n"
+        "            # ricaricare un servizio che non c'era, e l'errore che dice quale servizio e perché\n"
+        "            xonos_down: dict[str, object] = {}\n"
+        "            # try to load the item, retry with next item if it fails\n            for attempt in range(5):\n",
+    )
+    _replace(
+        controller,
+        "                    await self._load_item(\n"
+        "                        queue_item,\n"
+        "                        is_start=True,\n",
+        "                    await self._xonos_load_item(  # Xonos: ricarica il servizio che non c'era\n"
+        "                        queue_item,\n"
+        "                        xonos_down,\n"
+        "                        is_start=True,\n",
+    )
+    _replace(
+        controller,
+        "                    if queue_item and isinstance(err, MediaNotFoundError):\n"
+        "                        queue_item.available = False\n",
+        "                    # Xonos: non se è il suo servizio che non c'è: tornato quello, il brano si suona\n"
+        "                    if queue_item and isinstance(err, MediaNotFoundError) and err is not xonos_down.get(\"error\"):\n"
+        "                        queue_item.available = False\n",
+    )
+    _replace(
+        controller,
+        "                        await self.stop(queue_id)\n"
+        "                        raise MediaNotFoundError(msg) from err\n",
+        "                        await self.stop(queue_id)\n"
+        "                        if err is xonos_down.get(\"error\"):  # Xonos: quale servizio non c'è e perché\n"
+        "                            raise err\n"
+        "                        raise MediaNotFoundError(msg) from err\n",
+    )
+    _replace(
+        controller,
+        "                await self.stop(queue_id)\n"
+        '                raise MediaNotFoundError("No playable item found to start playback")\n',
+        "                await self.stop(queue_id)\n"
+        "                # Xonos: se un servizio non c'era, quale e perché\n"
+        '                if isinstance(down := xonos_down.get("error"), MediaNotFoundError):\n'
+        "                    raise down\n"
+        '                raise MediaNotFoundError("No playable item found to start playback")\n',
+    )
+    # La coda che torna dalla cache dopo un riavvio del server: "non disponibile" è un segno del momento (la rete mancava,
+    # un servizio non caricato, come nella 0.1.58) che Music Assistant salva con la coda e non toglie mai più.
+    _replace(
+        controller,
+        "                queue_data = PlayerQueueData.from_cache(prev_state, prev_items)\n",
+        "                queue_data = PlayerQueueData.from_cache(prev_state, prev_items)\n"
+        "                # Xonos: i brani segnati non disponibili si riprovano (Music Assistant li risegna se non vanno)\n"
+        "                if xonos_marked := [x for x in queue_data.items if not x.available]:\n"
+        "                    for xonos_item in xonos_marked:\n"
+        "                        xonos_item.available = True\n"
+        "                    self.logger.info(\n"
+        '                        "Xonos: %d brani della coda erano segnati non disponibili, si riprovano", len(xonos_marked)\n'
+        "                    )\n",
+    )
+    # Il brano dopo (precarico): non si segna come non disponibile se il suo servizio aspetta di riprovare.
+    _replace(
+        controller,
+        '                    "Skipping unplayable item %s (%s): %s", queue_item.name, queue_item.uri, err\n'
+        "                )\n"
+        "                queue_item.available = False\n",
+        '                    "Skipping unplayable item %s (%s): %s", queue_item.name, queue_item.uri, err\n'
+        "                )\n"
+        "                # Xonos: non se il suo servizio aspetta di riprovare (la rete mancava): tornato quello, si suona\n"
+        "                if self.mass.xonos_waiting(_xonos_instances(queue_item.media_item)) is None:\n"
+        "                    queue_item.available = False\n",
+    )
+    _replace(
+        controller,
+        "from music_assistant.controllers.player_queues.queue_loader import QueueLoaderMixin\n",
+        "from music_assistant.controllers.player_queues.queue_loader import QueueLoaderMixin, _xonos_instances\n",
+    )
+
+
+# Xonos: le funzioni di mass.py per i servizi che non si caricano senza rete (_provider_retry).
+PROVIDER_RETRY_HELPERS = '''
+# Xonos: le righe per il logcat sui servizi che non si caricano (solo il dominio, mai il nome dato dalla persona)
+_XONOS_LOG = logging.getLogger("xonos.servizi")
+# Xonos: dopo il 1°, 2°, 3°, 4° tentativo fallito per la rete si riprova fra tanti secondi, poi ogni 120 s come Music
+# Assistant. Sul telefono la rete manca quasi sempre per poco (un cambio di rete, la VPN che si ricollega, Xonos in
+# secondo piano): il primo tentativo presto la ritrova, il raddoppio non insiste quando manca davvero, e un tentativo
+# senza rete costa poco (la ricerca DNS fallisce subito).
+_XONOS_RETRY_S = (10, 20, 40, 60, 120)
+# Xonos: un play fa riprovare subito un servizio che aspetta, al massimo una volta ogni tanti secondi, e lo aspetta al
+# massimo tanti secondi (Music Assistant dà 15 s al buffer, l'app aspetta il play più a lungo)
+_XONOS_REVIVE_EVERY_S = 10.0
+_XONOS_REVIVE_WAIT_S = 15.0
+# Xonos: finché un servizio aspetta la rete, ogni tanti secondi si guarda il file del DNS che Xonos riscrive quando la
+# rete cambia (XONOS_DNS_FILE); a un cambio si riprova fra _XONOS_NET_SETTLE_S (più cambi di fila: un tentativo solo)
+_XONOS_NET_CHECK_S = 5.0
+_XONOS_NET_SETTLE_S = 2.0
+# Xonos: gli errori di sistema che vogliono dire "rete" (gli altri OSError, come un file che manca, no)
+_XONOS_NET_ERRNOS = frozenset(
+    {
+        errno.ENETUNREACH,
+        errno.ENETDOWN,
+        errno.EHOSTUNREACH,
+        errno.EHOSTDOWN,
+        errno.ECONNREFUSED,
+        errno.ECONNRESET,
+        errno.ECONNABORTED,
+        errno.ETIMEDOUT,
+        errno.EADDRNOTAVAIL,
+    }
+)
+
+
+def _xonos_network_error(exc: BaseException | None) -> BaseException | None:
+    """
+    Xonos: l'errore di rete dentro un errore di caricamento, anche come __cause__ di un altro (fino a 8 livelli), o None.
+
+    Di rete: quelli di aiohttp (non le risposte del server, tranne 5xx e 408, né un indirizzo scritto male), i timeout
+    (non il limite di Music Assistant a tutto un passo del caricamento: un servizio fermo per minuti), gli errori del DNS
+    (socket.gaierror, come "No address associated with hostname") e di connessione, e gli OSError coi numeri della rete.
+    """
+    for _ in range(8):
+        if exc is None:
+            return None
+        if isinstance(exc, BaseExceptionGroup):
+            found = [_xonos_network_error(inner) for inner in exc.exceptions]
+            return found[0] if found and all(x is not None for x in found) else None
+        if isinstance(exc, aiohttp.ClientResponseError):
+            return exc if exc.status >= 500 or exc.status == 408 else None
+        # un indirizzo scritto male nelle impostazioni (come "192.168.1.10:8096" senza http://) non passa da solo
+        if isinstance(exc, (aiohttp.InvalidURL, aiohttp.NonHttpUrlClientError)):
+            return None
+        # il limite di Music Assistant a un passo del caricamento (_provider_load_step, segnato da _provider_retry)
+        if isinstance(exc, TimeoutError) and getattr(exc, "xonos_step_limit", False):
+            return None
+        if isinstance(exc, (aiohttp.ClientError, TimeoutError, socket.gaierror, socket.herror, ConnectionError)):
+            return exc
+        if isinstance(exc, OSError) and exc.errno in _XONOS_NET_ERRNOS:
+            return exc
+        exc = exc.__cause__
+    return None
+
+
+def _xonos_detached(target: Callable[..., _R], *args: Any, **kwargs: Any) -> _R:
+    """
+    Xonos: target(*args, **kwargs) in un contesto vuoto, per i caricamenti e i timer che Xonos fa partire. Un task e un
+    timer prendono una copia del contesto di chi li crea: da un play avrebbero BYPASS_THROTTLER acceso (la sincronizzazione
+    di Spotify passerebbe davanti ai limiti come la riproduzione) e da una richiesta dell'API il suo utente.
+    """
+    return contextvars.Context().run(target, *args, **kwargs)
+
+
+def _xonos_stamp(path: str) -> tuple[int, int, int] | None:
+    """Xonos: come riconoscere che Xonos ha riscritto il file del DNS (lo sostituisce con un altro), o None."""
+    try:
+        info = os.stat(path)
+    except OSError:
+        return None
+    return info.st_ino, info.st_mtime_ns, info.st_size
+'''
+
+PROVIDER_RETRY_STATE = """        # Xonos: i servizi che non si caricano per un errore che passa da solo (vedi _provider_retry in prepare.py): i
+        # tentativi falliti di fila, il dominio, i caricamenti in corso, quando un play può farne ripartire uno, chi
+        # aspetta la rete, il controllo dei cambi di rete e il file del DNS che Xonos riscrive
+        self._xonos_tries: dict[str, int] = {}
+        self._xonos_domains: dict[str, str] = {}
+        self._xonos_loads: dict[str, asyncio.Future[None]] = {}
+        self._xonos_revive_at: dict[str, float] = {}
+        self._xonos_offline: set[str] = set()
+        self._xonos_watch: asyncio.Task[None] | None = None
+        self._xonos_dns_file = os.environ.get("XONOS_DNS_FILE")
+"""
+
+PROVIDER_RETRY_WRAPPER = '''    async def load_provider(
+        self,
+        instance_id: str,
+        allow_retry: bool = False,
+        remove_if_unsupported: bool = False,
+    ) -> None:
+        """Try to load a provider and catch errors."""
+        # Xonos: il caricamento in corso si vede, così un play lo aspetta invece di farne un altro (xonos_revive)
+        done: asyncio.Future[None] = self.loop.create_future()
+        self._xonos_loads[instance_id] = done
+        try:
+            await self._xonos_load_provider(instance_id, allow_retry, remove_if_unsupported)
+        finally:
+            if not done.done():
+                done.set_result(None)
+            if self._xonos_loads.get(instance_id) is done:
+                del self._xonos_loads[instance_id]
+
+    async def _xonos_load_provider(
+        self,
+        instance_id: str,
+        allow_retry: bool = False,
+        remove_if_unsupported: bool = False,
+    ) -> None:
+        """Xonos: il codice di Music Assistant che carica un servizio e ne prende gli errori (vedi load_provider)."""
+'''
+
+PROVIDER_RETRY_METHODS = '''    def xonos_waiting(self, instances: list[str]) -> str | None:
+        """
+        Xonos: il primo di questi servizi (istanze o domini) che non è caricato ma si sta caricando o aspetta di riprovare,
+        o None. Solo dizionari in memoria: si chiede quando un brano non si è potuto suonare.
+
+        :param instances: Le istanze o i domini da cui vengono i brani.
+        """
+        for wanted in instances:
+            if not wanted or wanted == "library" or self.get_provider(wanted) is not None:
+                continue
+            for instance_id, domain in list(self._xonos_domains.items()):
+                if wanted not in (instance_id, domain) or self.get_provider(instance_id) is not None:
+                    continue
+                if instance_id in self._xonos_loads or f"load_provider_{instance_id}" in self._tracked_timers:
+                    return instance_id
+        return None
+
+    def xonos_offline(self, instance_id: str) -> bool:
+        """Xonos: se il servizio aspetta di riprovare per un errore di rete."""
+        return instance_id in self._xonos_offline
+
+    def xonos_offline_waiting(self) -> list[str]:
+        """
+        Xonos: i servizi che aspettano di riprovare per un errore di rete. Per un play che non ha trovato niente senza
+        sapere da quali servizi venivano i brani (una playlist di Music Assistant, un genere: i brani non disponibili il
+        resolver li toglie prima).
+        """
+        return sorted(
+            instance_id
+            for instance_id in self._xonos_offline
+            if self.get_provider(instance_id) is None
+            and (instance_id in self._xonos_loads or f"load_provider_{instance_id}" in self._tracked_timers)
+        )
+
+    async def xonos_revive(self, instance_id: str, wait_s: float | None = None) -> bool:
+        """
+        Xonos: al play, un servizio che non si è caricato e aspetta di riprovare si ricarica subito, o si aspetta il
+        caricamento già in corso: uno solo anche con più play insieme, e non più di uno ogni _XONOS_REVIVE_EVERY_S.
+        Si aspetta al massimo wait_s (il caricamento poi continua da solo). True se ora è caricato.
+
+        :param instance_id: L'istanza del servizio (da xonos_waiting).
+        :param wait_s: Quanto aspettare al massimo il caricamento (di base _XONOS_REVIVE_WAIT_S).
+        """
+        if self.get_provider(instance_id) is not None:
+            return True
+        domain = self._xonos_domain(instance_id)
+        load: asyncio.Future[None] | asyncio.Task[None] | None = self._xonos_loads.get(instance_id)
+        if load is None:
+            now = time.monotonic()
+            if now < self._xonos_revive_at.get(instance_id, 0.0):
+                return False
+            self._xonos_revive_at[instance_id] = now + _XONOS_REVIVE_EVERY_S
+            _XONOS_LOG.info("Servizio %s non caricato: un brano lo chiede, riprovo subito", domain)
+            # fuori dal contesto del play: niente BYPASS_THROTTLER per il caricamento e i timer che crea
+            load = _xonos_detached(
+                self.create_task, self.load_provider, instance_id, True, task_id=f"xonos_revive_{instance_id}"
+            )
+        start = time.monotonic()
+        await asyncio.wait({load}, timeout=_XONOS_REVIVE_WAIT_S if wait_s is None else wait_s)
+        loaded = self.get_provider(instance_id) is not None
+        _XONOS_LOG.info(
+            "Servizio %s %s dopo %.1f s di attesa per un brano",
+            domain,
+            "caricato" if loaded else "ancora non caricato",
+            time.monotonic() - start,
+        )
+        return loaded
+
+    def _xonos_domain(self, instance_id: str) -> str:
+        """Xonos: il dominio di un servizio (spotify, filesystem_local...), per il registro di Xonos."""
+        return self._xonos_domains.get(instance_id) or instance_id.split("--")[0]
+
+    def _xonos_retry_in(self, instance_id: str, exc: BaseException, offline: BaseException | None) -> int:
+        """
+        Xonos: fra quanti secondi si riprova un servizio che non si è caricato. Per la rete prima (_XONOS_RETRY_S, coi
+        tentativi contati), per il resto ogni 120 s come Music Assistant.
+
+        :param instance_id: L'istanza del servizio.
+        :param exc: L'errore del caricamento.
+        :param offline: L'errore di rete dentro exc (da _xonos_network_error), o None.
+        """
+        tries = self._xonos_tries[instance_id] = self._xonos_tries.get(instance_id, 0) + 1
+        if offline is None:
+            self._xonos_offline.discard(instance_id)
+            delay = 120
+        else:
+            self._xonos_offline.add(instance_id)
+            delay = _XONOS_RETRY_S[min(tries, len(_XONOS_RETRY_S)) - 1]
+            self._xonos_watch_network()
+        _XONOS_LOG.info(
+            "Servizio %s non caricato (%s%s), tentativo %d: riprovo fra %d s",
+            self._xonos_domain(instance_id),
+            "errore di rete " if offline is not None else "",
+            type(offline if offline is not None else exc).__name__,
+            tries,
+            delay,
+        )
+        return delay
+
+    def _xonos_retry_outside(self, instance_id: str, exc: BaseException) -> None:
+        """
+        Xonos: un servizio già caricato una volta, ricaricato da fuori (load_provider_config: le impostazioni,
+        config/providers/reload) e fallito per la rete, si riprova da solo come da load_provider. Non un servizio nuovo
+        (se non si carica, Music Assistant ne toglie le impostazioni), né dentro load_provider, che pensa da sé ai suoi.
+
+        :param instance_id: L'istanza del servizio.
+        :param exc: L'errore del caricamento.
+        """
+        if instance_id in self._xonos_loads or instance_id not in self._xonos_domains:
+            return
+        if (offline := _xonos_network_error(exc)) is None:
+            return
+        # fuori dal contesto di chi ha chiesto (l'utente dell'API)
+        _xonos_detached(
+            self.call_later,
+            self._xonos_retry_in(instance_id, exc, offline),
+            self.load_provider,
+            instance_id,
+            True,
+            task_id=f"load_provider_{instance_id}",
+        )
+
+    def _xonos_loaded(self, instance_id: str) -> None:
+        """Xonos: un servizio caricato riparte da zero coi tentativi (e se ne aveva falliti, lo dice)."""
+        if (provider := self._providers.get(instance_id)) is None:
+            return
+        self._xonos_domains[instance_id] = provider.domain
+        self._xonos_offline.discard(instance_id)
+        if tries := self._xonos_tries.pop(instance_id, 0):
+            _XONOS_LOG.info(
+                "Servizio %s caricato dopo %d tentativi falliti", self._xonos_domain(instance_id), tries
+            )
+
+    def _xonos_watch_network(self) -> None:
+        """Xonos: accende il controllo dei cambi di rete, se c'è il file del DNS e non è già acceso."""
+        if not self._xonos_dns_file or (self._xonos_watch is not None and not self._xonos_watch.done()):
+            return
+        self._xonos_watch = _xonos_detached(
+            self.create_task, self._xonos_network_changes, task_id="xonos_network_changes"
+        )
+
+    async def _xonos_network_changes(self) -> None:
+        """
+        Xonos: finché un servizio aspetta la rete, un cambio di rete lo fa riprovare subito. Xonos riscrive il file del
+        DNS (XONOS_DNS_FILE, PhoneServer.writeDns) solo quando la rete cambia o Android la toglie e la ridà a Xonos (in
+        secondo piano, sulla stessa rete): basta guardarne la data ogni _XONOS_NET_CHECK_S, e solo finché qualcuno aspetta.
+        """
+        path = self._xonos_dns_file
+        if not path:
+            return
+        seen = _xonos_stamp(path)
+        while self._xonos_offline:
+            await asyncio.sleep(_XONOS_NET_CHECK_S)
+            # chi non aspetta più (caricato, tolto, spento, o fallito per altro) esce dall'elenco
+            for instance_id in list(self._xonos_offline):
+                if f"load_provider_{instance_id}" not in self._tracked_timers and instance_id not in self._xonos_loads:
+                    self._xonos_offline.discard(instance_id)
+            stamp = _xonos_stamp(path)
+            if stamp == seen:
+                continue
+            seen = stamp
+            for instance_id in list(self._xonos_offline):
+                task_id = f"load_provider_{instance_id}"
+                if task_id not in self._tracked_timers:
+                    continue
+                _XONOS_LOG.info("La rete è cambiata: riprovo subito il servizio %s", self._xonos_domain(instance_id))
+                _xonos_detached(
+                    self.call_later, _XONOS_NET_SETTLE_S, self.load_provider, instance_id, True, task_id=task_id
+                )
+
+'''
+
+# Xonos: le funzioni di queue_loader.py per i servizi che non si caricano senza rete (_provider_retry).
+PROVIDER_RETRY_LOADER = '''
+# Xonos: il play rifatto una volta dopo che un servizio è tornato (vedi _provider_retry in prepare.py)
+_XONOS_AGAIN: ContextVar[bool] = ContextVar("xonos_again", default=False)
+# Xonos: quanto aspetta un play che ha altri brani da suonare il servizio che si ricarica (gli altri brani intanto
+# aspettano: con la rete il servizio torna in un attimo, senza si suona quello che c'è)
+_XONOS_REVIVE_SOON_S = 3.0
+
+
+def _xonos_instances(item: object) -> list[str]:
+    """Xonos: i servizi (istanze o domini) da cui viene un elemento: il suo e quelli delle sue mappature."""
+    if item is None:
+        return []
+    found = [getattr(item, "provider", None)]
+    found += [mapping.provider_instance for mapping in getattr(item, "provider_mappings", None) or ()]
+    return [x for x in found if isinstance(x, str) and x and x != "library"]
+
+
+def _xonos_service_error(mass: MusicAssistant, instance_id: str) -> MediaNotFoundError:
+    """Xonos: l'errore per chi suona quando il servizio di un brano non è caricato: quale, e se è per la rete."""
+    domain = mass._xonos_domain(instance_id)
+    try:
+        service = mass.get_provider_manifest(domain).name
+    except KeyError:
+        service = domain
+    if mass.xonos_offline(instance_id):
+        return MediaNotFoundError(
+            f"No playable items found: {service} could not connect (no network?), it is retried automatically",
+            translation_key="xonos_service_offline",
+            translation_args=[service],
+        )
+    return MediaNotFoundError(
+        f"No playable items found: {service} is not loaded",
+        translation_key="xonos_service_down",
+        translation_args=[service],
+    )
+'''
+
+PROVIDER_RETRY_LOADER_METHODS = '''    async def _xonos_load_item(
+        self,
+        queue_item: QueueItem,
+        xonos_down: dict[str, object],
+        is_start: bool = False,
+        seek_position: int = 0,
+        fade_in: bool = False,
+    ) -> None:
+        """
+        Xonos: _load_item per play_index. Un brano che non si suona perché il suo servizio non si è caricato (la rete
+        mancava) e aspetta di riprovare fa ricaricare subito il servizio (una volta per play), poi si riprova. Se non torna,
+        l'errore dice quale servizio e perché (lo tiene anche xonos_down["error"]).
+
+        :param queue_item: The queue item to load.
+        :param xonos_down: Lo stato di questo play: se il brano scelto è già passato, se si è già provato a ricaricare un
+            servizio, e l'errore.
+        :param is_start: Whether this item starts playback, rather than following another item.
+        :param seek_position: Position (in seconds) to start playback from.
+        :param fade_in: Whether to fade in the audio.
+        """
+        # il brano scelto (il primo di questo play) si prova davvero anche se è segnato non disponibile, quando uno dei
+        # suoi servizi è caricato: il segno può venire da un errore di prima che non c'è più (la rete mancava, un flusso
+        # senza audio) e non scade. Se non va, play_index lo segna di nuovo e passa al brano dopo, come prima.
+        if not xonos_down.get("chosen"):
+            xonos_down["chosen"] = True
+            if not queue_item.available and any(
+                self.mass.get_provider(x) is not None for x in _xonos_instances(queue_item.media_item)
+            ):
+                self.logger.info("Xonos: %s era segnato non disponibile, lo riprovo", queue_item.uri)
+                queue_item.available = True
+        try:
+            await self._load_item(queue_item, is_start=is_start, seek_position=seek_position, fade_in=fade_in)
+            return
+        except MediaNotFoundError as err:
+            waiting = self.mass.xonos_waiting(_xonos_instances(queue_item.media_item))
+            if waiting is None:
+                raise
+            failed = err
+        if not xonos_down.get("tried"):
+            xonos_down["tried"] = True
+            if await self.mass.xonos_revive(waiting):
+                self.logger.info("Xonos: il servizio %s è tornato, riprovo %s", waiting, queue_item.uri)
+                queue_item.available = True
+                await self._load_item(queue_item, is_start=is_start, seek_position=seek_position, fade_in=fade_in)
+                return
+        error = xonos_down["error"] = _xonos_service_error(self.mass, waiting)
+        raise error from failed
+
+    async def _xonos_waiting_service(self, media_list: list[object], media_items: list[object]) -> str | None:
+        """
+        Xonos: il servizio da cui vengono gli elementi chiesti (uri o elementi) o trovati, se non è caricato e aspetta di
+        riprovare, o None. Solo quando qualcosa non si è potuto suonare.
+        """
+        from music_assistant.helpers.uri import parse_uri  # noqa: PLC0415
+
+        instances: list[str] = []
+        for item in media_list:
+            if isinstance(item, str):
+                with suppress(Exception):
+                    instances.append((await parse_uri(item))[1])
+            else:
+                instances += _xonos_instances(item)
+        for item in media_items:
+            instances += _xonos_instances(item)
+        return self.mass.xonos_waiting(list(dict.fromkeys(instances)))
+
+'''
 
 
 def _flows(root: Path) -> None:

@@ -299,7 +299,8 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
 
     /**
      * Il file del DNS per i programmi Linux dentro proot (il loro /etc/resolv.conf): i server DNS della rete in uso,
-     * più due pubblici di riserva, riscritto quando la rete cambia finché il server gira.
+     * più due pubblici di riserva, riscritto quando la rete cambia (o Android la toglie e la ridà a Xonos) finché il
+     * server gira. Music Assistant ne guarda la data per riprovare i servizi che non si sono caricati senza rete.
      */
     private fun watchDns() {
         val connectivity = app.getSystemService(ConnectivityManager::class.java) ?: return
@@ -311,16 +312,25 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
         val callback = object : ConnectivityManager.NetworkCallback() {
             private var properties: LinkProperties? = null
             private var capabilities: NetworkCapabilities? = null
+            private var blocked = false
 
             override fun onLinkPropertiesChanged(network: Network, properties: LinkProperties) {
                 this.properties = properties
-                writeDns(properties, capabilities)
+                writeDns(properties, capabilities, blocked)
             }
 
             // Arriva spesso (in rete mobile a ogni cambio di segnale): il file si riscrive solo se cambia.
             override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
                 this.capabilities = capabilities
-                properties?.let { writeDns(it, capabilities) }
+                properties?.let { writeDns(it, capabilities, blocked) }
+            }
+
+            // Da Android 10: la rete c'è ma Android la toglie a Xonos (in secondo piano senza servizio in primo piano), o
+            // gliela ridà, sulla stessa rete. Il file cambia anche qui: Music Assistant lo guarda e riprova subito i
+            // servizi che non si erano caricati senza rete (_provider_retry in server/ma/prepare.py).
+            override fun onBlockedStatusChanged(network: Network, blocked: Boolean) {
+                this.blocked = blocked
+                properties?.let { writeDns(it, capabilities, blocked) }
             }
         }
         runCatching { connectivity.registerDefaultNetworkCallback(callback) }
@@ -334,14 +344,14 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
         runCatching { app.getSystemService(ConnectivityManager::class.java)?.unregisterNetworkCallback(callback) }
     }
 
-    private fun writeDns(properties: LinkProperties?, capabilities: NetworkCapabilities?) {
+    private fun writeDns(properties: LinkProperties?, capabilities: NetworkCapabilities?, blocked: Boolean = false) {
         val own = properties?.dnsServers.orEmpty()
         val servers = own.mapNotNull { it.hostAddress } + FALLBACK_DNS
         // glibc ne legge al massimo tre. Le opzioni (provate con glibc 2.39 e un DNS finto): se il server perde una delle
         // due domande che glibc manda insieme (A e AAAA) la risposta arriva in 0,1 s invece che dopo 5 s
         // (single-request-reopen), e un server che non risponde costa 2 s invece di 5 (timeout:2). Con un server che
         // risponde non cambia niente. La prima riga dice la rete a Music Assistant, per il registro (glibc la salta).
-        val text = "# xonos: ${describeNetwork(properties, capabilities, own)}\n" +
+        val text = "# xonos: ${describeNetwork(properties, capabilities, own, blocked)}\n" +
             servers.distinct().take(3).joinToString("") { "nameserver $it\n" } +
             "options timeout:2 attempts:2 single-request-reopen\n"
         if (text == lastDns) return
@@ -359,6 +369,7 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
         properties: LinkProperties?,
         capabilities: NetworkCapabilities?,
         dns: List<java.net.InetAddress>,
+        blocked: Boolean,
     ): String {
         val kinds = listOf(
             NetworkCapabilities.TRANSPORT_WIFI to "Wi-Fi",
@@ -367,7 +378,8 @@ class PhoneServer private constructor(context: Context, private val pkg: ServerP
             NetworkCapabilities.TRANSPORT_VPN to "VPN",
         ).filter { capabilities?.hasTransport(it.first) == true }.joinToString("+") { it.second }.ifEmpty { "?" }
         val ipv6 = properties?.routes.orEmpty().any { it.isDefaultRoute && it.destination.address is Inet6Address }
-        return "rete $kinds, via IPv6 predefinita ${if (ipv6) "sì" else "no"}, DNS della rete " +
+        return "rete $kinds${if (blocked) " (tolta a Xonos da Android)" else ""}, " +
+            "via IPv6 predefinita ${if (ipv6) "sì" else "no"}, DNS della rete " +
             "${dns.count { it is Inet4Address }} IPv4 e ${dns.count { it is Inet6Address }} IPv6"
     }
 

@@ -8,8 +8,9 @@ si può: Music Assistant scarica Soloist (col consenso) e lo prova, avvia PulseA
 Poi lo ferma come lo ferma Music Assistant (AsyncProcess.close), guarda quanto processore usano proot e PulseAudio
 con dieci secondi di audio a tempo reale, con e senza la memoria condivisa di PulseAudio (memfd e srbchannel), e che
 PulseAudio si fermi quando non serve più. Prima di tutto, senza Spotify, il blocco di Spotify nel throttler di Music
-Assistant (spotify-blocco). Poi il brano dopo che va nella coda di Soloist (soloist-brano-dopo, coi calcoli veri di Music
-Assistant) e quanto audio tiene PulseAudio per chi suona (pulse-livello, per la riga "dentro il salto").
+Assistant (spotify-blocco), e un servizio che non si carica per la rete: riprova presto, il play che lo ricarica, il
+cambio di rete (servizio-senza-rete). Poi il brano dopo che va nella coda di Soloist (soloist-brano-dopo, coi calcoli veri
+di Music Assistant) e quanto audio tiene PulseAudio per chi suona (pulse-livello, per la riga "dentro il salto").
 Nel registro di Music Assistant: righe "XONOS_SELFTEST <prova> ok|fail <dettagli>" e alla fine
 "XONOS_SELFTEST fine <riuscite>/<prove>".
 """
@@ -66,6 +67,14 @@ async def run(mass: Any) -> None:
         say("spotify-blocco", block_ok, detail)
     except Exception as err:  # noqa: BLE001
         say("spotify-blocco", False, repr(err))
+
+    # Un servizio che non si carica per un errore di rete (pacchetto 2.10.8-13): si riprova presto, un play lo fa ricaricare
+    # subito, un cambio di rete pure. Con un servizio finto sul codice vero di Music Assistant: una ventina di secondi.
+    try:
+        retry_ok, detail = await _provider_retry()
+        say("servizio-senza-rete", retry_ok, detail)
+    except Exception as err:  # noqa: BLE001
+        say("servizio-senza-rete", False, repr(err))
 
     # Il profilo di Python che xonos_server scrive quando Python lavora tanto: thread, lavori di Music Assistant e
     # dove sta il ciclo. Qui con un ciclo occupato a scrivere JSON e thread che nascono e finiscono: tre secondi.
@@ -260,6 +269,625 @@ async def _spotify_block() -> tuple[bool, str]:
         f" chiamate al servizio {blocked.calls}; fuori dal blocco: blocco breve aspettato {short:.2f} s,"
         f" 6 chiamate col limite di 3 al secondo in {burst:.2f} s"
     )
+    return not problems, f"{'; '.join(problems)} | {detail}" if problems else detail
+
+
+async def _provider_retry() -> tuple[bool, str]:  # noqa: PLR0915
+    """
+    I servizi che non si caricano per un errore di rete (_provider_retry in prepare.py), col codice vero di Music
+    Assistant: MusicAssistant.load_provider (con la riprova), xonos_revive, il controllo dei cambi di rete e
+    QueueLoaderMixin._xonos_load_item, il pezzo di play_index che carica un brano. Su un Music Assistant di prova (creato
+    e non avviato: niente database, niente servizi veri) con un servizio finto: il suo caricamento (load_provider_config)
+    alza gli errori che si vogliono, come ClientConnectorDNSError di Spotify senza rete. Senza rete vera e senza Spotify.
+
+    - un errore di rete si riprova dopo 10 s, con "(will be retried later)" nel registro di Music Assistant e la riga di
+      Xonos (col dominio, mai il nome dato dalla persona né l'istanza); al tentativo dopo (il timer vero) il servizio si
+      carica e i tentativi si azzerano;
+    - tre errori di rete di fila: 10, 20, 40 s, e la traccia dell'errore nel registro solo la prima volta; un LoginFailed
+      con dentro un errore di rete come la rete; un SetupFailedError senza rete dopo 120 s come Music Assistant, anche
+      col limite di Music Assistant a un passo del caricamento, ma con il timeout di una chiamata come la rete; un
+      ValueError, un file che manca e un indirizzo senza http:// non si riprovano;
+    - un brano col servizio che aspetta di riprovare: il play lo fa caricare subito (prima del timer), il brano si
+      riprova e si carica; due play insieme fanno un caricamento solo;
+    - il servizio che resta senza rete: l'errore xonos_service_offline col nome del servizio, e un altro play subito dopo
+      non fa un altro caricamento (al massimo uno ogni 10 s); un brano segnato non disponibile col servizio caricato si
+      prova davvero se è quello scelto, e resta un errore di Music Assistant se il play è già passato oltre;
+    - un cambio di rete (Xonos riscrive il file del DNS) fa riprovare subito un servizio che aspetta;
+    - un servizio ricaricato da fuori (load_provider_config, come config/providers/reload) senza rete si riprova anche lui;
+    - play_media vero su una coda finta (_play_media_cases);
+    - il caricamento chiesto da un play parte senza il suo contesto (BYPASS_THROTTLER spento).
+    """
+    import shutil  # noqa: PLC0415
+    import socket  # noqa: PLC0415
+    import tempfile  # noqa: PLC0415
+    from functools import partial  # noqa: PLC0415
+    from types import SimpleNamespace  # noqa: PLC0415
+
+    import aiohttp  # noqa: PLC0415
+    from music_assistant_models.errors import (  # noqa: PLC0415
+        LoginFailed,
+        MediaNotFoundError,
+        SetupFailedError,
+    )
+    from music_assistant_models.enums import QueueOption  # noqa: PLC0415
+    from music_assistant_models.helpers import get_global_cache_value  # noqa: PLC0415
+    from music_assistant_models.media_items import Album, Playlist, ProviderMapping, Track  # noqa: PLC0415
+    from music_assistant_models.queue_item import QueueItem  # noqa: PLC0415
+
+    from music_assistant import mass as mass_module  # noqa: PLC0415
+    from music_assistant.controllers.player_queues.queue_loader import QueueLoaderMixin  # noqa: PLC0415
+    from music_assistant.helpers.throttle_retry import BYPASS_THROTTLER  # noqa: PLC0415
+
+    instance = "xonos_prova--rete"
+    domain = "xonos_prova"
+    other = "xonos_altro--sempre"  # un servizio sempre caricato, per le liste con un brano che si suona subito
+    folder = Path(tempfile.mkdtemp(prefix="xonos-servizio-"))
+    dns_file = folder / "resolv.conf"
+    dns_file.write_text("# xonos: rete prova\nnameserver 1.1.1.1\n")
+    test = mass_module.MusicAssistant(str(folder), str(folder))
+    test.loop = asyncio.get_running_loop()
+    test.loop_thread_id = threading.get_ident()
+    test._xonos_dns_file = str(dns_file)
+    # cosa alzano i prossimi caricamenti (None: riesce), quanto durano, quando sono partiti
+    errors: list[BaseException | None] = []
+    load_s = [0.0]
+    calls: list[float] = []
+    bypass: list[bool] = []  # se il caricamento è partito con BYPASS_THROTTLER acceso (il contesto di un play)
+
+    def mark(name: str, loaded: bool) -> None:
+        # come _update_available_providers_cache di Music Assistant: MediaItem.available guarda questo insieme, che nel
+        # server vero c'è (un nome finto in più non tocca i suoi brani)
+        providers = get_global_cache_value("available_providers")
+        if isinstance(providers, set):
+            if loaded:
+                providers.add(name)
+            else:
+                providers.discard(name)
+
+    class Config:
+        """Le impostazioni del servizio finto."""
+
+        async def get_provider_config(self, instance_id: str) -> Any:
+            if instance_id != instance:
+                raise KeyError(instance_id)
+            return SimpleNamespace(
+                instance_id=instance, domain=domain, name="Il mio servizio", enabled=True, last_error=None
+            )
+
+        def update_provider_last_error(self, instance_id: str, error: Any) -> None:
+            pass
+
+    async def load_provider_config(prov_conf: Any) -> None:
+        calls.append(time.monotonic())
+        bypass.append(BYPASS_THROTTLER.get())
+        if load_s[0]:
+            await asyncio.sleep(load_s[0])
+        error = errors.pop(0) if errors else None
+        if error is not None:
+            raise error
+        test._providers[instance] = SimpleNamespace(
+            instance_id=instance,
+            domain=domain,
+            name="Il mio servizio",
+            available=True,
+            manifest=SimpleNamespace(depends_on=None),
+        )
+        mark(instance, True)
+
+    test.config = Config()
+    test.load_provider_config = load_provider_config
+
+    class Catch(logging.Handler):
+        """Le righe del registro di Music Assistant e di Xonos durante la prova."""
+
+        def __init__(self) -> None:
+            super().__init__()
+            self.lines: list[tuple[str, str]] = []
+            self.traced: list[bool] = []  # per ogni "Error loading provider": se c'è la traccia dell'errore
+
+        def emit(self, record: logging.LogRecord) -> None:
+            with suppress(Exception):
+                self.lines.append((record.name, record.getMessage()))
+                if record.name == "music_assistant" and record.getMessage().startswith("Error loading provider"):
+                    self.traced.append(record.exc_info is not None)
+
+    catch = Catch()
+    watched = [logging.getLogger("music_assistant"), logging.getLogger("xonos.servizi")]
+    for logger in watched:
+        logger.addHandler(catch)
+
+    def dns_error() -> BaseException:
+        return aiohttp.ClientConnectorDNSError(
+            SimpleNamespace(host="accounts.spotify.com", port=443, ssl=True),
+            socket.gaierror(7, "No address associated with hostname"),
+        )
+
+    def timer() -> float | None:
+        handle = test._tracked_timers.get(f"load_provider_{instance}")
+        return None if handle is None else round(handle.when() - test.loop.time(), 1)
+
+    def unload() -> None:
+        test._providers.pop(instance, None)
+        mark(instance, False)
+
+    def reset() -> None:
+        unload()
+        test.cancel_timer(f"load_provider_{instance}")
+        test._xonos_tries.pop(instance, None)
+        test._xonos_offline.discard(instance)
+        test._xonos_revive_at.clear()
+        errors.clear()
+        load_s[0] = 0.0
+
+    def near(value: float | None, wanted: float) -> bool:
+        return value is not None and wanted - 1.5 <= value <= wanted + 0.5
+
+    def entry(number: int) -> QueueItem:
+        track = Track(
+            item_id=str(number),
+            provider="library",
+            name=f"brano {number}",
+            provider_mappings={ProviderMapping(item_id=f"b{number}", provider_domain=domain, provider_instance=instance)},
+        )
+        return QueueItem(
+            queue_id="coda",
+            queue_item_id=f"voce{number}",
+            name=f"brano {number}",
+            duration=200,
+            media_item=track,
+            available=False,
+        )
+
+    item_loads: list[str] = []
+
+    async def load_item(queue_item: QueueItem, is_start: bool = False, seek_position: int = 0, fade_in: bool = False) -> None:
+        item_loads.append(queue_item.queue_item_id)
+        if not queue_item.available or test.get_provider(instance) is None:
+            raise MediaNotFoundError(f"Item {queue_item.uri} is not available")
+
+    loader = SimpleNamespace(mass=test, _load_item=load_item, logger=logging.getLogger("music_assistant.xonos_prova"))
+    play = partial(QueueLoaderMixin._xonos_load_item, loader)
+
+    async def play_error(item: QueueItem, down: dict[str, object]) -> BaseException | None:
+        try:
+            await play(item, down, is_start=True)
+        except Exception as err:  # noqa: BLE001 - è quello che si guarda
+            return err
+        return None
+
+    problems: list[str] = []
+    seen: list[str] = []
+    saved = (mass_module._XONOS_NET_CHECK_S, mass_module._XONOS_NET_SETTLE_S)
+    try:
+        # 1. un errore di rete: riprova dopo 10 s, poi il timer vero lo carica
+        errors[:] = [dns_error()]
+        failed_at = time.monotonic()
+        await test.load_provider(instance, allow_retry=True)
+        first = timer()
+        retried = any("(will be retried later)" in text for name, text in catch.lines if name == "music_assistant")
+        ours = [text for name, text in catch.lines if name == "xonos.servizi"]
+        if not near(first, 10) or not retried:
+            problems.append(f"primo errore di rete: riprova fra {first} s, 'will be retried later' {retried}")
+        if not ours or "tentativo 1" not in ours[0] or "10 s" not in ours[0]:
+            problems.append(f"riga di Xonos: {ours[:1]}")
+        while test.get_provider(instance) is None and time.monotonic() - failed_at < 14:
+            await asyncio.sleep(0.2)
+        later = time.monotonic() - failed_at
+        if test.get_provider(instance) is None or not 9 <= later <= 12 or instance in test._xonos_tries or timer():
+            problems.append(f"tentativo dopo: caricato {test.get_provider(instance) is not None} dopo {later:.1f} s")
+        seen.append(f"errore di rete: riprova fra {first} s, caricato al tentativo dopo ({later:.1f} s)")
+
+        # 2. tre errori di rete di fila: 10, 20, 40 s, e la traccia dell'errore nel registro solo la prima volta
+        reset()
+        delays = []
+        traced_from = len(catch.traced)
+        for _ in range(3):
+            errors[:] = [dns_error()]
+            await test.load_provider(instance, allow_retry=True)
+            delays.append(timer())
+        traced = catch.traced[traced_from:]
+        if not all(near(got, wanted) for got, wanted in zip(delays, (10, 20, 40), strict=True)):
+            problems.append(f"tre errori di rete: {delays}")
+        if traced != [True, False, False]:
+            problems.append(f"traccia dell'errore nei tre tentativi: {traced}")
+        seen.append(f"tre di fila {delays}, traccia {traced}")
+
+        # 3. gli altri errori
+        kinds = []
+        step_limit = TimeoutError()
+        step_limit.xonos_step_limit = True  # come lo segna _provider_load_step quando scade il suo limite
+        for what, error, cause, wanted in (
+            ("LoginFailed con la rete dentro", LoginFailed("accesso"), dns_error(), 10),
+            ("SetupFailedError", SetupFailedError("finto"), None, 120),
+            ("ValueError", ValueError("finto"), None, None),
+            ("file che manca", FileNotFoundError(2, "No such file or directory"), None, None),
+            ("indirizzo senza http://", LoginFailed("accesso"), aiohttp.NonHttpUrlClientError("192.168.1.10:8096"), None),
+            ("limite di un passo del caricamento", SetupFailedError("finto"), step_limit, 120),
+            ("timeout di una chiamata", SetupFailedError("finto"), TimeoutError(), 10),
+        ):
+            reset()
+            error.__cause__ = cause
+            errors[:] = [error]
+            await test.load_provider(instance, allow_retry=True)
+            got = timer()
+            if (got is None) != (wanted is None) or (wanted is not None and not near(got, wanted)):
+                problems.append(f"{what}: riprova fra {got} s invece di {wanted}")
+            kinds.append(f"{what} {got}")
+        seen.append(", ".join(kinds))
+
+        # 4. un brano col servizio che aspetta di riprovare: il play lo carica subito
+        reset()
+        errors[:] = [dns_error()]
+        await test.load_provider(instance, allow_retry=True)
+        load_s[0] = 0.3
+        before = len(calls)
+        start = time.monotonic()
+        first_item = entry(1)
+        error = await play_error(first_item, {})
+        took = time.monotonic() - start
+        if error is not None or len(calls) != before + 1 or not first_item.available or took > 2 or timer():
+            problems.append(f"play che ricarica: {error!r}, caricamenti {len(calls) - before}, {took:.2f} s")
+        seen.append(f"play che ricarica: {took:.2f} s, caricamenti {len(calls) - before}")
+
+        # due play insieme: un caricamento solo
+        reset()
+        errors[:] = [dns_error()]
+        await test.load_provider(instance, allow_retry=True)
+        load_s[0] = 0.5
+        before = len(calls)
+        both = await asyncio.gather(play_error(entry(2), {}), play_error(entry(3), {}))
+        if any(x is not None for x in both) or len(calls) != before + 1:
+            problems.append(f"due play insieme: {both}, caricamenti {len(calls) - before}")
+        seen.append(f"due play insieme: caricamenti {len(calls) - before}")
+
+        # 5. il servizio resta senza rete
+        reset()
+        errors[:] = [dns_error(), dns_error()]
+        await test.load_provider(instance, allow_retry=True)
+        before = len(calls)
+        down: dict[str, object] = {}
+        error = await play_error(entry(4), down)
+        key = getattr(error, "translation_key", None)
+        args = getattr(error, "translation_args", None)
+        if key != "xonos_service_offline" or args != [domain] or down.get("error") is not error or len(calls) != before + 1:
+            problems.append(f"senza rete: {error!r} {key} {args}, caricamenti {len(calls) - before}")
+        start = time.monotonic()
+        again = await play_error(entry(5), {})
+        took = time.monotonic() - start
+        if getattr(again, "translation_key", None) != "xonos_service_offline" or len(calls) != before + 1 or took > 0.5:
+            problems.append(f"subito dopo: {again!r}, caricamenti {len(calls) - before}, {took:.2f} s")
+        seen.append(f"senza rete: {key}, subito dopo nessun caricamento in più ({took:.2f} s)")
+        # un brano segnato non disponibile col servizio caricato: quello scelto (il primo del play) si prova davvero, il
+        # segno può venire da un errore che non c'è più; uno dopo (il play è già passato oltre) dà l'errore di Music
+        # Assistant come prima; nessun caricamento
+        reset()
+        await test.load_provider(instance, allow_retry=True)
+        before = len(calls)
+        chosen = entry(6)
+        chosen_error = await play_error(chosen, {})
+        plain = await play_error(entry(7), {"chosen": True})
+        if chosen_error is not None or not chosen.available:
+            problems.append(f"brano scelto segnato non disponibile: {chosen_error!r}, disponibile {chosen.available}")
+        if not isinstance(plain, MediaNotFoundError) or str(plain.translation_key).startswith("xonos_") or len(calls) != before:
+            problems.append(f"servizio caricato: {plain!r}, caricamenti {len(calls) - before}")
+        seen.append("brano scelto segnato non disponibile: riprovato; il brano dopo: errore di Music Assistant")
+
+        # 6. un cambio di rete fa riprovare subito
+        reset()
+        if test._xonos_watch is not None:
+            test._xonos_watch.cancel()
+            with suppress(BaseException):
+                await test._xonos_watch
+        mass_module._XONOS_NET_CHECK_S = 0.3
+        mass_module._XONOS_NET_SETTLE_S = 0.2
+        errors[:] = [dns_error()]
+        await test.load_provider(instance, allow_retry=True)
+        before = len(calls)
+        await asyncio.sleep(0.5)
+        fresh = folder / "resolv.conf.new"
+        fresh.write_text("# xonos: rete nuova\nnameserver 9.9.9.9\n")
+        os.replace(fresh, dns_file)
+        changed_at = time.monotonic()
+        while test.get_provider(instance) is None and time.monotonic() - changed_at < 5:
+            await asyncio.sleep(0.1)
+        took = time.monotonic() - changed_at
+        if test.get_provider(instance) is None or len(calls) != before + 1 or took > 3:
+            problems.append(f"cambio di rete: caricato {test.get_provider(instance) is not None} in {took:.1f} s")
+        seen.append(f"cambio di rete: caricato in {took:.1f} s")
+
+        # 7. ricaricato da fuori (config/providers/reload, che Xonos usa quando Soloist è occupato) senza rete: si
+        # riprova anche lì, e l'errore arriva comunque a chi ha chiesto
+        reset()
+
+        async def broken_load(prov_conf: Any) -> None:
+            raise dns_error()
+
+        test._load_provider = broken_load
+        outside: BaseException | None = None
+        try:
+            await mass_module.MusicAssistant.load_provider_config(test, await test.config.get_provider_config(instance))
+        except Exception as err:  # noqa: BLE001 - è quello che si guarda
+            outside = err
+        finally:
+            del test._load_provider
+        got = timer()
+        if not isinstance(outside, aiohttp.ClientConnectorDNSError) or not near(got, 10):
+            problems.append(f"ricaricato da fuori: {outside!r}, riprova fra {got} s")
+        seen.append(f"ricaricato da fuori senza rete: riprova fra {got} s")
+
+        # 8. play_media col codice vero (QueueLoaderMixin._handle_play_media) su una coda finta
+        pm_ok, pm_detail = await _play_media_cases(
+            SimpleNamespace(
+                test=test,
+                instance=instance,
+                other=other,
+                domain=domain,
+                errors=errors,
+                load_s=load_s,
+                calls=calls,
+                bypass=bypass,
+                reset=reset,
+                dns_error=dns_error,
+                mark=mark,
+                loader=QueueLoaderMixin,
+                models=SimpleNamespace(Album=Album, Playlist=Playlist, ProviderMapping=ProviderMapping, Track=Track),
+                option=QueueOption,
+            )
+        )
+        if not pm_ok:
+            problems.append(pm_detail)
+        seen.append(pm_detail if pm_ok else "play_media: vedi sopra")
+
+        # 9. il caricamento chiesto da un play non prende il suo contesto (BYPASS_THROTTLER acceso): la sincronizzazione
+        # e i timer che crea passerebbero davanti ai limiti di Spotify come la riproduzione
+        reset()
+        errors[:] = [dns_error()]
+        await test.load_provider(instance, allow_retry=True)
+        bypass.clear()
+
+        async def from_play() -> bool:
+            BYPASS_THROTTLER.set(True)  # come _load_item e _handle_play_media
+            return await test.xonos_revive(instance)
+
+        revived = await asyncio.ensure_future(from_play())
+        if not revived or bypass != [False]:
+            problems.append(f"contesto del caricamento da un play: caricato {revived}, BYPASS_THROTTLER {bypass}")
+        seen.append(f"caricamento da un play senza BYPASS_THROTTLER ({bypass})")
+
+        # nelle righe di Xonos (il logcat) solo il dominio
+        ours = [text for name, text in catch.lines if name == "xonos.servizi"]
+        leaked = [text for text in ours if "Il mio servizio" in text or instance in text]
+        if leaked:
+            problems.append(f"nel logcat il nome o l'istanza: {leaked[:2]}")
+        seen.append(f"{len(ours)} righe di Xonos")
+    finally:
+        mass_module._XONOS_NET_CHECK_S, mass_module._XONOS_NET_SETTLE_S = saved
+        mark(instance, False)
+        mark(other, False)
+        for logger in watched:
+            logger.removeHandler(catch)
+        for handle in list(test._tracked_timers.values()):
+            handle.cancel()
+        test._tracked_timers.clear()
+        for task in list(test._tracked_tasks.values()):
+            task.cancel()
+        shutil.rmtree(folder, ignore_errors=True)
+    detail = "; ".join(seen)
+    return not problems, f"{'; '.join(problems)} | {detail}" if problems else detail
+
+
+async def _play_media_cases(kit: Any) -> tuple[bool, str]:  # noqa: PLR0915
+    """
+    play_media (QueueLoaderMixin._handle_play_media, il codice vero di Music Assistant con le modifiche di Xonos) con
+    il servizio finto di _provider_retry che aspetta di riprovare, su una coda finta: get_item_by_uri e il resolver finti
+    danno brani disponibili solo se il servizio è caricato, e il resolver toglie quelli non disponibili come quello vero.
+
+    - un album della libreria (i brani li ha già tolti il resolver: il servizio si trova nelle mappature dell'album),
+      aggiunto in coda (ADD) a una coda con una fonte: il servizio si ricarica, il play si rifà, e fonti ed elementi
+      chiesti ci sono una volta sola;
+    - una playlist di Music Assistant (mappatura builtin: non dice da quali servizi vengono i brani): si ricarica il
+      servizio che aspetta la rete;
+    - il servizio che resta senza rete: xonos_service_offline, un caricamento solo, e un play subito dopo non ne fa un
+      altro;
+    - una lista con un brano che si suona subito e uno del servizio che si ricarica: con la rete il servizio torna e ci
+      sono tutti e due, con un caricamento lento si aspettano al massimo 3 s e si suona quello che c'è.
+
+    Un brano è disponibile come in Music Assistant: se il suo servizio è nell'insieme available_providers della cache
+    globale (MediaItem.available), che il server vero ha sempre; il servizio finto ci entra quando si carica.
+    """
+    from types import SimpleNamespace  # noqa: PLC0415
+
+    from music_assistant_models.helpers import get_global_cache_value  # noqa: PLC0415
+
+    test = kit.test
+    models = kit.models
+    queue_option = kit.option
+
+    def song(number: int, service: str | None = None) -> Any:
+        service = service or kit.instance
+        kit.mark(service, test.get_provider(service) is not None)
+        return models.Track(
+            item_id=str(number),
+            provider="library",
+            name=f"brano {number}",
+            provider_mappings={
+                models.ProviderMapping(
+                    item_id=f"b{number}", provider_domain=service.split("--")[0], provider_instance=service
+                )
+            },
+        )
+
+    album = models.Album(
+        item_id="1",
+        provider="library",
+        name="album",
+        provider_mappings={
+            models.ProviderMapping(item_id="a1", provider_domain=kit.domain, provider_instance=kit.instance)
+        },
+    )
+    playlist = models.Playlist(
+        item_id="2",
+        provider="library",
+        name="playlist",
+        provider_mappings={models.ProviderMapping(item_id="p2", provider_domain="builtin", provider_instance="builtin")},
+    )
+
+    async def by_uri(uri: str) -> Any:
+        kind, _, number = uri.removeprefix("library://").partition("/")
+        if kind == "album":
+            return album
+        if kind == "playlist":
+            return playlist
+        return song(99, kit.other) if number == "altro" else song(int(number))
+
+    async def resolve(item: Any, start_item: Any, **kwargs: Any) -> list[Any]:
+        if isinstance(item, models.Track):
+            return [item]
+        # come il resolver di Music Assistant: i brani non disponibili restano fuori
+        return [track for track in (song(11), song(12), song(13)) if track.available]
+
+    class Queues:
+        """Una coda finta attorno a _handle_play_media vero."""
+
+        _handle_play_media = kit.loader._handle_play_media
+        _xonos_waiting_service = kit.loader._xonos_waiting_service
+        _reset_enqueued_media_items = kit.loader._reset_enqueued_media_items
+
+        def __init__(self, sources: list[Any] | None = None) -> None:
+            self.mass = test
+            self.logger = logging.getLogger("music_assistant.xonos_prova")
+            self.queue = SimpleNamespace(
+                queue_id="coda", is_dynamic=False, shuffle_enabled=False, smart_shuffle_active=False
+            )
+            self.data = SimpleNamespace(
+                queue=self.queue,
+                source_items=list(sources or []),
+                enqueued_media_items=[],
+                credited_albums=set(),
+                userid=None,
+            )
+            self._queue_data = {"coda": self.data}
+            self._media_resolver = SimpleNamespace(_resolve_media_items=resolve)
+            self.enqueued: list[list[str]] = []
+
+        def get(self, queue_id: str) -> Any:
+            return self.queue
+
+        def _set_transitioning(self, queue_id: str, value: bool) -> None:
+            pass
+
+        async def _apply_shuffle(self, queue_id: str, option: Any, shuffle: Any) -> None:
+            pass
+
+        def store_sources(self, queue: Any, items: list[Any]) -> None:
+            self.data.source_items = items
+
+        def is_smart_shuffle_active(self, queue: Any) -> bool:
+            return False
+
+        async def _enqueue_with_option(self, queue_id: str, queue_items: list[Any], option: Any, pin_first: bool = False) -> None:
+            self.enqueued.append([x.media_item.item_id for x in queue_items])
+
+    async def play(queues: Queues, media: Any, option: Any) -> BaseException | None:
+        async def go() -> BaseException | None:
+            try:
+                await queues._handle_play_media("coda", media, option=option)
+            except Exception as err:  # noqa: BLE001 - è quello che si guarda
+                return err
+            return None
+
+        # in un task suo: _handle_play_media accende BYPASS_THROTTLER nel suo contesto, che resta lì
+        return await asyncio.ensure_future(go())
+
+    async def waiting_again(slow: float = 0.0, fails: int = 1) -> None:
+        kit.reset()
+        kit.errors[:] = [kit.dns_error() for _ in range(fails)]
+        await test.load_provider(kit.instance, allow_retry=True)
+        kit.load_s[0] = slow
+
+    def key(err: BaseException | None) -> str:
+        return "nessun errore" if err is None else f"{type(err).__name__} {getattr(err, 'translation_key', None)}"
+
+    if not isinstance(get_global_cache_value("available_providers"), set):
+        return False, "play_media: available_providers non c'è nella cache globale (il server non ha servizi caricati?)"
+    problems: list[str] = []
+    seen: list[str] = []
+    saved = (getattr(test, "players", None), getattr(test, "music", None))
+    test.players = SimpleNamespace(get_player=lambda queue_id, raise_unavailable=False: SimpleNamespace(extra_data={}))
+    test.music = SimpleNamespace(get_item_by_uri=by_uri)
+    test._providers[kit.other] = SimpleNamespace(
+        instance_id=kit.other, domain="xonos_altro", name="altro", available=True, manifest=SimpleNamespace(depends_on=None)
+    )
+    kit.mark(kit.other, True)
+    try:
+        # un album della libreria aggiunto in coda: il servizio si ricarica e il play si rifà, fonti una volta sola
+        await waiting_again()
+        queues = Queues([song(98, kit.other)])
+        before = len(kit.calls)
+        error = await play(queues, "library://album/1", queue_option.ADD)
+        sources = [x.item_id for x in queues.data.source_items]
+        asked = [x.item_id for x in queues.data.enqueued_media_items]
+        loads = len(kit.calls) - before
+        if error is not None or queues.enqueued != [["11", "12", "13"]] or loads != 1:
+            problems.append(f"album: {key(error)}, in coda {queues.enqueued}, caricamenti {loads}")
+        if sources != ["98", "1"] or asked != ["1"]:
+            problems.append(f"album rifatto: fonti {sources}, elementi chiesti {asked} (attesi 98, 1 e 1)")
+        seen.append(f"album: in coda {queues.enqueued}, fonti {sources}, caricamenti {loads}")
+
+        # una playlist di Music Assistant: si ricarica il servizio che aspetta la rete
+        await waiting_again()
+        queues = Queues()
+        before = len(kit.calls)
+        error = await play(queues, "library://playlist/2", queue_option.PLAY)
+        loads = len(kit.calls) - before
+        if error is not None or queues.enqueued != [["11", "12", "13"]] or loads != 1:
+            problems.append(f"playlist di Music Assistant: {key(error)}, in coda {queues.enqueued}, caricamenti {loads}")
+        seen.append(f"playlist di Music Assistant: in coda {queues.enqueued}")
+
+        # il servizio resta senza rete: l'errore dice quale e perché; un play subito dopo non fa un altro caricamento
+        await waiting_again(fails=2)
+        queues = Queues()
+        before = len(kit.calls)
+        error = await play(queues, "library://album/1", queue_option.PLAY)
+        start = time.monotonic()
+        again = await play(queues, "library://album/1", queue_option.PLAY)
+        took = time.monotonic() - start
+        loads = len(kit.calls) - before
+        wanted = "xonos_service_offline"
+        if getattr(error, "translation_key", None) != wanted or getattr(again, "translation_key", None) != wanted:
+            problems.append(f"senza rete: {key(error)}, subito dopo {key(again)}")
+        if loads != 1 or took > 0.5 or queues.enqueued:
+            problems.append(f"senza rete: caricamenti {loads}, secondo play {took:.2f} s, in coda {queues.enqueued}")
+        seen.append(f"album senza rete: {wanted}, caricamenti {loads}, secondo play {took:.2f} s")
+
+        # una lista con un brano che si suona subito: con la rete il servizio torna e ci sono tutti e due
+        await waiting_again(slow=0.3)
+        queues = Queues()
+        start = time.monotonic()
+        error = await play(queues, ["library://track/altro", "library://track/21"], queue_option.PLAY)
+        took = time.monotonic() - start
+        if error is not None or queues.enqueued != [["99", "21"]] or took > 2:
+            problems.append(f"lista, servizio che torna: {key(error)}, in coda {queues.enqueued}, {took:.2f} s")
+        seen.append(f"lista col servizio che torna: in coda {queues.enqueued} in {took:.2f} s")
+
+        # con un caricamento lento si aspettano al massimo 3 s, poi si suona quello che c'è
+        await waiting_again(slow=5.0)
+        queues = Queues()
+        start = time.monotonic()
+        error = await play(queues, ["library://track/altro", "library://track/22"], queue_option.PLAY)
+        took = time.monotonic() - start
+        if error is not None or queues.enqueued != [["99"]] or not 2.5 <= took <= 4.5:
+            problems.append(f"lista, caricamento lento: {key(error)}, in coda {queues.enqueued}, {took:.2f} s")
+        seen.append(f"lista col caricamento lento: in coda {queues.enqueued} dopo {took:.2f} s")
+        # il caricamento continua da solo: finisce prima della prova dopo
+        if pending := list(test._xonos_loads.values()):
+            await asyncio.wait(pending, timeout=8)
+    finally:
+        kit.reset()
+        test._providers.pop(kit.other, None)
+        kit.mark(kit.other, False)
+        test.players, test.music = saved
+    detail = "play_media: " + "; ".join(seen)
     return not problems, f"{'; '.join(problems)} | {detail}" if problems else detail
 
 
